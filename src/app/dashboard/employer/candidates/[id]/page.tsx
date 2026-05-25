@@ -36,7 +36,7 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
 
   const { data: match } = await supabase
     .from('candidate_job_assignments')
-    .select('id, action')
+    .select('id, action, proposed_times')
     .in('job_id', jobIds)
     .eq('candidate_id', id)
     .maybeSingle()
@@ -110,6 +110,7 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
           candidateId={id}
           assignmentId={match.id}
           initialAction={(match.action ?? null) as 'request_meeting' | 'pass' | null}
+          initialProposedTimes={(match.proposed_times ?? []) as string[]}
           meeting={meeting}
         />
 

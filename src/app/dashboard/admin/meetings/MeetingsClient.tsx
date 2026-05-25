@@ -16,6 +16,7 @@ type PendingRequest = {
   employerName: string
   jobTitle: string
   requestedAt: string
+  proposedTimes: string[]
 }
 
 type ScheduledMeeting = {
@@ -47,7 +48,7 @@ export default function MeetingsClient() {
 
     const { data: assignments } = await supabase
       .from('candidate_job_assignments')
-      .select('id, candidate_id, job_id, action, created_at')
+      .select('id, candidate_id, job_id, action, created_at, proposed_times')
       .eq('action', 'request_meeting')
       .order('created_at', { ascending: false })
 
@@ -109,6 +110,7 @@ export default function MeetingsClient() {
       employerName: employerMap[jobMap[a.job_id]?.employerId ?? ''] ?? 'Unknown',
       jobTitle: jobMap[a.job_id]?.title ?? 'Unknown role',
       requestedAt: a.created_at,
+      proposedTimes: a.proposed_times ?? [],
     })))
 
     setScheduled((meetings ?? []).map((m: any) => ({
@@ -187,6 +189,33 @@ export default function MeetingsClient() {
                   {expandedId === req.assignmentId && (
                     <div className="border-t border-gray-100 pt-3 space-y-3">
                       {error && <p className="text-xs text-red-500">{error}</p>}
+
+                      {req.proposedTimes.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-medium text-gray-500">Employer&apos;s proposed times — click to use:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {req.proposedTimes.map((t, i) => {
+                              const localVal = new Date(t).toISOString().slice(0, 16)
+                              const isSelected = form.scheduled_at === localVal
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setForm(f => ({ ...f, scheduled_at: localVal }))}
+                                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                                    isSelected
+                                      ? 'bg-gray-900 text-white border-gray-900'
+                                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                                  }`}
+                                >
+                                  {new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
                         <Label htmlFor={`dt-${req.assignmentId}`}>Date &amp; Time <span className="text-destructive">*</span></Label>
                         <Input
