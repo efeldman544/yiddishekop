@@ -1,0 +1,294 @@
+'use client'
+
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+
+export type EmployerOption = {
+  id: string
+  company_name: string | null
+  full_name: string | null
+}
+
+export type Job = {
+  id: string
+  employer_id: string | null
+  company_name: string | null
+  job_title: string
+  status: string
+  employment_type: string | null
+  salary: string | null
+  hours: string | null
+  description: string | null
+  languages: string | null
+  notes: string | null
+  created_at: string
+}
+
+type FormState = {
+  employer_id: string; company_name: string; job_title: string; status: string
+  employment_type: string; salary: string; hours: string; description: string
+  languages: string; notes: string
+}
+
+const EMPTY_FORM: FormState = {
+  employer_id: '', company_name: '', job_title: '', status: 'Open',
+  employment_type: '', salary: '', hours: '', description: '', languages: '', notes: '',
+}
+
+const STATUS_OPTIONS = ['Open', 'Filled', 'On Hold', 'Closed']
+const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time', 'Contract']
+
+const STATUS_BADGE: Record<string, string> = {
+  'Open':    'bg-green-100 text-green-700 border-green-200',
+  'Filled':  'bg-blue-100 text-blue-700 border-blue-200',
+  'On Hold': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'Closed':  'bg-gray-100 text-gray-500 border-gray-200',
+}
+
+export function employerLabel(emp: EmployerOption) {
+  return emp.company_name || emp.full_name || emp.id
+}
+
+export default function JobsClient({
+  initialJobs,
+  initialEmployers,
+}: {
+  initialJobs: Job[]
+  initialEmployers: EmployerOption[]
+}) {
+  const [jobs, setJobs] = useState<Job[]>(initialJobs)
+  const [employers, setEmployers] = useState<EmployerOption[]>(initialEmployers)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function openNew() { setEditingId(null); setForm(EMPTY_FORM); setError(null); setPanelOpen(true) }
+
+  function openEdit(job: Job) {
+    setEditingId(job.id)
+    setForm({
+      employer_id: job.employer_id ?? '', company_name: job.company_name ?? '',
+      job_title: job.job_title, status: job.status, employment_type: job.employment_type ?? '',
+      salary: job.salary ?? '', hours: job.hours ?? '', description: job.description ?? '',
+      languages: job.languages ?? '', notes: job.notes ?? '',
+    })
+    setError(null); setPanelOpen(true)
+  }
+
+  function closePanel() { setPanelOpen(false); setEditingId(null); setError(null) }
+
+  function set<K extends keyof FormState>(key: K, value: string) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  function handleEmployerChange(employerId: string) {
+    const emp = employers.find(e => e.id === employerId)
+    setForm(prev => ({ ...prev, employer_id: employerId, company_name: emp?.company_name ?? '' }))
+  }
+
+  async function handleSave() {
+    if (!form.job_title.trim()) { setError('Job title is required.'); return }
+    if (!form.employer_id) { setError('Please select an employer.'); return }
+    setSaving(true); setError(null)
+    const supabase = createClient()
+    const payload = {
+      employer_id: form.employer_id, company_name: form.company_name.trim() || null,
+      job_title: form.job_title.trim(), status: form.status,
+      employment_type: form.employment_type || null, salary: form.salary || null,
+      hours: form.hours || null, description: form.description || null,
+      languages: form.languages || null, notes: form.notes || null,
+      updated_at: new Date().toISOString(),
+    }
+    if (editingId) {
+      const { data, error: err } = await supabase.from('job_requirements').update(payload).eq('id', editingId).select('*').single()
+      if (err) { setError(err.message); setSaving(false); return }
+      setJobs(prev => prev.map(j => j.id === editingId ? data as Job : j))
+    } else {
+      const { data, error: err } = await supabase.from('job_requirements').insert(payload).select('*').single()
+      if (err) { setError(err.message); setSaving(false); return }
+      setJobs(prev => [data as Job, ...prev])
+    }
+    setSaving(false); closePanel()
+  }
+
+  async function handleDelete() {
+    if (!editingId || !confirm('Delete this job?')) return
+    const supabase = createClient()
+    await supabase.from('job_requirements').delete().eq('id', editingId)
+    setJobs(prev => prev.filter(j => j.id !== editingId))
+    closePanel()
+  }
+
+  function getEmployerDisplay(job: Job) {
+    const emp = employers.find(e => e.id === job.employer_id)
+    const name = emp ? (emp.full_name || emp.id) : '—'
+    return { name, company: job.company_name ?? null }
+  }
+
+  return (
+    <>
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Job Board</h2>
+          <Button onClick={openNew}>+ New job</Button>
+        </div>
+
+        {jobs.length === 0 ? (
+          <div className="text-sm text-gray-400 py-12 text-center">No jobs yet. Add your first one.</div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Employer</th>
+                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Job Title</th>
+                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Status</th>
+                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Type</th>
+                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Created</th>
+                  <th className="px-5 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {jobs.map(job => (
+                  <tr key={job.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      {(() => { const { name, company } = getEmployerDisplay(job); return (
+                        <>
+                          <p className="font-semibold text-[13px] text-gray-950">{name}</p>
+                          {company && <p className="text-[12px] text-gray-400 mt-0.5">{company}</p>}
+                        </>
+                      )})()}
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.job_title}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.employment_type ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
+                      {new Date(job.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(job)}>Edit</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
+
+      {panelOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/30" onClick={closePanel} />
+          <div className="w-full max-w-lg bg-background shadow-2xl flex flex-col overflow-hidden border-l border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-[15px] font-semibold tracking-tight">{editingId ? 'Edit job' : 'New job'}</h3>
+              <Button variant="ghost" size="icon-sm" onClick={closePanel} className="text-muted-foreground">×</Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-1.5">
+                <Label>Employer <span className="text-destructive">*</span></Label>
+                <Select value={form.employer_id} onValueChange={handleEmployerChange}>
+                  <SelectTrigger><SelectValue placeholder="Select employer..." /></SelectTrigger>
+                  <SelectContent>
+                    {employers.map(emp => <SelectItem key={emp.id} value={emp.id}>{employerLabel(emp)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {employers.length === 0 && <p className="text-xs text-muted-foreground">No employer accounts found.</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="company_name">Company Name</Label>
+                <Input id="company_name" value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="e.g. Acme Corp" />
+                <p className="text-xs text-muted-foreground">Saved to the employer&apos;s profile and shown throughout the app.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="job_title">Job Title <span className="text-destructive">*</span></Label>
+                <Input id="job_title" value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder="e.g. Senior Accountant" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Status <span className="text-destructive">*</span></Label>
+                  <Select value={form.status} onValueChange={v => set('status', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Employment Type</Label>
+                  <Select value={form.employment_type || '_none'} onValueChange={v => set('employment_type', v === '_none' ? '' : v)}>
+                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">Select...</SelectItem>
+                      {EMPLOYMENT_OPTIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="salary">Salary</Label>
+                  <Input id="salary" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="e.g. $65,000/year" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="hours">Hours</Label>
+                  <Input id="hours" value={form.hours} onChange={e => set('hours', e.target.value)} placeholder="e.g. 40/week" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="languages">Languages Required</Label>
+                <Input id="languages" value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="e.g. English, Yiddish" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" value={form.description} onChange={e => set('description', e.target.value)} rows={4} placeholder="Role overview, responsibilities..." />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="notes">
+                  Internal Notes <span className="text-xs font-normal text-muted-foreground">— never shown to candidates or employers</span>
+                </Label>
+                <Textarea id="notes" value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Admin-only notes..." />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3">
+              {editingId ? (
+                <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                  Delete job
+                </Button>
+              ) : <div />}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={closePanel}>Cancel</Button>
+                <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save job'}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
