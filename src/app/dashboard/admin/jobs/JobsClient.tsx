@@ -69,6 +69,9 @@ export default function JobsClient({
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'jobs' | 'employers'>('jobs')
+  const [employerAccounts, setEmployerAccounts] = useState<{id: string; full_name: string | null; email: string | null; created_at: string}[] | null>(null)
+  const [loadingEmployers, setLoadingEmployers] = useState(false)
 
   function openNew() { setEditingId(null); setForm(EMPTY_FORM); setError(null); setPanelOpen(true) }
 
@@ -84,6 +87,19 @@ export default function JobsClient({
   }
 
   function closePanel() { setPanelOpen(false); setEditingId(null); setError(null) }
+
+  async function loadEmployerAccounts() {
+    if (employerAccounts !== null) return
+    setLoadingEmployers(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, created_at')
+      .eq('role', 'employer')
+      .order('full_name')
+    setEmployerAccounts(data ?? [])
+    setLoadingEmployers(false)
+  }
 
   function set<K extends keyof FormState>(key: K, value: string) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -135,56 +151,119 @@ export default function JobsClient({
 
   return (
     <>
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Job Board</h2>
-          <Button onClick={openNew}>+ New job</Button>
+      <main className="px-8 py-8 space-y-5 overflow-auto flex-1">
+        <div className="flex items-center gap-1 border-b border-gray-100 mb-6 -mx-8 px-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab('jobs')}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === 'jobs'
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
+            }`}
+          >
+            Jobs
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('employers'); loadEmployerAccounts() }}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === 'employers'
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
+            }`}
+          >
+            Employers
+          </button>
         </div>
 
-        {jobs.length === 0 ? (
-          <div className="text-sm text-gray-400 py-12 text-center">No jobs yet. Add your first one.</div>
+        {activeTab === 'jobs' ? (
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Job Board</h2>
+              <Button onClick={openNew}>+ New job</Button>
+            </div>
+
+            {jobs.length === 0 ? (
+              <div className="text-sm text-gray-400 py-12 text-center">No jobs yet. Add your first one.</div>
+            ) : (
+              <div className="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Employer</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Job Title</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Status</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Type</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Created</th>
+                      <th className="px-5 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {jobs.map(job => (
+                      <tr key={job.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-5 py-3.5">
+                          {(() => { const { name, company } = getEmployerDisplay(job); return (
+                            <>
+                              <p className="font-semibold text-[13px] text-gray-950">{name}</p>
+                              {company && <p className="text-[12px] text-gray-400 mt-0.5">{company}</p>}
+                            </>
+                          )})()}
+                        </td>
+                        <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.job_title}</td>
+                        <td className="px-5 py-3.5">
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                            {job.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.employment_type ?? '—'}</td>
+                        <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
+                          {new Date(job.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(job)}>Edit</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Employer</th>
-                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Job Title</th>
-                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Status</th>
-                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Type</th>
-                  <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3">Created</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {jobs.map(job => (
-                  <tr key={job.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-5 py-3.5">
-                      {(() => { const { name, company } = getEmployerDisplay(job); return (
-                        <>
-                          <p className="font-semibold text-[13px] text-gray-950">{name}</p>
-                          {company && <p className="text-[12px] text-gray-400 mt-0.5">{company}</p>}
-                        </>
-                      )})()}
-                    </td>
-                    <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.job_title}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {job.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-[13px] text-gray-500">{job.employment_type ?? '—'}</td>
-                    <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
-                      {new Date(job.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(job)}>Edit</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Employers</h2>
+            </div>
+            {loadingEmployers ? (
+              <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
+            ) : (employerAccounts ?? []).length === 0 ? (
+              <div className="text-sm text-gray-400 py-12 text-center">No employer accounts yet.</div>
+            ) : (
+              <div className="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Name</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Email</th>
+                      <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {(employerAccounts ?? []).map(emp => (
+                      <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-5 py-3.5 font-semibold text-gray-950 text-[13px]">{emp.full_name ?? '—'}</td>
+                        <td className="px-5 py-3.5 text-gray-500 text-[13px]">{emp.email ?? '—'}</td>
+                        <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
+                          {new Date(emp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </main>
 

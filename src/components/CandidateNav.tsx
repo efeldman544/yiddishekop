@@ -9,14 +9,17 @@ export default function CandidateNav() {
   const isRoot = pathname === '/dashboard/candidate'
 
   return (
-    <header className="app-nav">
-      <div className="flex items-center gap-4">
+    <header className="h-14 bg-white border-b border-gray-100 px-6 flex items-center justify-between shrink-0">
+      <div className="flex items-center gap-5">
+        <span className="font-bold text-[15px] tracking-tight text-gray-950">YiddisheKop</span>
         {!isRoot && (
-          <Link href="/dashboard/candidate" className="app-nav-link">
-            ← Back
+          <Link
+            href="/dashboard/candidate"
+            className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
+          >
+            ← Dashboard
           </Link>
         )}
-        <span className="app-nav-brand">YiddisheKop</span>
       </div>
       <SignOutButton />
     </header>

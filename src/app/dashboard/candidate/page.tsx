@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { CandidateProfile } from '@/types'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
   active:   { label: 'Active — open to opportunities',  variant: 'default' },
@@ -19,10 +19,10 @@ function StepItem({
 }) {
   return (
     <div className={`flex items-center gap-4 px-4 py-3.5 rounded-lg border transition-colors ${
-      done ? 'bg-emerald-50/60 border-emerald-200' : locked ? 'bg-muted/50 border-border opacity-50' : 'bg-card border-border'
+      done ? 'bg-emerald-50/60 border-emerald-200' : locked ? 'bg-muted/50 border-border opacity-50' : 'bg-white border-gray-200'
     }`}>
       <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-        done ? 'bg-emerald-500 text-white' : locked ? 'bg-muted text-muted-foreground' : 'bg-foreground text-background'
+        done ? 'bg-emerald-500 text-white' : locked ? 'bg-muted text-muted-foreground' : 'bg-indigo-600 text-white'
       }`}>
         {done ? '✓' : number}
       </div>
@@ -34,7 +34,7 @@ function StepItem({
       </div>
       {!locked && (
         <Link href={href} className={`shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
-          done ? 'text-emerald-700 hover:text-emerald-900' : 'bg-foreground text-background hover:opacity-80'
+          done ? 'text-emerald-700 hover:text-emerald-900' : 'bg-indigo-600 text-white hover:bg-indigo-700'
         }`}>
           {done ? 'Edit' : linkLabel}
         </Link>
@@ -60,19 +60,25 @@ export default async function CandidateDashboard() {
   const statusStyle = STATUS_LABELS[status] ?? STATUS_LABELS['active']
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-      <div className="max-w-3xl space-y-5">
-      <div className="bg-amber-50 border border-amber-100 rounded-xl px-6 py-5">
-        <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Your dashboard</p>
-        <h2 className="text-3xl font-bold tracking-tight text-amber-950">
-          {profile?.full_name ? `Welcome, ${profile.full_name}` : 'Your Dashboard'}
-        </h2>
-        <p className="text-sm text-amber-800/70 mt-1.5">Track your application and manage your profile.</p>
+    <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-950 tracking-tight">
+            {profile?.full_name ? `Welcome, ${profile.full_name}` : 'Dashboard'}
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">Track your application and manage your profile.</p>
+        </div>
+        {cp && (
+          <Link href="/dashboard/candidate/profile"
+            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+            Edit profile →
+          </Link>
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Getting started</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Getting started</p>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
           <StepItem number={1} title="Complete your profile"
@@ -85,12 +91,12 @@ export default async function CandidateDashboard() {
       </Card>
 
       {upcomingMeeting && (
-        <Card className="border-emerald-200 bg-emerald-50/60">
+        <Card className="border-indigo-100 bg-indigo-50/50">
           <CardHeader>
-            <CardTitle className="text-[11px] font-semibold text-emerald-700 uppercase tracking-widest">Upcoming meeting</CardTitle>
+            <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-widest">Upcoming meeting</p>
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
-            <p className="text-sm font-medium text-emerald-900">
+            <p className="text-sm font-medium text-gray-900">
               {new Date(upcomingMeeting.scheduled_at).toLocaleString('en-US', {
                 weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
@@ -101,13 +107,13 @@ export default async function CandidateDashboard() {
                 href={upcomingMeeting.meeting_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-emerald-700 underline underline-offset-4 font-medium"
+                className="inline-flex items-center gap-1.5 text-sm text-indigo-700 underline underline-offset-4 font-medium"
               >
                 Join meeting
               </a>
             )}
             {upcomingMeeting.notes && (
-              <p className="text-xs text-emerald-700">{upcomingMeeting.notes}</p>
+              <p className="text-xs text-indigo-700">{upcomingMeeting.notes}</p>
             )}
           </CardContent>
         </Card>
@@ -115,15 +121,7 @@ export default async function CandidateDashboard() {
 
       {cp && (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Your status</CardTitle>
-              <Link href="/dashboard/candidate/profile" className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                Edit profile →
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
+          <CardContent className="space-y-4 pt-6">
             <Badge variant={statusStyle.variant}>{statusStyle.label}</Badge>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {cp.location && (<><dt className="text-muted-foreground">Location</dt><dd>{cp.location}</dd></>)}
@@ -139,7 +137,6 @@ export default async function CandidateDashboard() {
           </CardContent>
         </Card>
       )}
-      </div>
     </main>
   )
 }

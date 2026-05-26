@@ -228,14 +228,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+    <main className="px-8 py-8 space-y-5 overflow-auto">
 
-        <div className="flex items-end justify-between mb-2">
-          <div>
-            <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1">Admin</p>
-            <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Candidates</h2>
-          </div>
-          <span className="text-sm text-gray-400 mb-1">{candidates.length} total</span>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Candidates</h1>
+          <span className="text-sm text-gray-400">{candidates.length} total</span>
         </div>
 
         {/* Search */}
@@ -257,7 +254,7 @@ export default function AdminDashboard() {
               <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   industries.includes(ind)
-                    ? 'bg-amber-700 text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {ind}
@@ -278,7 +275,7 @@ export default function AdminDashboard() {
               <button key={s} type="button" onClick={() => setStatus(s)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all capitalize ${
                   status === s
-                    ? 'bg-amber-700 text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {s || 'All'}
@@ -294,7 +291,7 @@ export default function AdminDashboard() {
               <button key={e} type="button" onClick={() => setEmployment(e)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   employment === e
-                    ? 'bg-amber-700 text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {e || 'All'}
@@ -316,11 +313,11 @@ export default function AdminDashboard() {
               const isExpanded = expandedAssign === c.id
 
               return (
-                <div key={c.id} className="w-full bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
+                <div key={c.id} className="w-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                   {/* Candidate info — links to detail */}
-                  <Link href={`/dashboard/admin/candidates/${c.id}`} className="block px-5 py-4 group hover:bg-amber-50/30 transition-colors">
+                  <Link href={`/dashboard/admin/candidates/${c.id}`} className="block px-5 py-4 group hover:bg-gray-50/60 transition-colors">
                     <div className="flex items-center justify-between gap-4">
-                      <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-sm select-none">
+                      <div className="shrink-0 w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-sm select-none">
                         {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
                       </div>
                       <div className="flex-1 min-w-0">

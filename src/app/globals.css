@@ -67,21 +67,6 @@ input, textarea, select {
 
 @layer components {
 
-  /* ── Nav ─────────────────────────────────────────── */
-  .app-nav {
-    @apply h-14 px-6 flex items-center justify-between shrink-0;
-    background-color: oklch(0.18 0.015 55);
-  }
-  .app-nav-brand {
-    @apply text-sm font-bold text-white tracking-tight;
-  }
-  .app-nav-link {
-    @apply px-3 py-1.5 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/10 transition-colors;
-  }
-  .app-nav-link-active {
-    @apply px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10;
-  }
-
   /* ── Page chrome ─────────────────────────────────── */
   .page-shell {
     @apply min-h-screen bg-background flex flex-col;
@@ -98,10 +83,10 @@ input, textarea, select {
 
   /* ── Typography ──────────────────────────────────── */
   .page-title {
-    @apply text-2xl font-semibold text-gray-900 tracking-tight;
+    @apply text-2xl font-bold text-gray-950 tracking-tight;
   }
   .section-label {
-    @apply text-xs font-semibold text-gray-400 uppercase tracking-widest;
+    @apply text-[11px] font-semibold text-gray-400 uppercase tracking-widest;
   }
   .field-label {
     @apply block text-sm font-medium text-gray-700 mb-1.5;
@@ -109,7 +94,7 @@ input, textarea, select {
 
   /* ── Cards ───────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
   }
   .card-body {
     @apply p-6;
@@ -117,21 +102,21 @@ input, textarea, select {
 
   /* ── Form controls ───────────────────────────────── */
   .input {
-    @apply w-full h-10 px-3 border border-gray-300 rounded-lg text-sm text-gray-900
+    @apply w-full h-10 px-3 border border-gray-200 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white
-           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
            transition-shadow;
   }
   .input-select {
-    @apply w-full h-10 px-3 border border-gray-300 rounded-lg text-sm text-gray-900
+    @apply w-full h-10 px-3 border border-gray-200 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white appearance-none
-           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
            transition-shadow;
   }
   .input-textarea {
-    @apply w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900
+    @apply w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white
-           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
            resize-none transition-shadow;
   }
 
@@ -143,7 +128,7 @@ input, textarea, select {
   .btn-primary {
     @apply inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-medium
            transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-           bg-blue-600 hover:bg-blue-700 text-white;
+           bg-indigo-600 hover:bg-indigo-700 text-white;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-medium
@@ -165,10 +150,10 @@ input, textarea, select {
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border;
   }
-  .badge-green  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50  text-green-700  border-green-200;  }
+  .badge-green  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-50  text-emerald-700  border-emerald-200;  }
   .badge-blue   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-blue-50   text-blue-700   border-blue-200;   }
   .badge-gray   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-gray-100  text-gray-500   border-gray-200;   }
-  .badge-amber  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-amber-50  text-amber-700  border-amber-200;  }
+  .badge-indigo { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-indigo-50 text-indigo-700 border-indigo-200; }
   .badge-violet { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200; }
 
   /* ── Loading / empty states ──────────────────────── */
@@ -181,38 +166,38 @@ input, textarea, select {
 }
 
 :root {
-  --background: oklch(0.987 0.007 75);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.09 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.09 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.42 0.14 52);
+  --popover-foreground: oklch(0.09 0 0);
+  --primary: oklch(0.48 0.24 264);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.005 75);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0.005 75);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0.005 75);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.975 0 0);
+  --secondary-foreground: oklch(0.09 0 0);
+  --muted: oklch(0.975 0 0);
+  --muted-foreground: oklch(0.52 0 0);
+  --accent: oklch(0.975 0 0);
+  --accent-foreground: oklch(0.09 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.005 75);
-  --input: oklch(0.922 0.005 75);
-  --ring: oklch(0.50 0.14 52);
+  --border: oklch(0.908 0 0);
+  --input: oklch(0.908 0 0);
+  --ring: oklch(0.48 0.24 264);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.42 0.14 52);
+  --radius: 0.5rem;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.09 0 0);
+  --sidebar-primary: oklch(0.48 0.24 264);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0.005 75);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0.005 75);
-  --sidebar-ring: oklch(0.50 0.14 52);
+  --sidebar-accent: oklch(0.975 0 0);
+  --sidebar-accent-foreground: oklch(0.09 0 0);
+  --sidebar-border: oklch(0.908 0 0);
+  --sidebar-ring: oklch(0.48 0.24 264);
 }
 
 .dark {
@@ -222,8 +207,8 @@ input, textarea, select {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.78 0.12 52);
-  --primary-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.72 0.18 264);
+  --primary-foreground: oklch(0.09 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -233,7 +218,7 @@ input, textarea, select {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.72 0.18 264);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -241,12 +226,12 @@ input, textarea, select {
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.72 0.18 264);
+  --sidebar-primary-foreground: oklch(0.09 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.72 0.18 264);
 }
 
 @layer base {

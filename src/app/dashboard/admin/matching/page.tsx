@@ -1,7 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import MatchingClient, { type MatchJob, type MatchCandidate } from './MatchingClient'
+import MeetingsClient from '../meetings/MeetingsClient'
+import PipelineTabs from './PipelineTabs'
 
-export default async function AdminMatchingPage() {
+export default async function AdminMatchingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const params = await searchParams
+  const tab = params?.tab === 'meetings' ? 'meetings' : 'pipeline'
+
   const supabase = await createClient()
 
   const [{ data: jobData }, { data: candidateData }, { data: assignmentData }] = await Promise.all([
@@ -21,10 +30,19 @@ export default async function AdminMatchingPage() {
   ])
 
   return (
-    <MatchingClient
-      jobs={(jobData as MatchJob[]) ?? []}
-      candidates={(candidateData as MatchCandidate[]) ?? []}
-      initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
-    />
+    <div className="flex flex-col h-full overflow-hidden">
+      <PipelineTabs activeTab={tab} />
+      {tab === 'meetings' ? (
+        <div className="flex-1 overflow-auto px-8 py-6">
+          <MeetingsClient />
+        </div>
+      ) : (
+        <MatchingClient
+          jobs={(jobData as MatchJob[]) ?? []}
+          candidates={(candidateData as MatchCandidate[]) ?? []}
+          initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
+        />
+      )}
+    </div>
   )
 }

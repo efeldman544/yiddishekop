@@ -10,16 +10,19 @@ export default function EmployerNav() {
   const isRoot = pathname === '/dashboard/employer'
 
   return (
-    <header className="app-nav">
-      <div className="flex items-center gap-4">
+    <header className="h-14 bg-white border-b border-gray-100 px-6 flex items-center justify-between shrink-0">
+      <div className="flex items-center gap-5">
+        <span className="font-bold text-[15px] tracking-tight text-gray-950">YiddisheKop</span>
         {!isRoot && (
-          <Link href="/dashboard/employer" className="app-nav-link">
-            ← Back
+          <Link
+            href="/dashboard/employer"
+            className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
+          >
+            ← Dashboard
           </Link>
         )}
-        <span className="app-nav-brand">YiddisheKop</span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <NotificationBell candidatePath="/dashboard/employer/candidates" />
         <SignOutButton />
       </div>
