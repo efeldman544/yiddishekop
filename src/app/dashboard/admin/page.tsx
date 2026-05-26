@@ -231,7 +231,10 @@ export default function AdminDashboard() {
     <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
 
         <div className="flex items-end justify-between mb-2">
-          <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Candidates</h2>
+          <div>
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1">Admin</p>
+            <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Candidates</h2>
+          </div>
           <span className="text-sm text-gray-400 mb-1">{candidates.length} total</span>
         </div>
 
@@ -254,7 +257,7 @@ export default function AdminDashboard() {
               <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   industries.includes(ind)
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-amber-700 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {ind}
@@ -275,7 +278,7 @@ export default function AdminDashboard() {
               <button key={s} type="button" onClick={() => setStatus(s)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all capitalize ${
                   status === s
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-amber-700 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {s || 'All'}
@@ -291,7 +294,7 @@ export default function AdminDashboard() {
               <button key={e} type="button" onClick={() => setEmployment(e)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   employment === e
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-amber-700 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
                 }`}>
                 {e || 'All'}
@@ -315,8 +318,11 @@ export default function AdminDashboard() {
               return (
                 <div key={c.id} className="w-full bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
                   {/* Candidate info — links to detail */}
-                  <Link href={`/dashboard/admin/candidates/${c.id}`} className="block px-5 py-4 group hover:bg-gray-50/50 transition-colors">
+                  <Link href={`/dashboard/admin/candidates/${c.id}`} className="block px-5 py-4 group hover:bg-amber-50/30 transition-colors">
                     <div className="flex items-center justify-between gap-4">
+                      <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-sm select-none">
+                        {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                           <p className="text-xl font-bold text-gray-950 tracking-tight">{c.full_name ?? 'Unnamed'}</p>
