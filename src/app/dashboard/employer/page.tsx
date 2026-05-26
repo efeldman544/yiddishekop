@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 
 type CandidateSummary = {
   id: string
@@ -98,54 +96,75 @@ export default function EmployerDashboard() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-      <div className="bg-amber-50 border border-amber-100 rounded-xl px-6 py-5">
-        <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Your dashboard</p>
-        <h2 className="text-3xl font-bold tracking-tight text-amber-950">
-          {employerName ? `Welcome, ${employerName}` : 'Dashboard'}
-        </h2>
-        <p className="text-sm text-amber-800/70 mt-1.5">
-          {(() => {
-            const pending = candidates.filter(c => !c.action).length
-            if (candidates.length === 0) return 'No candidates matched to your roles yet.'
-            if (pending === 0) return 'All candidates reviewed.'
-            return `${pending} candidate${pending !== 1 ? 's' : ''} awaiting review.`
-          })()}
-        </p>
+    <main className="px-6 py-8 space-y-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-950 tracking-tight">
+            {employerName ? `Welcome, ${employerName}` : 'Dashboard'}
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            {(() => {
+              const pending = candidates.filter(c => !c.action).length
+              if (candidates.length === 0) return 'No candidates matched to your roles yet.'
+              if (pending === 0) return 'All candidates reviewed.'
+              return `${pending} candidate${pending !== 1 ? 's' : ''} awaiting review.`
+            })()}
+          </p>
+        </div>
       </div>
 
-      {candidates.length > 0 && (
+      {candidates.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <p className="text-gray-900 font-semibold">No candidates yet</p>
+          <p className="text-sm text-gray-400 mt-1">Candidates matched to your roles will appear here.</p>
+        </div>
+      ) : (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Candidates</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Candidates</p>
           {candidates.map(c => (
-            <Card key={c.id} className="w-full overflow-hidden">
-              <CardContent className="pt-4 pb-3.5 px-5">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-sm select-none">
+            <div key={c.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-5">
+                <div className="flex items-start gap-5">
+                  <div className="shrink-0 w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base select-none">
                     {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
-                      <p className="text-xl font-bold tracking-tight">{c.full_name ?? 'Unnamed'}</p>
-                      {c.action === 'request_meeting' && <Badge className="bg-blue-100 text-blue-700 border-blue-200">Meeting requested</Badge>}
-                      {c.action === 'pass' && <Badge variant="secondary">Passed</Badge>}
+                    <div className="flex items-center gap-3 flex-wrap mb-1">
+                      <p className="text-lg font-bold text-gray-950 tracking-tight">{c.full_name ?? 'Unnamed'}</p>
+                      {c.action === 'request_meeting' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">Meeting requested</span>
+                      )}
+                      {c.action === 'pass' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">Passed</span>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2.5">
+                    <p className="text-sm text-gray-500 mb-3">
                       {[c.current_job_title, c.location].filter(Boolean).join(' · ')}
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                      {c.fields_worked_in?.map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
-                      {c.employment_type?.map(e => <Badge key={e} variant="outline" className="text-xs">{e}</Badge>)}
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.fields_worked_in?.map(f => (
+                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                      ))}
+                      {c.employment_type?.map(e => (
+                        <span key={e} className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e}</span>
+                      ))}
                     </div>
                   </div>
-                  <Link href={`/dashboard/employer/candidates/${c.id}`}
-                    className="shrink-0 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mt-0.5">
-                    View →
+                  <Link
+                    href={`/dashboard/employer/candidates/${c.id}`}
+                    className="shrink-0 text-sm font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                  >
+                    View profile →
                   </Link>
                 </div>
-              </CardContent>
+              </div>
               {c.assignmentId && (
-                <div className="border-t border-border px-5 py-2.5 flex items-center gap-2 bg-muted/30">
+                <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-2 bg-gray-50/50">
                   <Button
                     size="sm"
                     variant={c.action === 'request_meeting' ? 'default' : 'outline'}
@@ -164,7 +183,7 @@ export default function EmployerDashboard() {
                   </Button>
                 </div>
               )}
-            </Card>
+            </div>
           ))}
         </div>
       )}

@@ -46,9 +46,9 @@ export default function RecordingsClient({
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+    <main className="px-8 py-8 space-y-5 overflow-auto">
       <div className="flex items-end justify-between mb-2">
-        <h2 className="text-3xl font-bold text-gray-950 tracking-tight">Unassigned Recordings</h2>
+        <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Unassigned Recordings</h2>
         <span className="text-sm text-gray-400 mb-1">{recordings.length} total</span>
       </div>
 
@@ -57,7 +57,7 @@ export default function RecordingsClient({
       ) : (
         <div className="space-y-3">
           {recordings.map(rec => (
-            <div key={rec.id} className="w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div key={rec.id} className="w-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="space-y-1">
@@ -75,7 +75,7 @@ export default function RecordingsClient({
                         <button
                           type="button"
                           onClick={() => setTranscriptOpen(prev => prev === rec.id ? null : rec.id)}
-                          className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                          className="text-xs text-indigo-600 hover:text-indigo-800 transition-colors"
                         >
                           {transcriptOpen === rec.id ? 'Hide transcript' : 'Show transcript'}
                         </button>

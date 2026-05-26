@@ -8,8 +8,6 @@ import type { Role } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SignupPage() {
@@ -61,35 +59,53 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>Join YiddisheKop today</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="min-h-screen flex">
+      {/* Left panel */}
+      <div className="hidden md:flex w-80 bg-gray-950 flex-col justify-between px-10 py-12 shrink-0">
+        <div>
+          <span className="text-white font-bold text-xl tracking-tight">YiddisheKop</span>
+          <p className="text-gray-400 text-sm mt-8 leading-relaxed">
+            Connecting top talent with growing businesses across the Yiddish-speaking community.
+          </p>
+        </div>
+        <p className="text-gray-600 text-xs">© 2025 YiddisheKop</p>
+      </div>
+
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-white">
+        <div className="w-full max-w-sm">
+          <div className="md:hidden mb-8">
+            <span className="font-bold text-xl tracking-tight text-gray-950">YiddisheKop</span>
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Create an account</h1>
+            <p className="text-gray-400 text-sm mt-1.5">Join YiddisheKop today</p>
+          </div>
+
           {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="full_name">Full name</Label>
-              <Input id="full_name" name="full_name" type="text" required placeholder="Your full name" />
+              <Label htmlFor="full_name" className="text-sm font-medium text-gray-700">Full name</Label>
+              <Input id="full_name" name="full_name" type="text" required placeholder="Your full name" className="h-10" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" />
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
+              <Input id="email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="h-10" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required minLength={8} placeholder="••••••••" />
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
+              <Input id="password" name="password" type="password" required minLength={8} placeholder="••••••••" className="h-10" />
             </div>
             <div className="space-y-1.5">
-              <Label>I am a...</Label>
+              <Label className="text-sm font-medium text-gray-700">I am a...</Label>
               <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-10">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -98,18 +114,19 @@ export default function SignupPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading} className="w-full h-10 mt-2">
               {loading ? 'Creating account...' : 'Create account'}
             </Button>
           </form>
-          <p className="text-sm text-center text-muted-foreground">
+
+          <p className="text-sm text-center text-gray-400 mt-6">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-foreground underline underline-offset-4 hover:opacity-70">
+            <Link href="/login" className="font-medium text-gray-950 hover:text-indigo-600 transition-colors">
               Sign in
             </Link>
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

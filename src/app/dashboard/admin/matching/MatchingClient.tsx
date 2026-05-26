@@ -174,7 +174,7 @@ export default function MatchingClient({
   const assignedCount = (jobId: string) => assignments.filter(a => a.job_id === jobId).length
 
   return (
-    <div className="flex h-[calc(100vh-57px)] overflow-hidden">
+    <div className="flex flex-1 overflow-hidden">
 
       {/* Left — job list */}
       <div className="w-72 shrink-0 border-r border-gray-150 overflow-y-auto bg-gray-50/60">
