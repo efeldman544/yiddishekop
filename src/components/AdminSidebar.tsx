@@ -85,10 +85,8 @@ export default function AdminSidebar() {
       </nav>
 
       {/* Bottom actions */}
-      <div className="px-3 pb-5 pt-3 border-t border-gray-100 space-y-1 shrink-0">
-        <div className="px-3 py-2">
-          <NotificationBell />
-        </div>
+      <div className="px-4 pb-5 pt-3 border-t border-gray-100 flex items-center justify-between shrink-0">
+        <NotificationBell />
         <SignOutButton />
       </div>
     </aside>
