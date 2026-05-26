@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 
 type CandidateSummary = {
   id: string
@@ -15,7 +14,6 @@ type CandidateSummary = {
   employment_type: string[]
   resume_url: string | null
   action?: string | null
-  assignmentId?: string
 }
 
 export default function EmployerDashboard() {
@@ -23,7 +21,6 @@ export default function EmployerDashboard() {
   const [candidates, setCandidates] = useState<CandidateSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [employerName, setEmployerName] = useState<string | null>(null)
-  const [savingAction, setSavingAction] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -57,7 +54,7 @@ export default function EmployerDashboard() {
         .in('id', candidateIds)
 
       setCandidates((profiles ?? []).map((p: CandidateSummary) => ({
-        ...p, action: actionMap[p.id]?.action ?? null, assignmentId: actionMap[p.id]?.assignmentId,
+        ...p, action: actionMap[p.id]?.action ?? null,
       })))
       setLoading(false)
     }
@@ -74,22 +71,6 @@ export default function EmployerDashboard() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
-
-  async function handleCardAction(candidateId: string, assignmentId: string, newAction: 'request_meeting' | 'pass') {
-    const candidate = candidates.find(c => c.id === candidateId)
-    const next = candidate?.action === newAction ? null : newAction
-    setSavingAction(candidateId)
-    const supabase = createClient()
-    await supabase.from('candidate_job_assignments').update({ action: next }).eq('id', assignmentId)
-    if (next === 'request_meeting') {
-      fetch('/api/notifications/meeting-request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_id: candidateId }),
-      })
-    }
-    setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, action: next } : c))
-    setSavingAction(null)
-  }
 
   if (loading) {
     return <div className="state-center"><p className="state-text">Loading...</p></div>
@@ -163,26 +144,6 @@ export default function EmployerDashboard() {
                   </Link>
                 </div>
               </div>
-              {c.assignmentId && (
-                <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-2 bg-gray-50/50">
-                  <Button
-                    size="sm"
-                    variant={c.action === 'request_meeting' ? 'default' : 'outline'}
-                    disabled={savingAction === c.id}
-                    onClick={() => handleCardAction(c.id, c.assignmentId!, 'request_meeting')}
-                  >
-                    {c.action === 'request_meeting' ? '✓ Meeting requested' : 'Request meeting'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={c.action === 'pass' ? 'secondary' : 'outline'}
-                    disabled={savingAction === c.id}
-                    onClick={() => handleCardAction(c.id, c.assignmentId!, 'pass')}
-                  >
-                    {c.action === 'pass' ? '✓ Passed' : 'Pass'}
-                  </Button>
-                </div>
-              )}
             </div>
           ))}
         </div>
