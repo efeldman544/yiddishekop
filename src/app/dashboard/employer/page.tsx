@@ -66,7 +66,7 @@ export default function EmployerDashboard() {
     const channel = supabase.channel('employer-assignment-sync')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'candidate_job_assignments' }, (payload) => {
         const row = payload.new as { id: string; candidate_id: string; action: string | null }
-        setCandidates(prev => prev.map(c => c.assignmentId === row.id ? { ...c, action: row.action } : c))
+        setCandidates(prev => prev.map(c => c.id === row.candidate_id ? { ...c, action: row.action } : c))
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
