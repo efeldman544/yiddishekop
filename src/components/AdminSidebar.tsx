@@ -2,8 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import NotificationBell from '@/components/NotificationBell'
-import SignOutButton from '@/components/SignOutButton'
 
 const NAV = [
   {
@@ -84,11 +82,6 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Bottom actions */}
-      <div className="px-4 pb-5 pt-3 border-t border-gray-100 flex items-center justify-between shrink-0">
-        <NotificationBell />
-        <SignOutButton />
-      </div>
     </aside>
   )
 }
