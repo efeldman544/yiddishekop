@@ -30,7 +30,7 @@ export default async function AdminMatchingPage({
   ])
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden">
       <PipelineTabs activeTab={tab} />
       {tab === 'meetings' ? (
         <div className="flex-1 overflow-auto px-8 py-6">
