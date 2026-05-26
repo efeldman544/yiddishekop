@@ -69,7 +69,8 @@ input, textarea, select {
 
   /* ── Nav ─────────────────────────────────────────── */
   .app-nav {
-    @apply bg-gray-950 h-14 px-6 flex items-center justify-between shrink-0;
+    @apply h-14 px-6 flex items-center justify-between shrink-0;
+    background-color: oklch(0.18 0.015 55);
   }
   .app-nav-brand {
     @apply text-sm font-bold text-white tracking-tight;
@@ -83,7 +84,7 @@ input, textarea, select {
 
   /* ── Page chrome ─────────────────────────────────── */
   .page-shell {
-    @apply min-h-screen bg-gray-50 flex flex-col;
+    @apply min-h-screen bg-background flex flex-col;
   }
   .page-content {
     @apply flex-1 w-full max-w-5xl mx-auto px-6 py-8;
@@ -118,19 +119,19 @@ input, textarea, select {
   .input {
     @apply w-full h-10 px-3 border border-gray-300 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white
-           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
            transition-shadow;
   }
   .input-select {
     @apply w-full h-10 px-3 border border-gray-300 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white appearance-none
-           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
            transition-shadow;
   }
   .input-textarea {
     @apply w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900
            placeholder:text-gray-400 bg-white
-           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent
            resize-none transition-shadow;
   }
 
@@ -180,38 +181,38 @@ input, textarea, select {
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.987 0.007 75);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.42 0.14 52);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.97 0.005 75);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.97 0.005 75);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0.97 0.005 75);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.922 0.005 75);
+  --input: oklch(0.922 0.005 75);
+  --ring: oklch(0.50 0.14 52);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.42 0.14 52);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.97 0.005 75);
   --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-border: oklch(0.922 0.005 75);
+  --sidebar-ring: oklch(0.50 0.14 52);
 }
 
 .dark {
@@ -221,8 +222,8 @@ input, textarea, select {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.78 0.12 52);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

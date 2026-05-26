@@ -62,11 +62,12 @@ export default async function CandidateDashboard() {
   return (
     <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
       <div className="max-w-3xl space-y-5">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl px-6 py-5">
+        <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Your dashboard</p>
+        <h2 className="text-3xl font-bold tracking-tight text-amber-950">
           {profile?.full_name ? `Welcome, ${profile.full_name}` : 'Your Dashboard'}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1.5">Track your application and manage your profile.</p>
+        <p className="text-sm text-amber-800/70 mt-1.5">Track your application and manage your profile.</p>
       </div>
 
       <Card>

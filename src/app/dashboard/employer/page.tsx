@@ -99,11 +99,12 @@ export default function EmployerDashboard() {
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl px-6 py-5">
+        <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Your dashboard</p>
+        <h2 className="text-3xl font-bold tracking-tight text-amber-950">
           {employerName ? `Welcome, ${employerName}` : 'Dashboard'}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
+        <p className="text-sm text-amber-800/70 mt-1.5">
           {(() => {
             const pending = candidates.filter(c => !c.action).length
             if (candidates.length === 0) return 'No candidates matched to your roles yet.'
@@ -120,6 +121,9 @@ export default function EmployerDashboard() {
             <Card key={c.id} className="w-full overflow-hidden">
               <CardContent className="pt-4 pb-3.5 px-5">
                 <div className="flex items-start gap-4">
+                  <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-sm select-none">
+                    {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
                       <p className="text-xl font-bold tracking-tight">{c.full_name ?? 'Unnamed'}</p>
