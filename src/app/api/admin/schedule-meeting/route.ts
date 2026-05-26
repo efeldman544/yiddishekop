@@ -8,6 +8,39 @@ function adminClient() {
   )
 }
 
+async function getZoomToken(): Promise<string> {
+  const credentials = Buffer.from(
+    `${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`
+  ).toString('base64')
+  const res = await fetch(
+    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${process.env.ZOOM_ACCOUNT_ID}`,
+    { method: 'POST', headers: { Authorization: `Basic ${credentials}` } }
+  )
+  const data = await res.json()
+  return data.access_token
+}
+
+async function createZoomMeeting(topic: string, startTime: string): Promise<string | null> {
+  try {
+    const token = await getZoomToken()
+    const res = await fetch('https://api.zoom.us/v2/users/me/meetings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        type: 2,
+        start_time: startTime,
+        duration: 45,
+        settings: { host_video: true, participant_video: true, join_before_host: true, waiting_room: false },
+      }),
+    })
+    const data = await res.json()
+    return data.join_url ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,28 +49,31 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return new Response('Forbidden', { status: 403 })
 
-  const { assignment_id, candidate_id, employer_id, scheduled_at, meeting_link, notes } = await req.json()
+  const { assignment_id, candidate_id, employer_id, scheduled_at, notes } = await req.json()
   if (!assignment_id || !candidate_id || !employer_id || !scheduled_at) {
     return new Response('Missing required fields', { status: 400 })
   }
 
   const admin = adminClient()
 
+  const [{ data: candidateForTopic }, { data: employerForTopic }] = await Promise.all([
+    admin.from('candidate_profiles').select('full_name').eq('id', candidate_id).single(),
+    admin.from('profiles').select('full_name').eq('id', employer_id).single(),
+  ])
+
+  const topic = `Interview: ${employerForTopic?.full_name ?? 'Employer'} + ${candidateForTopic?.full_name ?? 'Candidate'}`
+  const meeting_link = await createZoomMeeting(topic, new Date(scheduled_at).toISOString())
+
   const { data: meeting, error } = await admin
     .from('meeting_requests')
-    .insert({ assignment_id, candidate_id, employer_id, scheduled_at, meeting_link: meeting_link || null, notes: notes || null, status: 'scheduled' })
+    .insert({ assignment_id, candidate_id, employer_id, scheduled_at, meeting_link, notes: notes || null, status: 'scheduled' })
     .select()
     .single()
 
   if (error) return new Response(error.message, { status: 500 })
 
-  const [{ data: candidate }, { data: employer }] = await Promise.all([
-    admin.from('candidate_profiles').select('full_name').eq('id', candidate_id).single(),
-    admin.from('profiles').select('full_name').eq('id', employer_id).single(),
-  ])
-
-  const candidateName = candidate?.full_name ?? 'the candidate'
-  const employerName = employer?.full_name ?? 'the employer'
+  const candidateName = candidateForTopic?.full_name ?? 'the candidate'
+  const employerName = employerForTopic?.full_name ?? 'the employer'
   const dateStr = new Date(scheduled_at).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
