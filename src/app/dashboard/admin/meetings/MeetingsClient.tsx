@@ -29,7 +29,6 @@ type ScheduledMeeting = {
 
 type ScheduleForm = {
   scheduled_at: string
-  meeting_link: string
   notes: string
 }
 
@@ -38,7 +37,7 @@ export default function MeetingsClient() {
   const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', meeting_link: '', notes: '' })
+  const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,7 +137,6 @@ export default function MeetingsClient() {
         candidate_id: req.candidateId,
         employer_id: req.employerId,
         scheduled_at: new Date(form.scheduled_at).toISOString(),
-        meeting_link: form.meeting_link || null,
         notes: form.notes || null,
       }),
     })
@@ -148,7 +146,7 @@ export default function MeetingsClient() {
       return
     }
     setExpandedId(null)
-    setForm({ scheduled_at: '', meeting_link: '', notes: '' })
+    setForm({ scheduled_at: '', notes: '' })
     await load()
     setSaving(false)
   }
@@ -179,7 +177,7 @@ export default function MeetingsClient() {
                       onClick={() => {
                         setExpandedId(expandedId === req.assignmentId ? null : req.assignmentId)
                         setError(null)
-                        setForm({ scheduled_at: '', meeting_link: '', notes: '' })
+                        setForm({ scheduled_at: '', notes: '' })
                       }}
                     >
                       {expandedId === req.assignmentId ? 'Cancel' : 'Schedule'}
@@ -226,16 +224,6 @@ export default function MeetingsClient() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor={`link-${req.assignmentId}`}>Video / Meeting Link</Label>
-                        <Input
-                          id={`link-${req.assignmentId}`}
-                          type="url"
-                          placeholder="https://zoom.us/j/..."
-                          value={form.meeting_link}
-                          onChange={e => setForm(f => ({ ...f, meeting_link: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
                         <Label htmlFor={`notes-${req.assignmentId}`}>Notes (optional)</Label>
                         <Textarea
                           id={`notes-${req.assignmentId}`}
@@ -246,7 +234,7 @@ export default function MeetingsClient() {
                         />
                       </div>
                       <Button onClick={() => handleSchedule(req)} disabled={saving} className="w-full">
-                        {saving ? 'Scheduling...' : 'Confirm & notify both parties'}
+                        {saving ? 'Creating Zoom meeting...' : 'Confirm & create Zoom meeting'}
                       </Button>
                     </div>
                   )}

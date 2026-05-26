@@ -10,7 +10,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
   return (
     <div>
-      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">{label}</dt>
+      <dt className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{label}</dt>
       <dd className="text-sm">{value}</dd>
     </div>
   )
@@ -36,7 +36,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
   const initialEmployerActions = Object.fromEntries(asgn.map(a => [a.employer_id, a.action]))
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <main className="px-8 py-8 space-y-6">
 
       <Card>
         <CardContent className="pt-6">

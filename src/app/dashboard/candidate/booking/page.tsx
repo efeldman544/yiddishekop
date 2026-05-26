@@ -58,7 +58,7 @@ export default function BookingPage() {
   }, [booked, router])
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8">
+    <main className="px-6 py-8 max-w-3xl">
       {booked ? (
         <Card className="text-center p-10">
           <CardContent className="pt-0">
