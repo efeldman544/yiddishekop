@@ -93,10 +93,10 @@ export default function CandidateActions({
   return (
     <>
       {meeting && (
-        <Card className="border-emerald-200 bg-emerald-50/60">
-          <CardHeader><CardTitle className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Meeting scheduled</CardTitle></CardHeader>
+        <Card className="border-indigo-200 bg-indigo-50/60">
+          <CardHeader><CardTitle className="text-xs font-semibold text-indigo-700 uppercase tracking-widest">Meeting scheduled</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-sm font-medium text-emerald-900">
+            <p className="text-sm font-medium text-indigo-900">
               {new Date(meeting.scheduled_at).toLocaleString('en-US', {
                 weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
@@ -104,11 +104,11 @@ export default function CandidateActions({
             </p>
             {meeting.meeting_link && (
               <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-emerald-700 underline underline-offset-4 font-medium">
+                className="inline-flex items-center gap-1.5 text-sm text-indigo-600 underline underline-offset-4 font-medium">
                 Join meeting
               </a>
             )}
-            {meeting.notes && <p className="text-xs text-emerald-700 mt-1">{meeting.notes}</p>}
+            {meeting.notes && <p className="text-xs text-indigo-700 mt-1">{meeting.notes}</p>}
           </CardContent>
         </Card>
       )}
@@ -147,7 +147,7 @@ export default function CandidateActions({
                   {new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
               ))}
-              <p className="text-xs text-amber-600 mt-1">Waiting for admin to confirm a time.</p>
+              <p className="text-xs text-gray-400 mt-1">Waiting for admin to confirm a time.</p>
             </div>
           )}
 

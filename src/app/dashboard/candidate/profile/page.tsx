@@ -144,7 +144,7 @@ export default function CandidateProfilePage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8">
+    <main className="px-6 py-8">
       <div className="mb-8">
         <h2 className="text-2xl font-bold tracking-tight">Your profile</h2>
         <p className="text-sm text-muted-foreground mt-1">Add your details so we can match you with the right opportunities.</p>
