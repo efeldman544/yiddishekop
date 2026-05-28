@@ -71,7 +71,7 @@ export default async function CandidateDashboard() {
         </div>
         {cp && (
           <Link href="/dashboard/candidate/profile"
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+            className="shrink-0 ml-6 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
             Edit profile →
           </Link>
         )}
