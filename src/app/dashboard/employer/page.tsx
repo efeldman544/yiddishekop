@@ -16,9 +16,19 @@ type CandidateSummary = {
   action?: string | null
 }
 
+type VideoCandidate = {
+  id: string
+  name: string
+  location: string | null
+  current_job_title: string | null
+  fields_worked_in: string[]
+  mux_playback_id: string | null
+}
+
 export default function EmployerDashboard() {
   const router = useRouter()
   const [candidates, setCandidates] = useState<CandidateSummary[]>([])
+  const [videoCandidates, setVideoCandidates] = useState<VideoCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [employerName, setEmployerName] = useState<string | null>(null)
 
@@ -56,6 +66,13 @@ export default function EmployerDashboard() {
       setCandidates((profiles ?? []).map((p: CandidateSummary) => ({
         ...p, action: actionMap[p.id]?.action ?? null,
       })))
+
+      const { data: videoData } = await supabase
+        .from('video_candidates')
+        .select('id, name, location, current_job_title, fields_worked_in, mux_playback_id')
+        .order('created_at', { ascending: false })
+      setVideoCandidates((videoData ?? []) as VideoCandidate[])
+
       setLoading(false)
     }
     load()
@@ -141,6 +158,43 @@ export default function EmployerDashboard() {
                     className="shrink-0 text-sm font-medium text-gray-400 hover:text-gray-900 transition-colors"
                   >
                     View profile →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {videoCandidates.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Video interviews</p>
+          {videoCandidates.map(c => (
+            <div key={c.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-5">
+                <div className="flex items-start gap-5">
+                  <div className="shrink-0 w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base select-none">
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap mb-1">
+                      <p className="text-lg font-bold text-gray-950 tracking-tight">{c.name}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-medium">Video interview</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-3">
+                      {[c.current_job_title, c.location].filter(Boolean).join(' · ')}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.fields_worked_in?.map(f => (
+                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/dashboard/employer/video-candidates/${c.id}`}
+                    className="shrink-0 text-sm font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                  >
+                    Watch →
                   </Link>
                 </div>
               </div>
