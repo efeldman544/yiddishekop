@@ -48,10 +48,11 @@ export default async function CandidateDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: cp }, { data: upcomingMeeting }] = await Promise.all([
+  const [{ data: profile }, { data: cp }, { data: upcomingMeeting }, { data: screeningBooking }] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single<{ full_name: string | null }>(),
     supabase.from('candidate_profiles').select('*').eq('id', user.id).single<CandidateProfile>(),
     supabase.from('meeting_requests').select('scheduled_at, meeting_link, notes').eq('candidate_id', user.id).eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(1).maybeSingle(),
+    supabase.from('screening_bookings').select('scheduled_at, meeting_link').eq('candidate_id', user.id).not('meeting_link', 'is', null).order('scheduled_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const step1Done = !!(cp?.full_name && cp?.phone && cp?.location && cp?.current_job_title && cp?.fields_worked_in?.length && cp?.employment_type?.length)
@@ -89,6 +90,30 @@ export default async function CandidateDashboard() {
             done={step2Done} locked={!step1Done} href="/dashboard/candidate/booking" linkLabel="Book now" />
         </CardContent>
       </Card>
+
+      {screeningBooking && (
+        <Card className="border-indigo-100 bg-indigo-50/50">
+          <CardHeader>
+            <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-widest">Screening call</p>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-0">
+            <p className="text-sm font-medium text-gray-900">
+              {new Date(screeningBooking.scheduled_at).toLocaleString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+              })}
+            </p>
+            <a
+              href={screeningBooking.meeting_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-indigo-700 underline underline-offset-4 font-medium"
+            >
+              Join screening call
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       {upcomingMeeting && (
         <Card className="border-indigo-100 bg-indigo-50/50">

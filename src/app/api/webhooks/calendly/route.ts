@@ -67,13 +67,16 @@ export async function POST(req: Request) {
 
   if (!profile?.id) return new Response('No candidate found for this email', { status: 200 })
 
-  // Store booking with zoom meeting ID for later recording lookup
+  const joinUrl: string | null = location?.join_url ?? null
+
+  // Store booking with zoom meeting ID and join URL for later lookup
   await supabase.from('screening_bookings').upsert({
     candidate_id: profile.id,
     zoom_meeting_id: zoomMeetingId,
     scheduled_at: startTime || null,
     calendly_event_uri: eventUri || null,
-  }, { onConflict: 'zoom_meeting_id' })
+    meeting_link: joinUrl,
+  }, { onConflict: 'candidate_id' })
 
   // Mark screening as booked on candidate profile
   await supabase.from('candidate_profiles').update({
