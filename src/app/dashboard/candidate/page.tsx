@@ -26,11 +26,9 @@ function StepItem({
           {done ? 'Completed' : description}
         </p>
       </div>
-      {!locked && (
-        <Link href={href} className={`shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
-          done ? 'text-emerald-700 hover:text-emerald-900' : 'bg-indigo-600 text-white hover:bg-indigo-700'
-        }`}>
-          {done ? 'Edit' : linkLabel}
+      {!locked && !done && (
+        <Link href={href} className="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700">
+          {linkLabel}
         </Link>
       )}
     </div>
