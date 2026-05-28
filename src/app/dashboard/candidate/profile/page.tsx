@@ -33,14 +33,14 @@ type FormState = {
   current_job_title: string; education_level: string; years_experience: string
   fields_worked_in: string[]; tools_software: string; languages: string
   roles_seeking: string; employment_type: string[]; desired_salary: string
-  currency: string; us_hours_comfortable: string; remote_experience: string; status: string
+  currency: string; us_hours_comfortable: string; remote_experience: string
 }
 
 const EMPTY: FormState = {
   full_name: '', email: '', phone: '', whatsapp: '', location: '', current_job_title: '',
   education_level: '', years_experience: '', fields_worked_in: [], tools_software: '',
   languages: '', roles_seeking: '', employment_type: [], desired_salary: '', currency: '',
-  us_hours_comfortable: '', remote_experience: '', status: 'active',
+  us_hours_comfortable: '', remote_experience: '',
 }
 
 function boolToRadio(v: boolean | null | undefined): string {
@@ -77,7 +77,7 @@ export default function CandidateProfilePage() {
           roles_seeking: data.roles_seeking ?? '', employment_type: data.employment_type ?? [],
           desired_salary: data.desired_salary ?? '', currency: data.currency ?? '',
           us_hours_comfortable: boolToRadio(data.us_hours_comfortable),
-          remote_experience: boolToRadio(data.remote_experience), status: data.status ?? 'active',
+          remote_experience: boolToRadio(data.remote_experience),
         })
         setExistingResumeUrl(data.resume_url ?? null)
       } else {
@@ -128,7 +128,7 @@ export default function CandidateProfilePage() {
       desired_salary: form.desired_salary || null, currency: form.currency || null,
       us_hours_comfortable: form.us_hours_comfortable === 'yes' ? true : form.us_hours_comfortable === 'no' ? false : null,
       remote_experience: form.remote_experience === 'yes' ? true : form.remote_experience === 'no' ? false : null,
-      status: form.status || 'active', resume_url, updated_at: new Date().toISOString(),
+      resume_url, updated_at: new Date().toISOString(),
     })
 
     if (upsertError) {
@@ -294,21 +294,6 @@ export default function CandidateProfilePage() {
               </RadioGroup>
             </div>
 
-            <div className="space-y-2">
-              <Label>Job Search Status <span className="text-destructive">*</span></Label>
-              <RadioGroup value={form.status} onValueChange={v => set('status', v)} className="space-y-1.5">
-                {[
-                  { value: 'active', label: 'Active — open to opportunities' },
-                  { value: 'inactive', label: 'Inactive — not looking right now' },
-                  { value: 'placed', label: 'Placed — already found a position' },
-                ].map(({ value, label }) => (
-                  <div key={value} className="flex items-center gap-2">
-                    <RadioGroupItem value={value} id={`status-${value}`} />
-                    <Label htmlFor={`status-${value}`} className="font-normal cursor-pointer">{label}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
           </CardContent>
         </Card>
 
@@ -321,6 +306,8 @@ export default function CandidateProfilePage() {
                 <a href={existingResumeUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">View</a>
                 {' — '}
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="text-primary underline underline-offset-4">Replace</button>
+                {' — '}
+                <button type="button" onClick={() => setExistingResumeUrl(null)} className="text-destructive underline underline-offset-4">Remove</button>
               </p>
             )}
             {resumeFile && (

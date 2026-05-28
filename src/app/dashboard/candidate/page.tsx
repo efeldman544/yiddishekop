@@ -2,14 +2,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { CandidateProfile } from '@/types'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-
-const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-  active:   { label: 'Active — open to opportunities',  variant: 'default' },
-  inactive: { label: 'Inactive — not looking right now', variant: 'secondary' },
-  placed:   { label: 'Placed',                           variant: 'outline' },
-}
+import StatusToggle from './StatusToggle'
 
 function StepItem({
   number, title, description, done, locked, href, linkLabel,
@@ -52,13 +46,11 @@ export default async function CandidateDashboard() {
     supabase.from('profiles').select('full_name').eq('id', user.id).single<{ full_name: string | null }>(),
     supabase.from('candidate_profiles').select('*').eq('id', user.id).single<CandidateProfile>(),
     supabase.from('meeting_requests').select('scheduled_at, meeting_link, notes').eq('candidate_id', user.id).eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(1).maybeSingle(),
-    supabase.from('screening_bookings').select('scheduled_at, meeting_link').eq('candidate_id', user.id).not('meeting_link', 'is', null).order('scheduled_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('screening_bookings').select('scheduled_at, meeting_link').eq('candidate_id', user.id).order('scheduled_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const step1Done = !!(cp?.full_name && cp?.phone && cp?.location && cp?.current_job_title && cp?.fields_worked_in?.length && cp?.employment_type?.length)
   const step2Done = !!cp?.screening_booked
-  const status = cp?.status || 'active'
-  const statusStyle = STATUS_LABELS[status] ?? STATUS_LABELS['active']
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
@@ -91,26 +83,30 @@ export default async function CandidateDashboard() {
         </CardContent>
       </Card>
 
-      {screeningBooking && (
+      {cp?.screening_booked && (
         <Card className="border-indigo-100 bg-indigo-50/50">
           <CardHeader>
             <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-widest">Screening call</p>
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
             <p className="text-sm font-medium text-gray-900">
-              {new Date(screeningBooking.scheduled_at).toLocaleString('en-US', {
+              {new Date(screeningBooking?.scheduled_at ?? cp.screening_booked_at ?? '').toLocaleString('en-US', {
                 weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
               })}
             </p>
-            <a
-              href={screeningBooking.meeting_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-indigo-700 underline underline-offset-4 font-medium"
-            >
-              Join screening call
-            </a>
+            {(screeningBooking as any)?.meeting_link ? (
+              <a
+                href={(screeningBooking as any).meeting_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-indigo-700 underline underline-offset-4 font-medium"
+              >
+                Join screening call
+              </a>
+            ) : (
+              <p className="text-xs text-indigo-500">Zoom link will appear here once confirmed.</p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -147,7 +143,6 @@ export default async function CandidateDashboard() {
       {cp && (
         <Card>
           <CardContent className="space-y-4 pt-6">
-            <Badge variant={statusStyle.variant}>{statusStyle.label}</Badge>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {cp.location && (<><dt className="text-muted-foreground">Location</dt><dd>{cp.location}</dd></>)}
               {cp.current_job_title && (<><dt className="text-muted-foreground">Current title</dt><dd>{cp.current_job_title}</dd></>)}
@@ -159,6 +154,17 @@ export default async function CandidateDashboard() {
               {cp.remote_experience !== null && cp.remote_experience !== undefined && (<><dt className="text-muted-foreground">Remote experience</dt><dd>{cp.remote_experience ? 'Yes' : 'No'}</dd></>)}
               {cp.resume_url && (<><dt className="text-muted-foreground">Resume</dt><dd><a href={cp.resume_url} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">View resume</a></dd></>)}
             </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {cp && (
+        <Card>
+          <CardHeader>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Job search status</p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <StatusToggle initialStatus={cp.status ?? 'active'} />
           </CardContent>
         </Card>
       )}
