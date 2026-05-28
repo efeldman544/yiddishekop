@@ -27,6 +27,13 @@ type ScheduledMeeting = {
   meetingLink: string | null
 }
 
+type ScreeningCall = {
+  candidateId: string
+  candidateName: string
+  scheduledAt: string
+  meetingLink: string
+}
+
 type ScheduleForm = {
   scheduled_at: string
   notes: string
@@ -35,6 +42,7 @@ type ScheduleForm = {
 export default function MeetingsClient() {
   const [pending, setPending] = useState<PendingRequest[]>([])
   const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
+  const [screenings, setScreenings] = useState<ScreeningCall[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
@@ -56,11 +64,17 @@ export default function MeetingsClient() {
       .select('assignment_id, candidate_id, employer_id, scheduled_at, meeting_link')
       .order('scheduled_at', { ascending: true })
 
+    const { data: screeningData } = await supabase
+      .from('screening_bookings')
+      .select('candidate_id, scheduled_at, meeting_link')
+      .not('meeting_link', 'is', null)
+      .order('scheduled_at', { ascending: true })
+
     const scheduledAssignmentIds = new Set((meetings ?? []).map((m: any) => m.assignment_id))
 
     const pendingAssignments = (assignments ?? []).filter((a: any) => !scheduledAssignmentIds.has(a.id))
 
-    if (pendingAssignments.length === 0 && (meetings ?? []).length === 0) {
+    if (pendingAssignments.length === 0 && (meetings ?? []).length === 0 && (screeningData ?? []).length === 0) {
       setLoading(false)
       return
     }
@@ -68,6 +82,7 @@ export default function MeetingsClient() {
     const candidateIds = [...new Set([
       ...pendingAssignments.map((a: any) => a.candidate_id),
       ...(meetings ?? []).map((m: any) => m.candidate_id),
+      ...(screeningData ?? []).map((s: any) => s.candidate_id),
     ])]
 
     const jobIds = [...new Set(pendingAssignments.map((a: any) => a.job_id))]
@@ -118,6 +133,13 @@ export default function MeetingsClient() {
       employerName: employerMap[m.employer_id] ?? 'Unknown',
       scheduledAt: m.scheduled_at,
       meetingLink: m.meeting_link,
+    })))
+
+    setScreenings((screeningData ?? []).map((s: any) => ({
+      candidateId: s.candidate_id,
+      candidateName: candidateMap[s.candidate_id] ?? 'Unknown',
+      scheduledAt: s.scheduled_at,
+      meetingLink: s.meeting_link,
     })))
 
     setLoading(false)
@@ -267,6 +289,30 @@ export default function MeetingsClient() {
                     Join link
                   </a>
                 )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {screenings.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
+            Screening Calls ({screenings.length})
+          </h3>
+          <div className="space-y-2">
+            {screenings.map(s => (
+              <div key={s.candidateId} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
+                <div>
+                  <span className="font-medium text-gray-900">{s.candidateName}</span>
+                  <span className="text-gray-400 ml-2">·</span>
+                  <span className="text-gray-500 ml-2">
+                    {new Date(s.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4 shrink-0">
+                  Join link
+                </a>
               </div>
             ))}
           </div>
