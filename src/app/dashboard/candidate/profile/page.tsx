@@ -22,8 +22,10 @@ const EDUCATION_OPTIONS = [
 const EXPERIENCE_OPTIONS = ['Less than 1 year', '1–2 years', '3–5 years', '6–10 years', '10+ years']
 
 const FIELDS_WORKED_IN = [
-  'Accounting', 'Admin', 'Customer Support', 'Design',
-  'Education', 'Healthcare', 'Marketing', 'Sales', 'Tech/Software', 'Other',
+  'Accounts Receivable', 'Bookkeeping', 'Customer Support', 'Data Entry',
+  'Digital Marketing', 'E-commerce Management', 'Executive Assistant', 'Healthcare',
+  'HR Manager', 'Personal Assistant', 'Project Management', 'Real Estate Management',
+  'Sales Representative', 'Social Media Management', 'Travel Concierge', 'Web Development',
 ]
 
 const EMPLOYMENT_TYPES = ['Full Time', 'Part Time']

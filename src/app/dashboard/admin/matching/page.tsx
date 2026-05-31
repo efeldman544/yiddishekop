@@ -13,7 +13,7 @@ export default async function AdminMatchingPage({
 
   const supabase = await createClient()
 
-  const [{ data: jobData }, { data: candidateData }, { data: assignmentData }] = await Promise.all([
+  const [{ data: jobData }, { data: candidateData }, { data: assignmentData }, { data: videoData }] = await Promise.all([
     supabase
       .from('job_requirements')
       .select('id, job_title, employment_type, languages, description, status, company_name, employer_id')
@@ -21,13 +21,38 @@ export default async function AdminMatchingPage({
       .order('created_at', { ascending: false }),
     supabase
       .from('candidate_profiles')
-      .select('id, full_name, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, us_hours_comfortable, status, admin_tags')
+      .select('id, full_name, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, us_hours_comfortable, status, admin_tags, interviewed')
       .eq('status', 'active')
       .order('full_name'),
     supabase
       .from('candidate_job_assignments')
       .select('candidate_id, job_id'),
+    supabase
+      .from('video_candidates')
+      .select('id, name, location, current_job_title, fields_worked_in, employment_type')
+      .order('created_at', { ascending: false }),
   ])
+
+  const regularCandidates: MatchCandidate[] = (candidateData ?? []).map((c: any) => ({
+    ...c,
+    source: 'profile' as const,
+  }))
+
+  const videoCandidates: MatchCandidate[] = (videoData ?? []).map((v: any) => ({
+    id: v.id,
+    full_name: v.name,
+    current_job_title: v.current_job_title,
+    location: v.location,
+    fields_worked_in: v.fields_worked_in ?? [],
+    employment_type: v.employment_type ?? [],
+    languages: null,
+    roles_seeking: null,
+    us_hours_comfortable: null,
+    status: 'active',
+    admin_tags: [],
+    interviewed: true,
+    source: 'video' as const,
+  }))
 
   return (
     <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden">
@@ -39,10 +64,11 @@ export default async function AdminMatchingPage({
       ) : (
         <MatchingClient
           jobs={(jobData as MatchJob[]) ?? []}
-          candidates={(candidateData as MatchCandidate[]) ?? []}
+          candidates={[...regularCandidates, ...videoCandidates]}
           initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
         />
       )}
     </div>
   )
 }
+
