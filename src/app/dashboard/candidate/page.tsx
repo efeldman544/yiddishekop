@@ -103,7 +103,7 @@ export default async function CandidateDashboard() {
                 Join screening call
               </a>
             ) : (
-              <p className="text-xs text-indigo-500">Zoom link will appear here once confirmed.</p>
+              <p className="text-xs text-indigo-500">Check your confirmation email for the Zoom link.</p>
             )}
           </CardContent>
         </Card>
