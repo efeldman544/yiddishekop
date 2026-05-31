@@ -24,6 +24,52 @@ function verifyCalendlySignature(rawBody: string, header: string): boolean {
   }
 }
 
+async function getZoomToken(): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${process.env.ZOOM_ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(
+            `${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`
+          ).toString('base64'),
+        },
+      }
+    )
+    const data = await res.json()
+    return data.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
+async function createZoomMeeting(startTime: string): Promise<{ join_url: string; id: string } | null> {
+  const token = await getZoomToken()
+  if (!token) return null
+  try {
+    const res = await fetch('https://api.zoom.us/v2/users/me/meetings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        topic: 'Screening Call',
+        type: 2,
+        start_time: startTime,
+        duration: 30,
+        settings: { waiting_room: false, join_before_host: true },
+      }),
+    })
+    const data = await res.json()
+    if (data.join_url && data.id) return { join_url: data.join_url, id: String(data.id) }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(req: Request) {
   const rawBody = await req.text()
 
@@ -42,22 +88,31 @@ export async function POST(req: Request) {
   const startTime: string = body.payload?.event?.start_time ?? ''
   const location = body.payload?.event?.location
 
-  // Extract Zoom meeting ID from location data or join URL
+  if (!inviteeEmail) return new Response('No invitee email', { status: 400 })
+
+  // Get join URL from Calendly's Zoom integration, or create one
+  let joinUrl: string | null = location?.join_url ?? null
   let zoomMeetingId: string | null = null
+
   if (location?.type === 'zoom') {
-    if (location.data?.id) {
-      zoomMeetingId = String(location.data.id)
-    } else if (location.join_url) {
-      const match = (location.join_url as string).match(/\/j\/(\d+)/)
+    zoomMeetingId = location.data?.id ? String(location.data.id) : null
+    if (!zoomMeetingId && joinUrl) {
+      const match = (joinUrl as string).match(/\/j\/(\d+)/)
       if (match) zoomMeetingId = match[1]
     }
   }
 
-  if (!inviteeEmail) return new Response('No invitee email', { status: 400 })
+  // If Calendly didn't supply a Zoom link, create one via the Zoom API
+  if (!joinUrl && startTime) {
+    const meeting = await createZoomMeeting(startTime)
+    if (meeting) {
+      joinUrl = meeting.join_url
+      zoomMeetingId = meeting.id
+    }
+  }
 
   const supabase = adminClient()
 
-  // Find candidate by email
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -67,9 +122,6 @@ export async function POST(req: Request) {
 
   if (!profile?.id) return new Response('No candidate found for this email', { status: 200 })
 
-  const joinUrl: string | null = location?.join_url ?? null
-
-  // Store booking with zoom meeting ID and join URL for later lookup
   await supabase.from('screening_bookings').upsert({
     candidate_id: profile.id,
     zoom_meeting_id: zoomMeetingId,
@@ -78,7 +130,6 @@ export async function POST(req: Request) {
     meeting_link: joinUrl,
   }, { onConflict: 'candidate_id' })
 
-  // Mark screening as booked on candidate profile
   await supabase.from('candidate_profiles').update({
     screening_booked: true,
     screening_booked_at: startTime || new Date().toISOString(),

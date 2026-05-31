@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import VideoUploadForm from './VideoUploadForm'
+import BulkUploadForm from './BulkUploadForm'
 
 type VideoCandidate = {
   id: string
@@ -42,7 +43,16 @@ export default function VideoCandidatesPage() {
           <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Video Interviews</h2>
           <p className="text-sm text-gray-400 mt-1">Candidates who interviewed but aren&apos;t in the main database.</p>
         </div>
-        <VideoUploadForm onAdded={c => setCandidates(prev => [c, ...prev])} />
+        <div className="flex gap-2">
+          <BulkUploadForm onDone={() => {
+            const supabase = createClient()
+            supabase.from('video_candidates')
+              .select('id, name, location, current_job_title, fields_worked_in, employment_type, mux_playback_id, created_at')
+              .order('created_at', { ascending: false })
+              .then(({ data }) => setCandidates((data ?? []) as VideoCandidate[]))
+          }} />
+          <VideoUploadForm onAdded={c => setCandidates(prev => [c, ...prev])} />
+        </div>
       </div>
 
       {candidates.length === 0 ? (

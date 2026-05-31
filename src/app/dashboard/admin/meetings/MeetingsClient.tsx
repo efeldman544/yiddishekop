@@ -31,7 +31,7 @@ type ScreeningCall = {
   candidateId: string
   candidateName: string
   scheduledAt: string
-  meetingLink: string
+  meetingLink: string | null
 }
 
 type ScheduleForm = {
@@ -67,7 +67,6 @@ export default function MeetingsClient() {
     const { data: screeningData } = await supabase
       .from('screening_bookings')
       .select('candidate_id, scheduled_at, meeting_link')
-      .not('meeting_link', 'is', null)
       .order('scheduled_at', { ascending: true })
 
     const scheduledAssignmentIds = new Set((meetings ?? []).map((m: any) => m.assignment_id))
@@ -310,9 +309,13 @@ export default function MeetingsClient() {
                     {new Date(s.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4 shrink-0">
-                  Join link
-                </a>
+                {s.meetingLink ? (
+                  <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4 shrink-0">
+                    Join link
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-400 shrink-0">No link yet</span>
+                )}
               </div>
             ))}
           </div>
