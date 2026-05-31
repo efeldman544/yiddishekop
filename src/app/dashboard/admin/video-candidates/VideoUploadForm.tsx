@@ -9,7 +9,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent } from '@/components/ui/card'
 
-const FIELDS = ['Accounting', 'Admin', 'Customer Support', 'Design', 'Education', 'Healthcare', 'Marketing', 'Sales', 'Tech/Software', 'Other']
+const FIELDS = [
+  'Accounts Receivable', 'Bookkeeping', 'Customer Support', 'Data Entry',
+  'Digital Marketing', 'E-commerce Management', 'Executive Assistant', 'Healthcare',
+  'HR Manager', 'Personal Assistant', 'Project Management', 'Real Estate Management',
+  'Sales Representative', 'Social Media Management', 'Travel Concierge', 'Web Development',
+]
 const EMP_TYPES = ['Full Time', 'Part Time']
 
 type VideoCandidate = {

@@ -31,8 +31,10 @@ type JobOption = {
 }
 
 const INDUSTRIES = [
-  'Accounting', 'Admin', 'Customer Support', 'Design',
-  'Education', 'Healthcare', 'Marketing', 'Sales', 'Tech/Software', 'Other',
+  'Accounts Receivable', 'Bookkeeping', 'Customer Support', 'Data Entry',
+  'Digital Marketing', 'E-commerce Management', 'Executive Assistant', 'Healthcare',
+  'HR Manager', 'Personal Assistant', 'Project Management', 'Real Estate Management',
+  'Sales Representative', 'Social Media Management', 'Travel Concierge', 'Web Development',
 ]
 
 const STATUS_OPTIONS = ['active', 'inactive', 'placed']
