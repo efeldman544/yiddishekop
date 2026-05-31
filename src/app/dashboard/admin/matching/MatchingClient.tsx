@@ -28,6 +28,8 @@ export type MatchCandidate = {
   us_hours_comfortable: boolean | null
   status: string
   admin_tags: string[]
+  interviewed: boolean | null
+  source: 'profile' | 'video'
 }
 
 type AiResult = {
@@ -75,6 +77,10 @@ function ruleScore(candidate: MatchCandidate, job: MatchJob): { ruleScore: numbe
   if (candidate.us_hours_comfortable && job.description?.toLowerCase().includes('us')) {
     score += 10
     badges.push({ label: 'US hours', style: 'bg-amber-50 text-amber-700 border border-amber-200' })
+  }
+  if (candidate.interviewed) {
+    score += 10
+    badges.push({ label: 'Interviewed', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' })
   }
   return { ruleScore: score, badges }
 }
@@ -132,12 +138,13 @@ export default function MatchingClient({
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
     setAiProgress(0)
-    const ids = scoredCandidates.map(c => c.id)
+    const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
+    const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
     try {
       const res = await fetch('/api/admin/ai-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: selectedJobId, candidateIds: ids }),
+        body: JSON.stringify({ jobId: selectedJobId, candidateIds, videoCandidateIds }),
       })
       if (res.ok) {
         const { results } = await res.json()
@@ -267,10 +274,20 @@ export default function MatchingClient({
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Link href={`/dashboard/admin/candidates/${c.id}`}
-                                className="text-[15px] font-bold text-gray-950 hover:text-gray-600 transition-colors">
-                                {c.full_name ?? 'Unnamed'}
-                              </Link>
+                              {c.source === 'video' ? (
+                                <Link href={`/dashboard/admin/video-candidates/${c.id}`}
+                                  className="text-[15px] font-bold text-gray-950 hover:text-gray-600 transition-colors">
+                                  {c.full_name ?? 'Unnamed'}
+                                </Link>
+                              ) : (
+                                <Link href={`/dashboard/admin/candidates/${c.id}`}
+                                  className="text-[15px] font-bold text-gray-950 hover:text-gray-600 transition-colors">
+                                  {c.full_name ?? 'Unnamed'}
+                                </Link>
+                              )}
+                              {c.source === 'video' && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">Video only</span>
+                              )}
                               {assigned && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Assigned</span>
                               )}

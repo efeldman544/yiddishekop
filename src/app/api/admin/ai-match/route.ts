@@ -100,59 +100,84 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
   if (profile?.role !== 'admin') return new Response('Forbidden', { status: 403 })
 
-  const { jobId, candidateIds } = await req.json()
-  if (!jobId || !Array.isArray(candidateIds) || candidateIds.length === 0) {
-    return new Response('Missing jobId or candidateIds', { status: 400 })
+  const { jobId, candidateIds, videoCandidateIds } = await req.json()
+  const hasRegular = Array.isArray(candidateIds) && candidateIds.length > 0
+  const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
+  if (!jobId || (!hasRegular && !hasVideo)) {
+    return new Response('Missing jobId or candidate IDs', { status: 400 })
   }
 
   const db = adminClient()
 
-  // Fetch job
   const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
   if (!job) return new Response('Job not found', { status: 404 })
 
-  // Fetch candidates with full profiles
-  const { data: candidates } = await db
-    .from('candidate_profiles')
-    .select('*, profiles(email)')
-    .in('id', candidateIds)
-
-  if (!candidates?.length) return Response.json({ results: [] })
-
-  // Fetch latest transcript per candidate
-  const { data: videos } = await db
-    .from('videos')
-    .select('candidate_id, transcript')
-    .in('candidate_id', candidateIds)
-    .not('transcript', 'is', null)
-    .order('created_at', { ascending: false })
-
-  const transcriptMap: Record<string, string> = {}
-  for (const v of videos ?? []) {
-    if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
-  }
-
-  // Fetch resume URLs
-  const resumeMap: Record<string, string | null> = {}
-  for (const c of candidates) {
-    resumeMap[c.id] = c.resume_url ?? null
-  }
-
-  // Score candidates in batches of 5 (rate limit safety)
   const BATCH = 5
   const results: { candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }[] = []
 
-  for (let i = 0; i < candidates.length; i += BATCH) {
-    const batch = candidates.slice(i, i + BATCH)
-    const batchResults = await Promise.all(
-      batch.map(async (c) => {
-        const resumeText = resumeMap[c.id] ? await getResumeText(resumeMap[c.id]!) : null
-        const transcript = transcriptMap[c.id] ?? null
-        const aiResult = await scoreCandidate(c, job, resumeText, transcript)
-        return { candidateId: c.id, ...aiResult }
-      })
-    )
-    results.push(...batchResults)
+  // --- Regular candidates (candidate_profiles + videos table for transcript) ---
+  if (hasRegular) {
+    const { data: candidates } = await db
+      .from('candidate_profiles')
+      .select('*, profiles(email)')
+      .in('id', candidateIds)
+
+    if (candidates?.length) {
+      const { data: videos } = await db
+        .from('videos')
+        .select('candidate_id, transcript')
+        .in('candidate_id', candidateIds)
+        .not('transcript', 'is', null)
+        .order('created_at', { ascending: false })
+
+      const transcriptMap: Record<string, string> = {}
+      for (const v of videos ?? []) {
+        if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
+      }
+
+      for (let i = 0; i < candidates.length; i += BATCH) {
+        const batch = candidates.slice(i, i + BATCH)
+        const batchResults = await Promise.all(
+          batch.map(async (c) => {
+            const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
+            const transcript = transcriptMap[c.id] ?? null
+            const aiResult = await scoreCandidate(c, job, resumeText, transcript)
+            return { candidateId: c.id, ...aiResult }
+          })
+        )
+        results.push(...batchResults)
+      }
+    }
+  }
+
+  // --- Video-only candidates (transcript stored directly on video_candidates) ---
+  if (hasVideo) {
+    const { data: videoCandidates } = await db
+      .from('video_candidates')
+      .select('id, name, location, current_job_title, fields_worked_in, employment_type, transcript')
+      .in('id', videoCandidateIds)
+
+    if (videoCandidates?.length) {
+      for (let i = 0; i < videoCandidates.length; i += BATCH) {
+        const batch = videoCandidates.slice(i, i + BATCH)
+        const batchResults = await Promise.all(
+          batch.map(async (vc) => {
+            const profileShape = {
+              current_job_title: vc.current_job_title,
+              location: vc.location,
+              fields_worked_in: vc.fields_worked_in ?? [],
+              employment_type: vc.employment_type ?? [],
+              languages: null, roles_seeking: null, years_experience: null,
+              education_level: null, tools_software: null,
+              us_hours_comfortable: null, remote_experience: null,
+            }
+            const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
+            return { candidateId: vc.id, ...aiResult }
+          })
+        )
+        results.push(...batchResults)
+      }
+    }
   }
 
   return Response.json({ results })
