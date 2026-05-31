@@ -116,12 +116,13 @@ export default function AdminDashboard() {
 
   const fetchCandidates = useCallback(async () => {
     setLoading(true)
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    let query = supabase
-      .from('candidate_profiles')
-      .select('id, full_name, email, location, current_job_title, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
-      .order('updated_at', { ascending: false })
+      let query = supabase
+        .from('candidate_profiles')
+        .select('id, full_name, email, location, current_job_title, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
+        .order('full_name', { ascending: true })
 
     if (search.trim()) {
       query = query.or(
@@ -160,8 +161,11 @@ export default function AdminDashboard() {
       setJobActions(actMap)
       setAssignmentIds(idMap)
     }
-
-    setLoading(false)
+    } catch (err) {
+      console.error('Failed to load candidates:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [search, industries, status, employment, interviewedFilter])
 
   useEffect(() => {
