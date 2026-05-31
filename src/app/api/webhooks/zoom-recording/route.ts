@@ -170,5 +170,13 @@ export async function POST(req: Request) {
 
   if (error) return new Response(`DB insert failed: ${error.message}`, { status: 500 })
 
+  // 11. Auto-mark candidate as interviewed when recording arrives
+  if (candidateId) {
+    await supabase.from('candidate_profiles').update({
+      interviewed: true,
+      interviewed_at: new Date().toISOString(),
+    }).eq('id', candidateId)
+  }
+
   return new Response('OK', { status: 200 })
 }

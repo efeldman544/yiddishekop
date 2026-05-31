@@ -19,6 +19,8 @@ type Candidate = {
   years_experience: string | null
   status: string | null
   admin_tags: string[]
+  interviewed: boolean | null
+  interviewed_at: string | null
 }
 
 type JobOption = {
@@ -56,6 +58,8 @@ export default function AdminDashboard() {
   const [industries, setIndustries] = useState<string[]>([])
   const [status, setStatus] = useState('')
   const [employment, setEmployment] = useState('')
+  const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
+  const [togglingInterviewed, setTogglingInterviewed] = useState<string | null>(null)
 
   const [jobs, setJobs] = useState<JobOption[]>([])
   // jobAssignments[candidateId] = array of assigned jobIds
@@ -96,13 +100,25 @@ export default function AdminDashboard() {
     loadJobs()
   }, [])
 
+  async function toggleInterviewed(candidateId: string, current: boolean | null) {
+    setTogglingInterviewed(candidateId)
+    const newVal = !current
+    const supabase = createClient()
+    await supabase.from('candidate_profiles').update({
+      interviewed: newVal,
+      interviewed_at: newVal ? new Date().toISOString() : null,
+    }).eq('id', candidateId)
+    setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, interviewed: newVal } : c))
+    setTogglingInterviewed(null)
+  }
+
   const fetchCandidates = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
 
     let query = supabase
       .from('candidate_profiles')
-      .select('id, full_name, email, location, current_job_title, fields_worked_in, employment_type, years_experience, status, admin_tags')
+      .select('id, full_name, email, location, current_job_title, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
       .order('updated_at', { ascending: false })
 
     if (search.trim()) {
@@ -113,6 +129,8 @@ export default function AdminDashboard() {
     if (industries.length > 0) query = query.overlaps('fields_worked_in', industries)
     if (status) query = query.eq('status', status)
     if (employment) query = query.overlaps('employment_type', [employment])
+    if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
+    if (interviewedFilter === 'no') query = query.or('interviewed.is.null,interviewed.eq.false')
 
     const { data } = await query
     const list = (data as Candidate[]) ?? []
@@ -142,7 +160,7 @@ export default function AdminDashboard() {
     }
 
     setLoading(false)
-  }, [search, industries, status, employment])
+  }, [search, industries, status, employment, interviewedFilter])
 
   useEffect(() => {
     const t = setTimeout(fetchCandidates, search ? 300 : 0)
@@ -298,6 +316,22 @@ export default function AdminDashboard() {
               </button>
             ))}
           </div>
+
+          <div className="w-px h-4 bg-gray-200 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium text-gray-400 mr-0.5">Interviewed</span>
+            {(['all', 'yes', 'no'] as const).map(v => (
+              <button key={v} type="button" onClick={() => setInterviewedFilter(v)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  interviewedFilter === v
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
+                }`}>
+                {v === 'all' ? 'All' : v === 'yes' ? '✓ Yes' : '✗ No'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Results */}
@@ -327,6 +361,9 @@ export default function AdminDashboard() {
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>
                               {c.status}
                             </span>
+                          )}
+                          {c.interviewed && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Interviewed ✓</span>
                           )}
                           {c.admin_tags?.map(tag => (
                             <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">{tag}</span>
@@ -388,14 +425,28 @@ export default function AdminDashboard() {
                         })
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={isExpanded ? 'default' : 'outline'}
-                      onClick={() => setExpandedAssign(isExpanded ? null : c.id)}
-                    >
-                      {isExpanded ? 'Done' : '+ Assign job'}
-                    </Button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={togglingInterviewed === c.id}
+                        onClick={() => toggleInterviewed(c.id, c.interviewed)}
+                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                          c.interviewed
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-700'
+                        }`}
+                      >
+                        {c.interviewed ? 'Interviewed ✓' : 'Mark interviewed'}
+                      </button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isExpanded ? 'default' : 'outline'}
+                        onClick={() => setExpandedAssign(isExpanded ? null : c.id)}
+                      >
+                        {isExpanded ? 'Done' : '+ Assign job'}
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Expanded job assign panel */}
