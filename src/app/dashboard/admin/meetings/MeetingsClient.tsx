@@ -20,6 +20,7 @@ type PendingRequest = {
 }
 
 type ScheduledMeeting = {
+  id: string
   assignmentId: string
   candidateName: string
   employerName: string
@@ -28,6 +29,7 @@ type ScheduledMeeting = {
 }
 
 type ScreeningCall = {
+  id: string
   candidateId: string
   candidateName: string
   scheduledAt: string
@@ -48,6 +50,7 @@ export default function MeetingsClient() {
   const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -61,12 +64,12 @@ export default function MeetingsClient() {
 
     const { data: meetings } = await supabase
       .from('meeting_requests')
-      .select('assignment_id, candidate_id, employer_id, scheduled_at, meeting_link')
+      .select('id, assignment_id, candidate_id, employer_id, scheduled_at, meeting_link')
       .order('scheduled_at', { ascending: true })
 
     const { data: screeningData } = await supabase
       .from('screening_bookings')
-      .select('candidate_id, scheduled_at, meeting_link')
+      .select('id, candidate_id, scheduled_at, meeting_link')
       .order('scheduled_at', { ascending: true })
 
     const scheduledAssignmentIds = new Set((meetings ?? []).map((m: any) => m.assignment_id))
@@ -127,6 +130,7 @@ export default function MeetingsClient() {
     })))
 
     setScheduled((meetings ?? []).map((m: any) => ({
+      id: m.id,
       assignmentId: m.assignment_id,
       candidateName: candidateMap[m.candidate_id] ?? 'Unknown',
       employerName: employerMap[m.employer_id] ?? 'Unknown',
@@ -135,6 +139,7 @@ export default function MeetingsClient() {
     })))
 
     setScreenings((screeningData ?? []).map((s: any) => ({
+      id: s.id,
       candidateId: s.candidate_id,
       candidateName: candidateMap[s.candidate_id] ?? 'Unknown',
       scheduledAt: s.scheduled_at,
@@ -170,6 +175,24 @@ export default function MeetingsClient() {
     setForm({ scheduled_at: '', notes: '' })
     await load()
     setSaving(false)
+  }
+
+  async function handleDeleteMeeting(id: string) {
+    if (!confirm('Delete this scheduled meeting?')) return
+    setDeleting(id)
+    const supabase = createClient()
+    await supabase.from('meeting_requests').delete().eq('id', id)
+    setScheduled(prev => prev.filter(m => m.id !== id))
+    setDeleting(null)
+  }
+
+  async function handleDeleteScreening(id: string) {
+    if (!confirm('Delete this screening call booking?')) return
+    setDeleting(id)
+    const supabase = createClient()
+    await supabase.from('screening_bookings').delete().eq('id', id)
+    setScreenings(prev => prev.filter(s => s.id !== id))
+    setDeleting(null)
   }
 
   if (loading) return <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
@@ -273,7 +296,7 @@ export default function MeetingsClient() {
           </h3>
           <div className="space-y-2">
             {scheduled.map(m => (
-              <div key={m.assignmentId} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
+              <div key={m.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
                 <div>
                   <span className="font-medium text-gray-900">{m.employerName}</span>
                   <span className="text-gray-400"> + </span>
@@ -283,11 +306,17 @@ export default function MeetingsClient() {
                     {new Date(m.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                {m.meetingLink && (
-                  <a href={m.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4 shrink-0">
-                    Join link
-                  </a>
-                )}
+                <div className="flex items-center gap-3 shrink-0">
+                  {m.meetingLink && (
+                    <a href={m.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4">
+                      Join link
+                    </a>
+                  )}
+                  <button onClick={() => handleDeleteMeeting(m.id)} disabled={deleting === m.id}
+                    className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
+                    {deleting === m.id ? '…' : 'Delete'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -301,7 +330,7 @@ export default function MeetingsClient() {
           </h3>
           <div className="space-y-2">
             {screenings.map(s => (
-              <div key={s.candidateId} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
+              <div key={s.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
                 <div>
                   <span className="font-medium text-gray-900">{s.candidateName}</span>
                   <span className="text-gray-400 ml-2">·</span>
@@ -309,13 +338,19 @@ export default function MeetingsClient() {
                     {new Date(s.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                {s.meetingLink ? (
-                  <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4 shrink-0">
-                    Join link
-                  </a>
-                ) : (
-                  <span className="text-xs text-gray-400 shrink-0">No link yet</span>
-                )}
+                <div className="flex items-center gap-3 shrink-0">
+                  {s.meetingLink ? (
+                    <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4">
+                      Join link
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-400">No link yet</span>
+                  )}
+                  <button onClick={() => handleDeleteScreening(s.id)} disabled={deleting === s.id}
+                    className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
+                    {deleting === s.id ? '…' : 'Delete'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
