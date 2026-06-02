@@ -57,11 +57,40 @@ function nameWords(s: string): string[] {
 }
 
 function cleanFolderName(raw: string): string {
-  return raw
-    .replace(/^\d{4}[-/]\d{2}[-/]\d{2}\s+/, '')   // leading YYYY-MM-DD
-    .replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s+/, '')   // leading MM-DD-YYYY
-    .replace(/^\d+\s*[-–]\s*/, '')                  // leading number prefix "01 - "
-    .replace(/\s*[-–]\s*(interview|recording|call|meeting|zoom).*$/i, '') // trailing " - Interview"
+  let s = raw.trim()
+  // Zoom YiddisheKop: "2025-07-22 18.51.09 Gilah Shull_ Interview"
+  s = s.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}\.\d{2}\.\d{2}\s+/, '')
+  // Generic datetime prefix
+  s = s.replace(/^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}[.:]\d{2}[.:]\d{2}\s+/, '')
+  // Zoom folder: "2026-03-10  Ariella Eve" (1 or 2 spaces after date)
+  s = s.replace(/^\d{4}[-/]\d{2}[-/]\d{2}\s+/, '')
+  s = s.replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s+/, '')
+  s = s.replace(/^\d+\s*[-–]\s*/, '')
+  // Zoom "Name_ Interview" / "Name_ New Meeting" — strip underscore + anything after
+  s = s.replace(/\s*_.*$/, '')
+  // " - Interview / Recording / Meeting" suffix
+  s = s.replace(/\s*[-–]\s*(interview|recording|call|meeting|zoom)\b.*$/i, '')
+  // "Name's Personal Meeting Room" / "Name's Zoom Meeting" / truncated "Name's Perso..." / "Name's Zoo..."
+  s = s.replace(/\s*'s\s+(personal|zoom|perso|zoo)\b.*$/i, '')
+  s = s.replace(/\s*'s\s+personal\s+meeting\s+room.*$/i, '')
+  // trailing date
+  s = s.replace(/\s+\d{4}[-/]\d{2}[-/]\d{2}.*$/, '')
+  return s.trim()
+}
+
+// Strip VTT timestamp/cue markup, leaving just the spoken text
+function parseVtt(text: string): string {
+  return text
+    .split('\n')
+    .filter(line => {
+      const t = line.trim()
+      return t.length > 0
+        && t !== 'WEBVTT'
+        && !/^\d+$/.test(t)
+        && !/^\d{2}:\d{2}:\d{2}/.test(t)
+        && !/^NOTE/.test(t)
+    })
+    .join('\n')
     .trim()
 }
 
@@ -71,22 +100,22 @@ function groupByFolder(files: FileList): Map<string, { mp4: File | null; txt: Fi
     const parts = (file.webkitRelativePath || file.name).split('/')
     const n = file.name.toLowerCase()
     const isVideo = n.endsWith('.mp4') || n.endsWith('.mov') || n.endsWith('.webm') || file.type.startsWith('video/')
-    const isText = n.endsWith('.txt')
-    if (!isVideo && !isText) continue
+    const isTranscript = n.endsWith('.txt') || n.endsWith('.vtt')
+    if (!isVideo && !isTranscript) continue
 
     let key: string
     if (parts.length >= 2) {
-      // In a subfolder — use immediate parent folder name, cleaned
       key = cleanFolderName(parts[parts.length - 2])
     } else {
-      // Flat folder — use filename without extension
       key = cleanFolderName(file.name.replace(/\.[^.]+$/, ''))
     }
     if (!key) continue
     if (!groups.has(key)) groups.set(key, { mp4: null, txt: null })
     const g = groups.get(key)!
-    if (isVideo) g.mp4 = file
-    else if (isText) g.txt = file
+    if (isVideo && !g.mp4) g.mp4 = file
+    // prefer .vtt (Zoom native) but fall back to .txt
+    else if (isTranscript && !g.txt) g.txt = file
+    else if (isTranscript && n.endsWith('.vtt')) g.txt = file // upgrade to vtt if we had txt
   }
   return groups
 }
@@ -299,11 +328,17 @@ export default function VideosPage() {
   async function handleTranscriptFolder(files: FileList) {
     const entries: { key: string; txt: File }[] = []
     for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith('.txt')) continue
-      const key = file.name.replace(/\.txt$/i, '').replace(/[_\-]+/g, ' ').trim()
+      const n = file.name.toLowerCase()
+      if (!n.endsWith('.txt') && !n.endsWith('.vtt')) continue
+      const key = cleanFolderName(file.name.replace(/\.[^.]+$/, ''))
+      if (!key) continue
       entries.push({ key, txt: file })
     }
-    const reads = await Promise.all(entries.map(async e => ({ key: e.key, text: await e.txt.text(), fname: e.txt.name })))
+    const reads = await Promise.all(entries.map(async e => {
+      const raw = await e.txt.text()
+      const text = e.txt.name.toLowerCase().endsWith('.vtt') ? parseVtt(raw) : raw
+      return { key: e.key, text, fname: e.txt.name }
+    }))
     mergeBulkTranscripts(reads)
   }
 
@@ -312,10 +347,12 @@ export default function VideosPage() {
     const { data: profs } = await supabase.from('candidate_profiles').select('id, full_name').order('full_name')
     const opts: CandidateOption[] = ((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? '' }))
 
-    const reads = await Promise.all(entries.map(async e => ({
-      ...e,
-      transcriptText: e.transcriptFile ? await e.transcriptFile.text() : e.transcriptText,
-    })))
+    const reads = await Promise.all(entries.map(async e => {
+      if (!e.transcriptFile) return { ...e }
+      const raw = await e.transcriptFile.text()
+      const transcriptText = e.transcriptFile.name.toLowerCase().endsWith('.vtt') ? parseVtt(raw) : raw
+      return { ...e, transcriptText }
+    }))
 
     setBulkRows(prev => {
       const next = [...prev]
