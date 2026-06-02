@@ -50,27 +50,111 @@ function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
+const STOP_WORDS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'jr', 'sr', 'ii', 'iii', 'iv', 'esq'])
+
+function nameWords(s: string): string[] {
+  return s.toLowerCase().split(/[\s,.\-_()\[\]]+/).filter(w => w.length > 1 && !STOP_WORDS.has(w))
+}
+
+function cleanFolderName(raw: string): string {
+  let s = raw.trim()
+  // Zoom YiddisheKop: "2025-07-22 18.51.09 Gilah Shull_ Interview"
+  s = s.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}\.\d{2}\.\d{2}\s+/, '')
+  // Generic datetime prefix
+  s = s.replace(/^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}[.:]\d{2}[.:]\d{2}\s+/, '')
+  // Zoom folder: "2026-03-10  Ariella Eve" (1 or 2 spaces after date)
+  s = s.replace(/^\d{4}[-/]\d{2}[-/]\d{2}\s+/, '')
+  s = s.replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s+/, '')
+  s = s.replace(/^\d+\s*[-–]\s*/, '')
+  // Zoom "Name_ Interview" / "Name_ New Meeting" — strip underscore + anything after
+  s = s.replace(/\s*_.*$/, '')
+  // " - Interview / Recording / Meeting" suffix
+  s = s.replace(/\s*[-–]\s*(interview|recording|call|meeting|zoom)\b.*$/i, '')
+  // "Name's Personal Meeting Room" / "Name's Zoom Meeting" / truncated "Name's Perso..." / "Name's Zoo..."
+  s = s.replace(/\s*'s\s+(personal|zoom|perso|zoo)\b.*$/i, '')
+  s = s.replace(/\s*'s\s+personal\s+meeting\s+room.*$/i, '')
+  // trailing date
+  s = s.replace(/\s+\d{4}[-/]\d{2}[-/]\d{2}.*$/, '')
+  return s.trim()
+}
+
+// Strip VTT timestamp/cue markup, leaving just the spoken text
+function parseVtt(text: string): string {
+  return text
+    .split('\n')
+    .filter(line => {
+      const t = line.trim()
+      return t.length > 0
+        && t !== 'WEBVTT'
+        && !/^\d+$/.test(t)
+        && !/^\d{2}:\d{2}:\d{2}/.test(t)
+        && !/^NOTE/.test(t)
+    })
+    .join('\n')
+    .trim()
+}
+
 function groupByFolder(files: FileList): Map<string, { mp4: File | null; txt: File | null }> {
   const groups = new Map<string, { mp4: File | null; txt: File | null }>()
   for (const file of Array.from(files)) {
     const parts = (file.webkitRelativePath || file.name).split('/')
-    const folderParts = parts.slice(0, -1)
-    const folder = folderParts.length > 0 ? folderParts[folderParts.length - 1] : null
-    if (!folder) continue
-    if (!groups.has(folder)) groups.set(folder, { mp4: null, txt: null })
-    const g = groups.get(folder)!
     const n = file.name.toLowerCase()
-    if (n.endsWith('.mp4') || n.endsWith('.mov') || file.type.startsWith('video/')) g.mp4 = file
-    else if (n.endsWith('.txt')) g.txt = file
+    const isVideo = n.endsWith('.mp4') || n.endsWith('.mov') || n.endsWith('.webm') || file.type.startsWith('video/')
+    const isTranscript = n.endsWith('.txt') || n.endsWith('.vtt')
+    if (!isVideo && !isTranscript) continue
+
+    let key: string
+    if (parts.length >= 2) {
+      key = cleanFolderName(parts[parts.length - 2])
+    } else {
+      key = cleanFolderName(file.name.replace(/\.[^.]+$/, ''))
+    }
+    if (!key) continue
+    if (!groups.has(key)) groups.set(key, { mp4: null, txt: null })
+    const g = groups.get(key)!
+    if (isVideo && !g.mp4) g.mp4 = file
+    // prefer .vtt (Zoom native) but fall back to .txt
+    else if (isTranscript && !g.txt) g.txt = file
+    else if (isTranscript && n.endsWith('.vtt')) g.txt = file // upgrade to vtt if we had txt
   }
   return groups
 }
 
 function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOption | null {
   const key = normalize(name)
-  return profiles.find(p => normalize(p.label) === key)
-    ?? profiles.find(p => normalize(p.label).includes(key) || key.includes(normalize(p.label)))
-    ?? null
+  const words = nameWords(name)
+
+  // 1. Exact normalized
+  let m = profiles.find(p => normalize(p.label) === key)
+  if (m) return m
+
+  // 2. All words match in any order (handles "Smith John" vs "John Smith")
+  if (words.length >= 2) {
+    m = profiles.find(p => {
+      const pw = nameWords(p.label)
+      return words.every(w => pw.some(pw2 => pw2 === w || pw2.startsWith(w) || w.startsWith(pw2)))
+        && pw.every(pw2 => words.some(w => w === pw2 || w.startsWith(pw2) || pw2.startsWith(w)))
+    })
+    if (m) return m
+
+    // 3. Relaxed: all input words found in profile (profile may have middle name etc.)
+    m = profiles.find(p => {
+      const pw = nameWords(p.label)
+      return words.every(w => pw.some(pw2 => pw2.startsWith(w) || w.startsWith(pw2)))
+    })
+    if (m) return m
+  }
+
+  // 4. Substring fallback (only if key is long enough to avoid false positives)
+  if (key.length >= 6) {
+    m = profiles.find(p => {
+      const pk = normalize(p.label)
+      return pk.includes(key) || key.includes(pk)
+    })
+    if (m) return m
+  }
+
+  return null
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -90,6 +174,10 @@ export default function VideosPage() {
   // create-card form for unassigned videos
   const [creatingCard, setCreatingCard] = useState<string | null>(null)
   const [cardName, setCardName] = useState('')
+
+  // re-match all unmatched video_candidates
+  const [rematching, setRematching] = useState(false)
+  const [rematchResult, setRematchResult] = useState<string | null>(null)
 
   // bulk upload state
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -115,6 +203,40 @@ export default function VideosPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  // ── Re-match all video_candidates to profiles ───────────────────────────
+  async function handleRematchAll() {
+    setRematching(true)
+    setRematchResult(null)
+    const supabase = createClient()
+    const { data: profs } = await supabase.from('candidate_profiles').select('id, full_name').order('full_name')
+    const opts: CandidateOption[] = ((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? '' }))
+
+    let matched = 0
+    const toRemove: string[] = []
+
+    await Promise.all(videoCandidates.map(async vc => {
+      const hit = matchCandidate(vc.name, opts)
+      if (!hit) return
+      await supabase.from('videos').insert({
+        candidate_id: hit.id,
+        mux_asset_id: vc.mux_asset_id,
+        mux_playback_id: vc.mux_playback_id,
+        transcript: vc.transcript,
+        approved: true,
+      })
+      await supabase.from('candidate_profiles').update({
+        interviewed: true, interviewed_at: new Date().toISOString(),
+      }).eq('id', hit.id)
+      await supabase.from('video_candidates').delete().eq('id', vc.id)
+      toRemove.push(vc.id)
+      matched++
+    }))
+
+    setVideoCandidates(prev => prev.filter(v => !toRemove.includes(v.id)))
+    setRematchResult(`Matched ${matched} of ${videoCandidates.length} candidates.`)
+    setRematching(false)
+  }
 
   // ── Assign unassigned video to a candidate ──────────────────────────────
   async function handleAssign(videoId: string) {
@@ -206,11 +328,17 @@ export default function VideosPage() {
   async function handleTranscriptFolder(files: FileList) {
     const entries: { key: string; txt: File }[] = []
     for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith('.txt')) continue
-      const key = file.name.replace(/\.txt$/i, '').replace(/[_\-]+/g, ' ').trim()
+      const n = file.name.toLowerCase()
+      if (!n.endsWith('.txt') && !n.endsWith('.vtt')) continue
+      const key = cleanFolderName(file.name.replace(/\.[^.]+$/, ''))
+      if (!key) continue
       entries.push({ key, txt: file })
     }
-    const reads = await Promise.all(entries.map(async e => ({ key: e.key, text: await e.txt.text(), fname: e.txt.name })))
+    const reads = await Promise.all(entries.map(async e => {
+      const raw = await e.txt.text()
+      const text = e.txt.name.toLowerCase().endsWith('.vtt') ? parseVtt(raw) : raw
+      return { key: e.key, text, fname: e.txt.name }
+    }))
     mergeBulkTranscripts(reads)
   }
 
@@ -219,10 +347,12 @@ export default function VideosPage() {
     const { data: profs } = await supabase.from('candidate_profiles').select('id, full_name').order('full_name')
     const opts: CandidateOption[] = ((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? '' }))
 
-    const reads = await Promise.all(entries.map(async e => ({
-      ...e,
-      transcriptText: e.transcriptFile ? await e.transcriptFile.text() : e.transcriptText,
-    })))
+    const reads = await Promise.all(entries.map(async e => {
+      if (!e.transcriptFile) return { ...e }
+      const raw = await e.transcriptFile.text()
+      const transcriptText = e.transcriptFile.name.toLowerCase().endsWith('.vtt') ? parseVtt(raw) : raw
+      return { ...e, transcriptText }
+    }))
 
     setBulkRows(prev => {
       const next = [...prev]
@@ -371,7 +501,7 @@ export default function VideosPage() {
         <div className="border border-indigo-100 rounded-xl p-5 bg-indigo-50/30 space-y-4">
           <p className="text-sm font-semibold text-gray-900">Bulk import</p>
           <p className="text-xs text-gray-500">
-            Select your <strong>videos folder</strong> (one subfolder per candidate, subfolder name = candidate name) and/or your <strong>transcripts folder</strong> (flat folder of <code>.txt</code> files named by candidate). Files are matched to existing candidates automatically.
+            Select your <strong>videos folder</strong> — works with flat folders (video files named after candidate), subfolders per candidate, or subfolders with dates/prefixes like "2026-01-15 John Smith". Also select your <strong>transcripts folder</strong> (.txt files named by candidate). Both are matched to existing candidates automatically.
           </p>
           <div className="flex gap-3 flex-wrap">
             <button onClick={() => videoFolderRef.current?.click()} disabled={bulkRunning}
@@ -519,9 +649,19 @@ export default function VideosPage() {
 
       {/* Video-only candidates */}
       <section className="space-y-3">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-          Video-only candidates ({videoCandidates.length})
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            Video-only candidates ({videoCandidates.length})
+          </h3>
+          {videoCandidates.length > 0 && (
+            <div className="flex items-center gap-3">
+              {rematchResult && <span className="text-xs text-emerald-600">{rematchResult}</span>}
+              <Button size="sm" variant="outline" onClick={handleRematchAll} disabled={rematching}>
+                {rematching ? 'Matching…' : 'Re-match all to profiles'}
+              </Button>
+            </div>
+          )}
+        </div>
         {videoCandidates.length === 0 ? (
           <p className="text-sm text-gray-400">None.</p>
         ) : videoCandidates.map(vc => (

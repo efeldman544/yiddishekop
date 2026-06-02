@@ -10,10 +10,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent } from '@/components/ui/card'
 
 const FIELDS = [
-  'Accounts Receivable', 'Bookkeeping', 'Customer Support', 'Data Entry',
-  'Digital Marketing', 'E-commerce Management', 'Executive Assistant', 'Healthcare',
-  'HR Manager', 'Personal Assistant', 'Project Management', 'Real Estate Management',
-  'Sales Representative', 'Social Media Management', 'Travel Concierge', 'Web Development',
+  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
+  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
+  'Education & Training', 'Engineering', 'Healthcare & Medical',
+  'Hospitality & Travel', 'Human Resources', 'Information Technology',
+  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
+  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
+  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
+  'Sales & Business Development', 'Technology & Software', 'Other',
 ]
 const EMP_TYPES = ['Full Time', 'Part Time']
 

@@ -22,10 +22,14 @@ const EDUCATION_OPTIONS = [
 const EXPERIENCE_OPTIONS = ['Less than 1 year', '1–2 years', '3–5 years', '6–10 years', '10+ years']
 
 const FIELDS_WORKED_IN = [
-  'Accounts Receivable', 'Bookkeeping', 'Customer Support', 'Data Entry',
-  'Digital Marketing', 'E-commerce Management', 'Executive Assistant', 'Healthcare',
-  'HR Manager', 'Personal Assistant', 'Project Management', 'Real Estate Management',
-  'Sales Representative', 'Social Media Management', 'Travel Concierge', 'Web Development',
+  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
+  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
+  'Education & Training', 'Engineering', 'Healthcare & Medical',
+  'Hospitality & Travel', 'Human Resources', 'Information Technology',
+  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
+  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
+  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
+  'Sales & Business Development', 'Technology & Software', 'Other',
 ]
 
 const EMPLOYMENT_TYPES = ['Full Time', 'Part Time']
