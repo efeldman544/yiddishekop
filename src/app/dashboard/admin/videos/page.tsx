@@ -585,54 +585,77 @@ export default function VideosPage() {
 
   async function uploadToMux(file: File, onStatus: (s: RowStatus) => void): Promise<{ assetId: string; playbackId: string } | null> {
     onStatus('uploading')
-    const res = await fetch('/api/mux/upload-url', { method: 'POST' })
-    const { uploadId, url } = await res.json()
-    await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
+    const urlRes = await fetch('/api/mux/upload-url', { method: 'POST' })
+    if (!urlRes.ok) {
+      const text = await urlRes.text().catch(() => '')
+      throw new Error(`Upload URL failed (${urlRes.status})${text ? ': ' + text : ''}`)
+    }
+    const { uploadId, url } = await urlRes.json()
+    const putRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
+    if (!putRes.ok) throw new Error(`File upload failed (${putRes.status})`)
     onStatus('processing')
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 4000))
       const poll = await fetch(`/api/mux/asset/${uploadId}`)
+      if (!poll.ok) continue
       const data = await poll.json()
       if (data.status === 'ready') return { assetId: data.assetId, playbackId: data.playbackId }
-      if (data.status === 'errored') return null
+      if (data.status === 'errored') throw new Error('Mux processing failed')
     }
-    return null
+    throw new Error('Timed out waiting for video')
+  }
+
+  async function processOneRow(row: BulkRow, supabase: ReturnType<typeof createClient>) {
+    if (row.status === 'done') return
+    try {
+      let muxAssetId: string | null = null
+      let muxPlaybackId: string | null = null
+      if (row.videoFile) {
+        const mux = await uploadToMux(row.videoFile, s => updateBulkRow(row.key, { status: s }))
+        muxAssetId = mux?.assetId ?? null
+        muxPlaybackId = mux?.playbackId ?? null
+      }
+      updateBulkRow(row.key, { status: 'saving' })
+      if (row.matchedId) {
+        const { error: insErr } = await supabase.from('videos').insert({
+          candidate_id: row.matchedId,
+          mux_asset_id: muxAssetId, mux_playback_id: muxPlaybackId,
+          transcript: row.transcriptText ?? null, approved: true,
+        })
+        if (insErr) throw new Error(insErr.message)
+        await supabase.from('candidate_profiles').update({
+          interviewed: true, interviewed_at: new Date().toISOString(),
+        }).eq('id', row.matchedId)
+      } else {
+        const { error: insErr } = await supabase.from('video_candidates').insert({
+          name: row.candidateName.trim(),
+          mux_asset_id: muxAssetId, mux_playback_id: muxPlaybackId,
+          transcript: row.transcriptText ?? null,
+        })
+        if (insErr) throw new Error(insErr.message)
+      }
+      updateBulkRow(row.key, { status: 'done', error: null })
+    } catch (err: any) {
+      updateBulkRow(row.key, { status: 'error', error: err.message ?? 'Failed' })
+    }
   }
 
   async function runBulkUpload() {
     setBulkRunning(true)
     const supabase = createClient()
-    await Promise.all(bulkRows.map(async row => {
-      if (row.status === 'done') return
-      try {
-        let muxAssetId: string | null = null
-        let muxPlaybackId: string | null = null
-        if (row.videoFile) {
-          const mux = await uploadToMux(row.videoFile, s => updateBulkRow(row.key, { status: s }))
-          if (mux) { muxAssetId = mux.assetId; muxPlaybackId = mux.playbackId }
+    const pending = bulkRows.filter(r => r.status !== 'done')
+
+    // Process max 2 video uploads concurrently to avoid overwhelming the Mux API
+    const CONCURRENCY = 2
+    let idx = 0
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, async () => {
+        while (idx < pending.length) {
+          const row = pending[idx++]
+          await processOneRow(row, supabase)
         }
-        updateBulkRow(row.key, { status: 'saving' })
-        if (row.matchedId) {
-          await supabase.from('videos').insert({
-            candidate_id: row.matchedId,
-            mux_asset_id: muxAssetId, mux_playback_id: muxPlaybackId,
-            transcript: row.transcriptText ?? null, approved: true,
-          })
-          await supabase.from('candidate_profiles').update({
-            interviewed: true, interviewed_at: new Date().toISOString(),
-          }).eq('id', row.matchedId)
-        } else {
-          await supabase.from('video_candidates').insert({
-            name: row.candidateName.trim(),
-            mux_asset_id: muxAssetId, mux_playback_id: muxPlaybackId,
-            transcript: row.transcriptText ?? null,
-          })
-        }
-        updateBulkRow(row.key, { status: 'done', error: null })
-      } catch (err: any) {
-        updateBulkRow(row.key, { status: 'error', error: err.message ?? 'Failed' })
-      }
-    }))
+      })
+    )
     setBulkRunning(false)
     await load()
   }
