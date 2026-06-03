@@ -216,7 +216,7 @@ export default function VideosPage() {
     const toRemove: string[] = []
 
     await Promise.all(videoCandidates.map(async vc => {
-      const hit = matchCandidate(vc.name, opts)
+      const hit = matchCandidate(cleanFolderName(vc.name), opts)
       if (!hit) return
       await supabase.from('videos').insert({
         candidate_id: hit.id,
