@@ -94,28 +94,56 @@ function parseVtt(text: string): string {
     .trim()
 }
 
+// Zoom creates these non-content files inside every recording folder — skip them
+const ZOOM_SKIP = /^(chat|meeting_saved_chat|playback|recording_info|attendee_audio)/i
+// Zoom-generated recording filenames — means candidate name is in the FOLDER, not the file
+const ZOOM_RECORDING_FILENAME = /^(zoom_?\d*|gmt\d{6,}|audio_only|video_only|gallery|speaker|closed_caption|meeting_saved|screen)/i
+// Zoom-generated subfolder names — skip these when looking for candidate folder
+const ZOOM_INTERNAL_DIR = /^(zoom_?\d*|gmt\d{6,}|audio_only|gallery|speaker_view|active_speaker)/i
+
 function groupByFolder(files: FileList): Map<string, { mp4: File | null; txt: File | null }> {
   const groups = new Map<string, { mp4: File | null; txt: File | null }>()
   for (const file of Array.from(files)) {
-    const parts = (file.webkitRelativePath || file.name).split('/')
+    const relPath = file.webkitRelativePath || file.name
+    const parts = relPath.split('/')
     const n = file.name.toLowerCase()
-    const isVideo = n.endsWith('.mp4') || n.endsWith('.mov') || n.endsWith('.webm') || file.type.startsWith('video/')
-    const isTranscript = n.endsWith('.txt') || n.endsWith('.vtt')
+    const nameNoExt = file.name.replace(/\.[^.]+$/, '')
+
+    // Skip Zoom auto-generated non-interview files
+    if (ZOOM_SKIP.test(nameNoExt)) continue
+
+    const isVideo = (n.endsWith('.mp4') || n.endsWith('.mov') || n.endsWith('.webm'))
+                 && !n.includes('audio_only')
+    const isTranscript = n.endsWith('.vtt') || n.endsWith('.txt')
     if (!isVideo && !isTranscript) continue
 
-    let key: string
+    let key = ''
+
     if (parts.length >= 2) {
-      key = cleanFolderName(parts[parts.length - 2])
+      // Find nearest non-internal parent folder
+      let parentIdx = parts.length - 2
+      while (parentIdx > 0 && ZOOM_INTERNAL_DIR.test(parts[parentIdx])) parentIdx--
+      const parentKey = parentIdx > 0 ? cleanFolderName(parts[parentIdx]) : ''
+
+      // If the filename itself carries the candidate name (not a Zoom internal name),
+      // use it — handles flat files like "YiddisheKop/2025-07-22 Name_ Interview.mp4"
+      const cleanedFile = cleanFolderName(nameNoExt)
+      if (!ZOOM_RECORDING_FILENAME.test(nameNoExt) && cleanedFile && cleanedFile !== parentKey) {
+        key = cleanedFile
+      } else {
+        key = parentKey
+      }
     } else {
-      key = cleanFolderName(file.name.replace(/\.[^.]+$/, ''))
+      key = cleanFolderName(nameNoExt)
     }
+
     if (!key) continue
     if (!groups.has(key)) groups.set(key, { mp4: null, txt: null })
     const g = groups.get(key)!
     if (isVideo && !g.mp4) g.mp4 = file
     // prefer .vtt (Zoom native) but fall back to .txt
     else if (isTranscript && !g.txt) g.txt = file
-    else if (isTranscript && n.endsWith('.vtt')) g.txt = file // upgrade to vtt if we had txt
+    else if (isTranscript && n.endsWith('.vtt')) g.txt = file
   }
   return groups
 }
@@ -195,7 +223,6 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
     const pWords = nameWords(p.label)
     let sim = 0
     if (words.length >= 2 && pWords.length >= 2) {
-      // Each input word must fuzzy-match a distinct profile word
       let matched = 0
       const used = new Set<number>()
       for (const w of words) {
@@ -214,6 +241,41 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
     if (sim > bestSim) { bestSim = sim; best = p }
   }
   return bestSim >= 0.82 ? best : null
+}
+
+// Like matchCandidate but returns the best candidate even below threshold (for suggestions)
+function bestFuzzyMatch(name: string, profiles: CandidateOption[]): { match: CandidateOption | null; score: number } {
+  const key = normalize(name)
+  const words = nameWords(name)
+
+  // Check exact / word-order passes first
+  const exact = matchCandidate(name, profiles)
+  if (exact) return { match: exact, score: 1 }
+
+  let best: CandidateOption | null = null
+  let bestSim = 0
+  for (const p of profiles) {
+    const pWords = nameWords(p.label)
+    let sim = 0
+    if (words.length >= 2 && pWords.length >= 2) {
+      let matched = 0
+      const used = new Set<number>()
+      for (const w of words) {
+        let topScore = 0, topIdx = -1
+        pWords.forEach((pw, i) => {
+          if (used.has(i)) return
+          const s = jaroWinkler(w, pw)
+          if (s > topScore) { topScore = s; topIdx = i }
+        })
+        if (topScore >= 0.7) { matched++; used.add(topIdx) }
+      }
+      sim = matched / Math.max(words.length, pWords.length)
+    } else {
+      sim = jaroWinkler(key, normalize(p.label))
+    }
+    if (sim > bestSim) { bestSim = sim; best = p }
+  }
+  return { match: bestSim >= 0.6 ? best : null, score: bestSim }
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -237,6 +299,9 @@ export default function VideosPage() {
   // re-match all unmatched video_candidates
   const [rematching, setRematching] = useState(false)
   const [rematchResult, setRematchResult] = useState<string | null>(null)
+  // near-match suggestions for video candidates that didn't fully auto-match
+  const [suggestions, setSuggestions] = useState<Record<string, CandidateOption>>({})
+  const [confirmingSuggestion, setConfirmingSuggestion] = useState<string | null>(null)
 
   // bulk upload state
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -255,9 +320,19 @@ export default function VideosPage() {
         .order('created_at', { ascending: false }),
       supabase.from('candidate_profiles').select('id, full_name').order('full_name'),
     ])
+    const opts: CandidateOption[] = ((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? p.id }))
     setUnassigned((vids ?? []) as UnassignedVideo[])
     setVideoCandidates((vcs ?? []) as VideoCandidate[])
-    setCandidateOptions(((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? p.id })))
+    setCandidateOptions(opts)
+
+    // Pre-compute near-match suggestions for unmatched video candidates
+    const sugg: Record<string, CandidateOption> = {}
+    for (const vc of vcs ?? []) {
+      if (matchCandidate(cleanFolderName(vc.name), opts)) continue // already exact match
+      const { match } = bestFuzzyMatch(cleanFolderName(vc.name), opts)
+      if (match) sugg[vc.id] = match
+    }
+    setSuggestions(sugg)
     setLoading(false)
   }
 
@@ -273,10 +348,50 @@ export default function VideosPage() {
 
     let matched = 0
     const toRemove: string[] = []
+    const newSugg: Record<string, CandidateOption> = {}
 
     await Promise.all(videoCandidates.map(async vc => {
-      const hit = matchCandidate(cleanFolderName(vc.name), opts)
-      if (!hit) return
+      const cleaned = cleanFolderName(vc.name)
+      const hit = matchCandidate(cleaned, opts)
+      if (hit) {
+        await supabase.from('videos').insert({
+          candidate_id: hit.id,
+          mux_asset_id: vc.mux_asset_id,
+          mux_playback_id: vc.mux_playback_id,
+          transcript: vc.transcript,
+          approved: true,
+        })
+        await supabase.from('candidate_profiles').update({
+          interviewed: true, interviewed_at: new Date().toISOString(),
+        }).eq('id', hit.id)
+        await supabase.from('video_candidates').delete().eq('id', vc.id)
+        toRemove.push(vc.id)
+        matched++
+      } else {
+        // Collect near-matches for manual review
+        const { match } = bestFuzzyMatch(cleaned, opts)
+        if (match) newSugg[vc.id] = match
+      }
+    }))
+
+    setVideoCandidates(prev => prev.filter(v => !toRemove.includes(v.id)))
+    setSuggestions(prev => ({ ...prev, ...newSugg }))
+    const nearCount = Object.keys(newSugg).length
+    setRematchResult(
+      `Matched ${matched} of ${videoCandidates.length}.` +
+      (nearCount > 0 ? ` ${nearCount} need review (see suggestions below).` : '')
+    )
+    setRematching(false)
+  }
+
+  // ── Confirm a near-match suggestion ────────────────────────────────────
+  async function handleConfirmSuggestion(vcId: string) {
+    const hit = suggestions[vcId]
+    if (!hit) return
+    setConfirmingSuggestion(vcId)
+    const supabase = createClient()
+    const vc = videoCandidates.find(v => v.id === vcId)
+    if (vc) {
       await supabase.from('videos').insert({
         candidate_id: hit.id,
         mux_asset_id: vc.mux_asset_id,
@@ -287,14 +402,11 @@ export default function VideosPage() {
       await supabase.from('candidate_profiles').update({
         interviewed: true, interviewed_at: new Date().toISOString(),
       }).eq('id', hit.id)
-      await supabase.from('video_candidates').delete().eq('id', vc.id)
-      toRemove.push(vc.id)
-      matched++
-    }))
-
-    setVideoCandidates(prev => prev.filter(v => !toRemove.includes(v.id)))
-    setRematchResult(`Matched ${matched} of ${videoCandidates.length} candidates.`)
-    setRematching(false)
+    }
+    await supabase.from('video_candidates').delete().eq('id', vcId)
+    setVideoCandidates(prev => prev.filter(v => v.id !== vcId))
+    setSuggestions(prev => { const n = { ...prev }; delete n[vcId]; return n })
+    setConfirmingSuggestion(null)
   }
 
   // ── Assign unassigned video to a candidate ──────────────────────────────
@@ -731,8 +843,26 @@ export default function VideosPage() {
                 <p className="text-xs text-gray-400 mt-0.5">
                   {[vc.current_job_title, vc.location].filter(Boolean).join(' · ')}
                 </p>
+                {suggestions[vc.id] && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+                      Possible match: <strong>{suggestions[vc.id].label}</strong>
+                    </span>
+                    <button
+                      onClick={() => handleConfirmSuggestion(vc.id)}
+                      disabled={confirmingSuggestion === vc.id}
+                      className="text-xs text-emerald-600 hover:text-emerald-800 font-medium disabled:opacity-50">
+                      {confirmingSuggestion === vc.id ? 'Linking…' : '✓ Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setSuggestions(p => { const n = { ...p }; delete n[vc.id]; return n })}
+                      className="text-xs text-gray-400 hover:text-gray-600">
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <Link href={`/dashboard/admin/video-candidates/${vc.id}`}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2">
+                  className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2 block mt-1">
                   View full profile →
                 </Link>
               </div>
