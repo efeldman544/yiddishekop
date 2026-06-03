@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -115,8 +115,16 @@ export default function MatchingClient({
   const [aiRunning, setAiRunning] = useState(false)
   const [aiProgress, setAiProgress] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const analyzedJobs = useRef<Set<string>>(new Set())
 
   const selectedJob = jobs.find(j => j.id === selectedJobId) ?? null
+
+  // Auto-run AI when switching to a job that hasn't been analyzed yet
+  useEffect(() => {
+    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
+    analyzedJobs.current.add(selectedJobId)
+    runAiMatching() // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scoredCandidates = useMemo<ScoredCandidate[]>(() => {
     if (!selectedJob) return []
@@ -151,7 +159,12 @@ export default function MatchingClient({
         const map: Record<string, AiResult> = {}
         for (const r of results) map[r.candidateId] = r
         setAiScores(prev => ({ ...prev, ...map }))
+      } else {
+        // Allow retry on failure
+        analyzedJobs.current.delete(selectedJobId)
       }
+    } catch {
+      analyzedJobs.current.delete(selectedJobId)
     } finally {
       setAiRunning(false)
       setAiProgress(100)
@@ -233,7 +246,7 @@ export default function MatchingClient({
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${JOB_STATUS_BADGE[selectedJob.status] ?? ''}`}>{selectedJob.status}</span>
                   <Button size="sm" onClick={runAiMatching} disabled={aiRunning}>
-                    {aiRunning ? 'Analyzing…' : hasAiForJob ? 'Re-run AI' : '✦ AI Analysis'}
+                    {aiRunning ? 'Analyzing…' : 'Re-run AI'}
                   </Button>
                 </div>
               </div>
@@ -252,7 +265,7 @@ export default function MatchingClient({
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                 {sortedCandidates.length} active candidate{sortedCandidates.length !== 1 ? 's' : ''}
-                {hasAiForJob ? ' — sorted by AI score' : ' — sorted by rule match'}
+                {hasAiForJob ? ' · AI scored' : aiRunning ? ' · AI analyzing…' : ''}
               </p>
               <p className="text-[11px] text-gray-400">{assignedCount(selectedJob.id)} assigned</p>
             </div>
