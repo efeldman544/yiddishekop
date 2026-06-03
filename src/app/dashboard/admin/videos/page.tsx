@@ -120,6 +120,40 @@ function groupByFolder(files: FileList): Map<string, { mp4: File | null; txt: Fi
   return groups
 }
 
+// Jaro-Winkler similarity (0–1) — handles transpositions and spelling variants
+function jaroSimilarity(a: string, b: string): number {
+  if (a === b) return 1
+  if (!a.length || !b.length) return 0
+  const dist = Math.floor(Math.max(a.length, b.length) / 2) - 1
+  const aM = new Uint8Array(a.length), bM = new Uint8Array(b.length)
+  let matches = 0
+  for (let i = 0; i < a.length; i++) {
+    const lo = Math.max(0, i - dist), hi = Math.min(i + dist + 1, b.length)
+    for (let j = lo; j < hi; j++) {
+      if (bM[j] || a[i] !== b[j]) continue
+      aM[i] = bM[j] = 1; matches++; break
+    }
+  }
+  if (!matches) return 0
+  let t = 0, k = 0
+  for (let i = 0; i < a.length; i++) {
+    if (!aM[i]) continue
+    while (!bM[k]) k++
+    if (a[i] !== b[k]) t++
+    k++
+  }
+  return (matches / a.length + matches / b.length + (matches - t / 2) / matches) / 3
+}
+
+function jaroWinkler(a: string, b: string): number {
+  const j = jaroSimilarity(a, b)
+  let p = 0
+  for (let i = 0; i < Math.min(4, a.length, b.length); i++) {
+    if (a[i] === b[i]) p++; else break
+  }
+  return j + p * 0.1 * (1 - j)
+}
+
 function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOption | null {
   const key = normalize(name)
   const words = nameWords(name)
@@ -137,7 +171,7 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
     })
     if (m) return m
 
-    // 3. Relaxed: all input words found in profile (profile may have middle name etc.)
+    // 3. Relaxed: all input words found in profile (handles middle names)
     m = profiles.find(p => {
       const pw = nameWords(p.label)
       return words.every(w => pw.some(pw2 => pw2.startsWith(w) || w.startsWith(pw2)))
@@ -145,7 +179,7 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
     if (m) return m
   }
 
-  // 4. Substring fallback (only if key is long enough to avoid false positives)
+  // 4. Substring fallback
   if (key.length >= 6) {
     m = profiles.find(p => {
       const pk = normalize(p.label)
@@ -154,7 +188,32 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
     if (m) return m
   }
 
-  return null
+  // 5. Jaro-Winkler fuzzy: per-word similarity handles spelling variants ("Gittel"/"Gittle", "Rivkah"/"Rivka")
+  let best: CandidateOption | null = null
+  let bestSim = 0
+  for (const p of profiles) {
+    const pWords = nameWords(p.label)
+    let sim = 0
+    if (words.length >= 2 && pWords.length >= 2) {
+      // Each input word must fuzzy-match a distinct profile word
+      let matched = 0
+      const used = new Set<number>()
+      for (const w of words) {
+        let topScore = 0, topIdx = -1
+        pWords.forEach((pw, i) => {
+          if (used.has(i)) return
+          const s = jaroWinkler(w, pw)
+          if (s > topScore) { topScore = s; topIdx = i }
+        })
+        if (topScore >= 0.82) { matched++; used.add(topIdx) }
+      }
+      sim = matched / Math.max(words.length, pWords.length)
+    } else {
+      sim = jaroWinkler(key, normalize(p.label))
+    }
+    if (sim > bestSim) { bestSim = sim; best = p }
+  }
+  return bestSim >= 0.82 ? best : null
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
