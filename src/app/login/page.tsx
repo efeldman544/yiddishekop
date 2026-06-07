@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div>
           <span className="text-white font-bold text-xl tracking-tight">YiddisheKop</span>
           <p className="text-gray-400 text-sm mt-8 leading-relaxed">
-            Connecting top talent with growing businesses across the Yiddish-speaking community.
+            Connecting great talent with the businesses that need them.
           </p>
         </div>
         <p className="text-gray-600 text-xs">© 2025 YiddisheKop</p>

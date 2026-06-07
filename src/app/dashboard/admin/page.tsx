@@ -62,6 +62,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [industries, setIndustries] = useState<string[]>([])
+  const [industriesExpanded, setIndustriesExpanded] = useState(false)
   const [status, setStatus] = useState('')
   const [employment, setEmployment] = useState('')
   const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
@@ -205,6 +206,12 @@ export default function AdminDashboard() {
     setIndustries(prev => prev.includes(val) ? prev.filter(i => i !== val) : [...prev, val])
   }
 
+  const INDUSTRY_PREVIEW_COUNT = 8
+  const visibleIndustries = industriesExpanded
+    ? INDUSTRIES
+    : INDUSTRIES.filter((ind, i) => industries.includes(ind) || i < INDUSTRY_PREVIEW_COUNT)
+  const hiddenIndustryCount = INDUSTRIES.length - visibleIndustries.length
+
   async function toggleJobAssignment(candidateId: string, jobId: string) {
     const key = `${candidateId}-${jobId}`
     setTogglingAssign(key)
@@ -278,7 +285,7 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] font-medium text-gray-400 mr-0.5">Industry</span>
-            {INDUSTRIES.map(ind => (
+            {visibleIndustries.map(ind => (
               <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   industries.includes(ind)
@@ -288,6 +295,18 @@ export default function AdminDashboard() {
                 {ind}
               </button>
             ))}
+            {hiddenIndustryCount > 0 && (
+              <button type="button" onClick={() => setIndustriesExpanded(true)}
+                className="px-2.5 py-1 rounded-full text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
+                +{hiddenIndustryCount} more
+              </button>
+            )}
+            {industriesExpanded && (
+              <button type="button" onClick={() => setIndustriesExpanded(false)}
+                className="px-2.5 py-1 rounded-full text-xs font-medium text-gray-400 hover:text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
+                Show less
+              </button>
+            )}
             {industries.length > 0 && (
               <button type="button" onClick={() => setIndustries([])} className="text-xs text-red-400 hover:text-red-600 transition-colors ml-1">
                 Clear
