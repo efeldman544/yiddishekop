@@ -15,7 +15,7 @@ const NAV = [
     ),
   },
   {
-    label: 'Pipeline',
+    label: 'Matching',
     href: '/dashboard/admin/matching',
     exact: false,
     icon: (
