@@ -72,6 +72,11 @@ export default function JobsClient({
   const [activeTab, setActiveTab] = useState<'jobs' | 'employers'>('jobs')
   const [employerAccounts, setEmployerAccounts] = useState<{id: string; full_name: string | null; email: string | null; created_at: string}[] | null>(null)
   const [loadingEmployers, setLoadingEmployers] = useState(false)
+  const [employerPanelOpen, setEmployerPanelOpen] = useState(false)
+  const [employerForm, setEmployerForm] = useState({ full_name: '', email: '', company_name: '' })
+  const [employerError, setEmployerError] = useState<string | null>(null)
+  const [creatingEmployer, setCreatingEmployer] = useState(false)
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null)
 
   function openNew() { setEditingId(null); setForm(EMPTY_FORM); setError(null); setPanelOpen(true) }
 
@@ -99,6 +104,52 @@ export default function JobsClient({
       .order('full_name')
     setEmployerAccounts(data ?? [])
     setLoadingEmployers(false)
+  }
+
+  function openNewEmployer() {
+    setEmployerForm({ full_name: '', email: '', company_name: '' })
+    setEmployerError(null)
+    setCreatedCredentials(null)
+    setEmployerPanelOpen(true)
+  }
+
+  function closeEmployerPanel() {
+    setEmployerPanelOpen(false)
+    setEmployerError(null)
+    setCreatedCredentials(null)
+  }
+
+  async function handleCreateEmployer() {
+    if (!employerForm.full_name.trim()) { setEmployerError('Full name is required.'); return }
+    if (!employerForm.email.trim()) { setEmployerError('Email is required.'); return }
+    setCreatingEmployer(true)
+    setEmployerError(null)
+    try {
+      const res = await fetch('/api/admin/create-employer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: employerForm.email.trim(),
+          full_name: employerForm.full_name.trim(),
+          company_name: employerForm.company_name.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        setEmployerError(text || `Failed to create employer (${res.status})`)
+        return
+      }
+      const data = await res.json()
+      setCreatedCredentials({ email: data.email, password: data.password })
+      setEmployerAccounts(prev => [
+        { id: data.id, full_name: data.full_name, email: data.email, created_at: new Date().toISOString() },
+        ...(prev ?? []),
+      ])
+      const newEmp: EmployerOption = { id: data.id, company_name: data.company_name, full_name: data.full_name }
+      setEmployers(prev => [...prev, newEmp].sort((a, b) => employerLabel(a).localeCompare(employerLabel(b))))
+    } finally {
+      setCreatingEmployer(false)
+    }
   }
 
   function set<K extends keyof FormState>(key: K, value: string) {
@@ -234,6 +285,7 @@ export default function JobsClient({
           <>
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Employers</h2>
+              <Button onClick={openNewEmployer}>+ Add employer</Button>
             </div>
             {loadingEmployers ? (
               <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
@@ -364,6 +416,86 @@ export default function JobsClient({
                 <Button variant="outline" onClick={closePanel}>Cancel</Button>
                 <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save job'}</Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {employerPanelOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/30" onClick={closeEmployerPanel} />
+          <div className="w-full max-w-lg bg-background shadow-2xl flex flex-col overflow-hidden border-l border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-[15px] font-semibold tracking-tight">Add employer</h3>
+              <Button variant="ghost" size="icon-sm" onClick={closeEmployerPanel} className="text-muted-foreground">×</Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+              {employerError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{employerError}</AlertDescription>
+                </Alert>
+              )}
+
+              {createdCredentials ? (
+                <div className="space-y-3">
+                  <Alert>
+                    <AlertDescription>
+                      Account created. Share these credentials with the employer — the password won&apos;t be shown again.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 space-y-1.5 text-sm">
+                    <p><span className="text-muted-foreground">Email:</span> <span className="font-medium">{createdCredentials.email}</span></p>
+                    <p><span className="text-muted-foreground">Temporary password:</span> <span className="font-mono font-medium">{createdCredentials.password}</span></p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="emp_full_name">Full name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="emp_full_name"
+                      value={employerForm.full_name}
+                      onChange={e => setEmployerForm(prev => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="e.g. Sara Klein"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="emp_email">Email <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="emp_email"
+                      type="email"
+                      value={employerForm.email}
+                      onChange={e => setEmployerForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="employer@company.com"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="emp_company_name">Company name</Label>
+                    <Input
+                      id="emp_company_name"
+                      value={employerForm.company_name}
+                      onChange={e => setEmployerForm(prev => ({ ...prev, company_name: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                    />
+                    <p className="text-xs text-muted-foreground">Optional — shown throughout the app once set.</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    A temporary password will be generated automatically. You&apos;ll see it once after creating the account so you can pass it along.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-2">
+              {createdCredentials ? (
+                <Button onClick={closeEmployerPanel}>Done</Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={closeEmployerPanel}>Cancel</Button>
+                  <Button onClick={handleCreateEmployer} disabled={creatingEmployer}>{creatingEmployer ? 'Creating…' : 'Create account'}</Button>
+                </>
+              )}
             </div>
           </div>
         </div>

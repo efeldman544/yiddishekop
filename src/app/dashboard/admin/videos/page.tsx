@@ -243,40 +243,7 @@ function matchCandidate(name: string, profiles: CandidateOption[]): CandidateOpt
   return bestSim >= 0.82 ? best : null
 }
 
-// Like matchCandidate but returns the best candidate even below threshold (for suggestions)
-function bestFuzzyMatch(name: string, profiles: CandidateOption[]): { match: CandidateOption | null; score: number } {
-  const key = normalize(name)
-  const words = nameWords(name)
-
-  // Check exact / word-order passes first
-  const exact = matchCandidate(name, profiles)
-  if (exact) return { match: exact, score: 1 }
-
-  let best: CandidateOption | null = null
-  let bestSim = 0
-  for (const p of profiles) {
-    const pWords = nameWords(p.label)
-    let sim = 0
-    if (words.length >= 2 && pWords.length >= 2) {
-      let matched = 0
-      const used = new Set<number>()
-      for (const w of words) {
-        let topScore = 0, topIdx = -1
-        pWords.forEach((pw, i) => {
-          if (used.has(i)) return
-          const s = jaroWinkler(w, pw)
-          if (s > topScore) { topScore = s; topIdx = i }
-        })
-        if (topScore >= 0.7) { matched++; used.add(topIdx) }
-      }
-      sim = matched / Math.max(words.length, pWords.length)
-    } else {
-      sim = jaroWinkler(key, normalize(p.label))
-    }
-    if (sim > bestSim) { bestSim = sim; best = p }
-  }
-  return { match: bestSim >= 0.6 ? best : null, score: bestSim }
-}
+type NameSuggestion = { match: CandidateOption; confidence: 'high' | 'medium' | 'low'; reason: string }
 
 // ── Main component ───────────────────────────────────────────────────────────
 
@@ -299,8 +266,8 @@ export default function VideosPage() {
   // re-match all unmatched video_candidates
   const [rematching, setRematching] = useState(false)
   const [rematchResult, setRematchResult] = useState<string | null>(null)
-  // near-match suggestions for video candidates that didn't fully auto-match
-  const [suggestions, setSuggestions] = useState<Record<string, CandidateOption>>({})
+  // AI-suggested matches for video candidates that didn't fully auto-match
+  const [suggestions, setSuggestions] = useState<Record<string, NameSuggestion>>({})
   const [confirmingSuggestion, setConfirmingSuggestion] = useState<string | null>(null)
 
   // bulk upload state
@@ -324,70 +291,85 @@ export default function VideosPage() {
     setUnassigned((vids ?? []) as UnassignedVideo[])
     setVideoCandidates((vcs ?? []) as VideoCandidate[])
     setCandidateOptions(opts)
-
-    // Pre-compute near-match suggestions for unmatched video candidates
-    const sugg: Record<string, CandidateOption> = {}
-    for (const vc of vcs ?? []) {
-      if (matchCandidate(cleanFolderName(vc.name), opts)) continue // already exact match
-      const { match } = bestFuzzyMatch(cleanFolderName(vc.name), opts)
-      if (match) sugg[vc.id] = match
-    }
-    setSuggestions(sugg)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  // ── Re-match all video_candidates to profiles ───────────────────────────
+  // ── Re-match all video_candidates to profiles using AI name matching ────
   async function handleRematchAll() {
     setRematching(true)
     setRematchResult(null)
+    setSuggestions({})
     const supabase = createClient()
-    const { data: profs } = await supabase.from('candidate_profiles').select('id, full_name').order('full_name')
-    const opts: CandidateOption[] = ((profs ?? []) as any[]).map(p => ({ id: p.id, label: p.full_name ?? '' }))
+    const total = videoCandidates.length
 
-    let matched = 0
-    const toRemove: string[] = []
-    const newSugg: Record<string, CandidateOption> = {}
-
-    await Promise.all(videoCandidates.map(async vc => {
-      const cleaned = cleanFolderName(vc.name)
-      const hit = matchCandidate(cleaned, opts)
-      if (hit) {
-        await supabase.from('videos').insert({
-          candidate_id: hit.id,
-          mux_asset_id: vc.mux_asset_id,
-          mux_playback_id: vc.mux_playback_id,
-          transcript: vc.transcript,
-          approved: true,
-        })
-        await supabase.from('candidate_profiles').update({
-          interviewed: true, interviewed_at: new Date().toISOString(),
-        }).eq('id', hit.id)
-        await supabase.from('video_candidates').delete().eq('id', vc.id)
-        toRemove.push(vc.id)
-        matched++
-      } else {
-        // Collect near-matches for manual review
-        const { match } = bestFuzzyMatch(cleaned, opts)
-        if (match) newSugg[vc.id] = match
+    try {
+      const res = await fetch('/api/admin/ai-name-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoCandidates: videoCandidates.map(vc => ({ id: vc.id, name: cleanFolderName(vc.name) || vc.name })),
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        setRematchResult(`AI matching failed (${res.status})${text ? ': ' + text : ''}`)
+        return
       }
-    }))
+      const { results } = await res.json() as {
+        results: { videoId: string; candidateId: string | null; confidence: 'high' | 'medium' | 'low' | 'none'; reason: string }[]
+      }
 
-    setVideoCandidates(prev => prev.filter(v => !toRemove.includes(v.id)))
-    setSuggestions(prev => ({ ...prev, ...newSugg }))
-    const nearCount = Object.keys(newSugg).length
-    setRematchResult(
-      `Matched ${matched} of ${videoCandidates.length}.` +
-      (nearCount > 0 ? ` ${nearCount} need review (see suggestions below).` : '')
-    )
-    setRematching(false)
+      const profileById: Record<string, CandidateOption> = {}
+      for (const opt of candidateOptions) profileById[opt.id] = opt
+
+      let matched = 0
+      const toRemove: string[] = []
+      const newSugg: Record<string, NameSuggestion> = {}
+
+      await Promise.all(results.map(async r => {
+        const hit = r.candidateId ? profileById[r.candidateId] : null
+        if (!hit) return
+        const vc = videoCandidates.find(v => v.id === r.videoId)
+        if (!vc) return
+
+        if (r.confidence === 'high') {
+          await supabase.from('videos').insert({
+            candidate_id: hit.id,
+            mux_asset_id: vc.mux_asset_id,
+            mux_playback_id: vc.mux_playback_id,
+            transcript: vc.transcript,
+            approved: true,
+          })
+          await supabase.from('candidate_profiles').update({
+            interviewed: true, interviewed_at: new Date().toISOString(),
+          }).eq('id', hit.id)
+          await supabase.from('video_candidates').delete().eq('id', vc.id)
+          toRemove.push(vc.id)
+          matched++
+        } else if (r.confidence === 'medium' || r.confidence === 'low') {
+          newSugg[vc.id] = { match: hit, confidence: r.confidence, reason: r.reason }
+        }
+      }))
+
+      setVideoCandidates(prev => prev.filter(v => !toRemove.includes(v.id)))
+      setSuggestions(newSugg)
+      const reviewCount = Object.keys(newSugg).length
+      setRematchResult(
+        `AI matched ${matched} of ${total}.` +
+        (reviewCount > 0 ? ` ${reviewCount} need review (see suggestions below).` : '')
+      )
+    } finally {
+      setRematching(false)
+    }
   }
 
-  // ── Confirm a near-match suggestion ────────────────────────────────────
+  // ── Confirm an AI-suggested match ───────────────────────────────────────
   async function handleConfirmSuggestion(vcId: string) {
-    const hit = suggestions[vcId]
-    if (!hit) return
+    const sugg = suggestions[vcId]
+    if (!sugg) return
+    const hit = sugg.match
     setConfirmingSuggestion(vcId)
     const supabase = createClient()
     const vc = videoCandidates.find(v => v.id === vcId)
@@ -851,7 +833,7 @@ export default function VideosPage() {
             <div className="flex items-center gap-3">
               {rematchResult && <span className="text-xs text-emerald-600">{rematchResult}</span>}
               <Button size="sm" variant="outline" onClick={handleRematchAll} disabled={rematching}>
-                {rematching ? 'Matching…' : 'Re-match all to profiles'}
+                {rematching ? 'AI matching…' : '✦ AI re-match all'}
               </Button>
             </div>
           )}
@@ -867,21 +849,27 @@ export default function VideosPage() {
                   {[vc.current_job_title, vc.location].filter(Boolean).join(' · ')}
                 </p>
                 {suggestions[vc.id] && (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
-                      Possible match: <strong>{suggestions[vc.id].label}</strong>
+                  <div className="flex items-start gap-2 mt-1.5">
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 max-w-md">
+                      <span className="font-medium uppercase tracking-wide text-[10px] text-amber-500 mr-1">
+                        {suggestions[vc.id].confidence} confidence
+                      </span>
+                      AI suggests: <strong>{suggestions[vc.id].match.label}</strong>
+                      {suggestions[vc.id].reason && <span className="block text-amber-600 mt-0.5">{suggestions[vc.id].reason}</span>}
                     </span>
-                    <button
-                      onClick={() => handleConfirmSuggestion(vc.id)}
-                      disabled={confirmingSuggestion === vc.id}
-                      className="text-xs text-emerald-600 hover:text-emerald-800 font-medium disabled:opacity-50">
-                      {confirmingSuggestion === vc.id ? 'Linking…' : '✓ Confirm'}
-                    </button>
-                    <button
-                      onClick={() => setSuggestions(p => { const n = { ...p }; delete n[vc.id]; return n })}
-                      className="text-xs text-gray-400 hover:text-gray-600">
-                      ✕
-                    </button>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        onClick={() => handleConfirmSuggestion(vc.id)}
+                        disabled={confirmingSuggestion === vc.id}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 font-medium disabled:opacity-50 text-left">
+                        {confirmingSuggestion === vc.id ? 'Linking…' : '✓ Confirm'}
+                      </button>
+                      <button
+                        onClick={() => setSuggestions(p => { const n = { ...p }; delete n[vc.id]; return n })}
+                        className="text-xs text-gray-400 hover:text-gray-600 text-left">
+                        ✕ Dismiss
+                      </button>
+                    </div>
                   </div>
                 )}
                 <Link href={`/dashboard/admin/video-candidates/${vc.id}`}
