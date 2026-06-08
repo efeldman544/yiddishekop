@@ -42,29 +42,14 @@ const INDUSTRIES = [
 ]
 
 // Candidates filled out `fields_worked_in` under earlier, differently-worded category
-// lists before the current set was adopted. Map each current category to the legacy
-// labels it replaced so filtering still surfaces those older profiles.
-const INDUSTRY_LEGACY_ALIASES: Record<string, string[]> = {
-  'Accounting & Finance': ['Accounting', 'Accounts Receivable', 'Bookkeeping'],
-  'Administrative & Office Support': ['Admin', 'Data Entry', 'Executive Assistant', 'Personal Assistant', 'Project Management'],
-  'Arts & Creative': ['Design'],
-  'Customer Service': ['Customer Support'],
-  'Education & Training': ['Education'],
-  'Healthcare & Medical': ['Healthcare'],
-  'Human Resources': ['HR Manager'],
-  'Hospitality & Travel': ['Travel Concierge'],
-  'Marketing & Advertising': ['Marketing', 'Digital Marketing', 'Social Media Management'],
-  'Real Estate': ['Real Estate Management'],
-  'Retail & E-commerce': ['E-commerce Management'],
-  'Sales & Business Development': ['Sales', 'Sales Representative'],
-  'Technology & Software': ['Tech/Software', 'Web Development'],
-}
-
-function industriesWithLegacyAliases(selected: string[]): string[] {
+// lists before the current set was adopted. `legacyAliases` maps each current category
+// to the older stored values it should also match — populated from the AI-derived
+// mapping fetched in loadIndustryAliases() so it covers whatever is actually in the DB.
+function industriesWithLegacyAliases(selected: string[], legacyAliases: Record<string, string[]>): string[] {
   const expanded = new Set<string>()
   for (const ind of selected) {
     expanded.add(ind)
-    for (const alias of INDUSTRY_LEGACY_ALIASES[ind] ?? []) expanded.add(alias)
+    for (const alias of legacyAliases[ind] ?? []) expanded.add(alias)
   }
   return Array.from(expanded)
 }
@@ -90,6 +75,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [industries, setIndustries] = useState<string[]>([])
+  const [legacyIndustryAliases, setLegacyIndustryAliases] = useState<Record<string, string[]>>({})
   const [industriesExpanded, setIndustriesExpanded] = useState(false)
   const [status, setStatus] = useState('')
   const [employment, setEmployment] = useState('')
@@ -135,6 +121,28 @@ export default function AdminDashboard() {
     loadJobs()
   }, [])
 
+  // Build a current-category → legacy-value alias map (AI-derived from whatever is
+  // actually stored in the DB) so industry filtering also surfaces candidates who
+  // filled out their profile under an older version of the category list.
+  useEffect(() => {
+    async function loadIndustryAliases() {
+      try {
+        const res = await fetch('/api/admin/industry-alias-map')
+        if (!res.ok) return
+        const { aliasMap } = await res.json() as { aliasMap: Record<string, string | null> }
+        const reverse: Record<string, string[]> = {}
+        for (const [legacyValue, current] of Object.entries(aliasMap)) {
+          if (!current) continue
+          ;(reverse[current] ??= []).push(legacyValue)
+        }
+        setLegacyIndustryAliases(reverse)
+      } catch {
+        // Non-critical — filtering just falls back to exact matches only.
+      }
+    }
+    loadIndustryAliases()
+  }, [])
+
   async function toggleInterviewed(candidateId: string, current: boolean | null) {
     setTogglingInterviewed(candidateId)
     const newVal = !current
@@ -162,7 +170,7 @@ export default function AdminDashboard() {
         `full_name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%,current_job_title.ilike.%${search}%`
       )
     }
-    if (industries.length > 0) query = query.overlaps('fields_worked_in', industriesWithLegacyAliases(industries))
+    if (industries.length > 0) query = query.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
     if (status) query = query.eq('status', status)
     if (employment) query = query.overlaps('employment_type', [employment])
     if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
@@ -199,7 +207,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [search, industries, status, employment, interviewedFilter])
+  }, [search, industries, status, employment, interviewedFilter, legacyIndustryAliases])
 
   useEffect(() => {
     const t = setTimeout(fetchCandidates, search ? 300 : 0)
