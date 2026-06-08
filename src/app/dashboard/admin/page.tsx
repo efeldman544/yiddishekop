@@ -41,6 +41,34 @@ const INDUSTRIES = [
   'Sales & Business Development', 'Technology & Software', 'Other',
 ]
 
+// Candidates filled out `fields_worked_in` under earlier, differently-worded category
+// lists before the current set was adopted. Map each current category to the legacy
+// labels it replaced so filtering still surfaces those older profiles.
+const INDUSTRY_LEGACY_ALIASES: Record<string, string[]> = {
+  'Accounting & Finance': ['Accounting', 'Accounts Receivable', 'Bookkeeping'],
+  'Administrative & Office Support': ['Admin', 'Data Entry', 'Executive Assistant', 'Personal Assistant', 'Project Management'],
+  'Arts & Creative': ['Design'],
+  'Customer Service': ['Customer Support'],
+  'Education & Training': ['Education'],
+  'Healthcare & Medical': ['Healthcare'],
+  'Human Resources': ['HR Manager'],
+  'Hospitality & Travel': ['Travel Concierge'],
+  'Marketing & Advertising': ['Marketing', 'Digital Marketing', 'Social Media Management'],
+  'Real Estate': ['Real Estate Management'],
+  'Retail & E-commerce': ['E-commerce Management'],
+  'Sales & Business Development': ['Sales', 'Sales Representative'],
+  'Technology & Software': ['Tech/Software', 'Web Development'],
+}
+
+function industriesWithLegacyAliases(selected: string[]): string[] {
+  const expanded = new Set<string>()
+  for (const ind of selected) {
+    expanded.add(ind)
+    for (const alias of INDUSTRY_LEGACY_ALIASES[ind] ?? []) expanded.add(alias)
+  }
+  return Array.from(expanded)
+}
+
 const STATUS_OPTIONS = ['active', 'inactive', 'placed']
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 
@@ -134,7 +162,7 @@ export default function AdminDashboard() {
         `full_name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%,current_job_title.ilike.%${search}%`
       )
     }
-    if (industries.length > 0) query = query.overlaps('fields_worked_in', industries)
+    if (industries.length > 0) query = query.overlaps('fields_worked_in', industriesWithLegacyAliases(industries))
     if (status) query = query.eq('status', status)
     if (employment) query = query.overlaps('employment_type', [employment])
     if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
