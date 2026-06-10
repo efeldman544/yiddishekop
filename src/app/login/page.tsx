@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/types'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -44,71 +41,59 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="auth-dark">
       {/* Left panel */}
-      <div className="hidden md:flex w-80 bg-gray-950 flex-col justify-between px-10 py-12 shrink-0">
+      <div className="auth-panel">
         <div>
-          <span className="text-white font-bold text-xl tracking-tight">YiddisheKop</span>
-          <p className="text-gray-400 text-sm mt-8 leading-relaxed">
-            Connecting great talent with the businesses that need them.
-          </p>
+          <div className="auth-logo">Yiddishe<span>Kop</span></div>
+          <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
         </div>
-        <p className="text-gray-600 text-xs">© 2025 YiddisheKop</p>
+        <p className="auth-copy">© 2026 YiddisheKop</p>
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-white">
-        <div className="w-full max-w-sm">
-          <div className="md:hidden mb-8">
-            <span className="font-bold text-xl tracking-tight text-gray-950">YiddisheKop</span>
-          </div>
+      {/* Main */}
+      <div className="auth-main">
+        <div className="auth-box">
+          <div className="auth-logo-mobile md:hidden">Yiddishe<span>Kop</span></div>
 
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Welcome back</h1>
-            <p className="text-gray-400 text-sm mt-1.5">Sign in to your account</p>
-          </div>
+          <h1 className="auth-heading">Welcome back</h1>
+          <p className="auth-sub">Sign in to your account</p>
 
-          {error && (
-            <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
-            </div>
-          )}
+          {error && <div className="auth-error">{error}</div>}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-              <Input
+          <form onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label htmlFor="email" className="auth-label">Email</label>
+              <input
                 id="email"
                 name="email"
                 type="email"
                 required
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="h-10"
+                className="auth-input"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
-              <Input
+            <div className="auth-field">
+              <label htmlFor="password" className="auth-label">Password</label>
+              <input
                 id="password"
                 name="password"
                 type="password"
                 required
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="h-10"
+                className="auth-input"
               />
             </div>
-            <Button type="submit" disabled={loading} className="w-full h-10 mt-2">
-              {loading ? 'Signing in...' : 'Sign in'}
-            </Button>
+            <button type="submit" disabled={loading} className="auth-btn">
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
           </form>
 
-          <p className="text-sm text-center text-gray-400 mt-6">
+          <p className="auth-footer">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="font-medium text-gray-950 hover:text-indigo-600 transition-colors">
-              Sign up
-            </Link>
+            <Link href="/signup">Sign up</Link>
           </p>
         </div>
       </div>
