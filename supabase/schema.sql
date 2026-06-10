@@ -51,3 +51,37 @@ create policy "Admins can view all profiles"
       where id = auth.uid() and role = 'admin'
     )
   );
+
+-- ── job_leads: inbound "start hiring" requests from the public landing page ──
+-- Run this in your Supabase SQL Editor to enable the /start-hiring form.
+
+create table public.job_leads (
+  id            uuid default gen_random_uuid() primary key,
+  contact_name  text not null,
+  email         text not null,
+  phone         text,
+  company_name  text,
+  role_title    text not null,
+  employment_type text,
+  hours         text,
+  salary        text,
+  description   text,
+  created_at    timestamptz default now()
+);
+
+alter table public.job_leads enable row level security;
+
+-- Anyone (including unauthenticated visitors) can submit a lead
+create policy "Public can insert job leads"
+  on public.job_leads for insert
+  with check (true);
+
+-- Only admins can view submissions
+create policy "Admins can view job leads"
+  on public.job_leads for select
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
