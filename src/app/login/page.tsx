@@ -95,6 +95,9 @@ export default function LoginPage() {
             Don&apos;t have an account?{' '}
             <Link href="/signup">Sign up</Link>
           </p>
+          <p className="auth-footer" style={{ marginTop: 8 }}>
+            <Link href="/" style={{ color: 'var(--auth-dim)' }}>← Back to home</Link>
+          </p>
         </div>
       </div>
     </div>

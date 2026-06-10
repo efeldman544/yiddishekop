@@ -33,7 +33,7 @@ export default function LandingPage() {
             <a href="#roles" onClick={closeMenu}>Roles</a>
           </nav>
           <div className="lp-nav-right">
-            <a href="#portals" className="lp-btn lp-btn-ghost">Log in</a>
+            <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
             <a href="#start" className="lp-btn lp-btn-gold">Start hiring</a>
             <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
           </div>
