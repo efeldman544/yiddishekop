@@ -51,7 +51,7 @@ export default function SignupPage() {
       {/* Left panel */}
       <div className="auth-panel">
         <div>
-          <div className="auth-logo">Yiddishe<span>Kop</span></div>
+          <Link href="/" className="auth-logo">Yiddishe<span>Kop</span></Link>
           <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
         </div>
         <p className="auth-copy">© 2026 YiddisheKop</p>
@@ -60,7 +60,7 @@ export default function SignupPage() {
       {/* Main */}
       <div className="auth-main">
         <div className="auth-box">
-          <div className="auth-logo-mobile">Yiddishe<span>Kop</span></div>
+          <Link href="/" className="auth-logo-mobile">Yiddishe<span>Kop</span></Link>
 
           <h1 className="auth-heading">Create an account</h1>
           <p className="auth-sub">Join YiddisheKop today</p>

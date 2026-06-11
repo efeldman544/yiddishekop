@@ -4,6 +4,48 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Brand palette remap ───────────────────────────────────────────────
+   The dashboards were built with Tailwind's indigo accent and cool grays.
+   Remapping those palettes to the landing page's gold/warm-stone tones
+   rebrands every portal screen in one place. */
+@theme {
+  --color-indigo-50: #FBF6EA;
+  --color-indigo-100: #F5EBD2;
+  --color-indigo-200: #EBD9A9;
+  --color-indigo-300: #E4C77E;
+  --color-indigo-400: #D6B260;
+  --color-indigo-500: #C9A24B;
+  --color-indigo-600: #A98336;
+  --color-indigo-700: #8A6A2B;
+  --color-indigo-800: #6C5322;
+  --color-indigo-900: #54401B;
+  --color-indigo-950: #2E230E;
+
+  --color-violet-50: #F8F4EC;
+  --color-violet-100: #EFE6D4;
+  --color-violet-200: #DFCDA8;
+  --color-violet-300: #CDB283;
+  --color-violet-400: #B89A64;
+  --color-violet-500: #9F814C;
+  --color-violet-600: #84683C;
+  --color-violet-700: #6A532F;
+  --color-violet-800: #524024;
+  --color-violet-900: #3D2F1B;
+  --color-violet-950: #221A0E;
+
+  --color-gray-50: #FAFAF8;
+  --color-gray-100: #F4F3F0;
+  --color-gray-200: #E7E5E0;
+  --color-gray-300: #D6D3CC;
+  --color-gray-400: #A8A49A;
+  --color-gray-500: #78746A;
+  --color-gray-600: #57544C;
+  --color-gray-700: #44413B;
+  --color-gray-800: #292723;
+  --color-gray-900: #1C1A17;
+  --color-gray-950: #0E0E0C;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -83,7 +125,10 @@ input, textarea, select {
 
   /* ── Typography ──────────────────────────────────── */
   .page-title {
-    @apply text-2xl font-bold text-gray-950 tracking-tight;
+    @apply text-2xl text-gray-950 tracking-tight;
+    font-family: var(--font-fraunces), 'Fraunces', serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
   .section-label {
     @apply text-[11px] font-semibold text-gray-400 uppercase tracking-widest;
@@ -126,9 +171,9 @@ input, textarea, select {
            transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-medium
+    @apply inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-semibold
            transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-           bg-indigo-600 hover:bg-indigo-700 text-white;
+           bg-indigo-500 hover:bg-indigo-300 text-gray-950;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-medium
@@ -166,24 +211,24 @@ input, textarea, select {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.09 0 0);
+  --background: oklch(0.99 0.003 90);
+  --foreground: oklch(0.15 0.005 90);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.09 0 0);
+  --card-foreground: oklch(0.15 0.005 90);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.09 0 0);
-  --primary: oklch(0.48 0.24 264);
+  --popover-foreground: oklch(0.15 0.005 90);
+  --primary: oklch(0.62 0.1 84);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.975 0 0);
-  --secondary-foreground: oklch(0.09 0 0);
-  --muted: oklch(0.975 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.975 0 0);
-  --accent-foreground: oklch(0.09 0 0);
+  --secondary: oklch(0.975 0.004 90);
+  --secondary-foreground: oklch(0.15 0.005 90);
+  --muted: oklch(0.975 0.004 90);
+  --muted-foreground: oklch(0.52 0.01 90);
+  --accent: oklch(0.975 0.004 90);
+  --accent-foreground: oklch(0.15 0.005 90);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.908 0 0);
-  --input: oklch(0.908 0 0);
-  --ring: oklch(0.48 0.24 264);
+  --border: oklch(0.91 0.006 90);
+  --input: oklch(0.91 0.006 90);
+  --ring: oklch(0.72 0.11 84);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -456,13 +501,13 @@ input, textarea, select {
   padding: 48px 40px; border-right: 1px solid var(--lp-line);
 }
 @media (min-width: 768px) { .auth-dark .auth-panel { display: flex; } }
-.auth-dark .auth-logo { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 26px; letter-spacing: -0.01em; color: var(--lp-cream); }
+.auth-dark .auth-logo { display: inline-block; font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 26px; letter-spacing: -0.01em; color: var(--lp-cream); text-decoration: none; }
 .auth-dark .auth-logo span { color: var(--lp-gold); }
 .auth-dark .auth-tagline { font-size: 14px; color: var(--lp-cream-dim); margin-top: 28px; line-height: 1.65; }
 .auth-dark .auth-copy { font-size: 12px; color: rgba(201,193,174,0.45); }
 .auth-dark .auth-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
 .auth-dark .auth-box { width: 100%; max-width: 360px; }
-.auth-dark .auth-logo-mobile { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 24px; letter-spacing: -0.01em; color: var(--lp-cream); margin-bottom: 32px; }
+.auth-dark .auth-logo-mobile { display: inline-block; font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 24px; letter-spacing: -0.01em; color: var(--lp-cream); margin-bottom: 32px; text-decoration: none; }
 .auth-dark .auth-logo-mobile span { color: var(--lp-gold); }
 .auth-dark .auth-heading { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 30px; color: var(--lp-cream); letter-spacing: -0.02em; margin-bottom: 6px; }
 .auth-dark .auth-sub { font-size: 15px; color: var(--lp-cream-dim); margin-bottom: 32px; }
@@ -494,3 +539,34 @@ input, textarea, select {
 }
 .auth-dark .auth-select:focus { border-color: var(--lp-gold); }
 .auth-dark .auth-select option { background: var(--lp-ink-2); color: var(--lp-cream); }
+
+/* ─── Dashboard chrome — dark ink sidebar/headers matching the landing page ── */
+
+.dash-dark {
+  background: var(--lp-ink);
+  border-color: var(--lp-line) !important;
+}
+.dash-brand {
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  color: var(--lp-cream);
+  text-decoration: none;
+}
+.dash-brand span { color: var(--lp-gold); }
+.dash-nav-link {
+  color: var(--lp-cream-dim);
+}
+.dash-nav-link:hover {
+  background: rgba(243, 236, 221, 0.06);
+  color: var(--lp-cream);
+}
+.dash-nav-link.active {
+  background: rgba(201, 162, 75, 0.14);
+  color: var(--lp-gold-soft);
+}
+.dash-nav-link .dash-icon { color: rgba(201, 193, 174, 0.55); }
+.dash-nav-link.active .dash-icon { color: var(--lp-gold); }
+.dash-link-dim { color: var(--lp-cream-dim); }
+.dash-link-dim:hover { color: var(--lp-cream); }
