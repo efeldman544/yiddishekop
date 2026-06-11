@@ -2,6 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Public routes — always accessible, skip Supabase entirely
+  const publicPaths = ['/', '/login', '/signup', '/start-hiring', '/privacy-policy', '/auth/callback', '/api/webhooks', '/api/start-hiring']
+  if (publicPaths.some((p) => pathname === p || (p !== '/' && pathname.startsWith(p)))) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -26,14 +34,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
-
-  // Public routes — always accessible
-  const publicPaths = ['/login', '/signup', '/auth/callback', '/api/webhooks']
-  if (publicPaths.some((p) => pathname.startsWith(p))) {
-    return supabaseResponse
-  }
 
   // Not logged in → redirect to login
   if (!user) {
