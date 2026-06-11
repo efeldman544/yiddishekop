@@ -67,13 +67,13 @@ ${transcript ? transcript.slice(0, 5000) : '(Not provided — rely on profile fi
 ━━━ INSTRUCTIONS ━━━
 Output a single JSON object. The fields BEFORE "score" force you to reason correctly before you commit to a number.
 
-1. job_work_arrangement: Read the full description. Is this "remote", "on-site", "hybrid", or "unspecified"? Look for phrases like "in our office", "must commute", a city/country requirement, "in-person", "work from home", etc.
+1. job_work_arrangement: Read the full description. Default is "remote" unless the description explicitly says otherwise. Only set "on-site" if the description clearly requires in-person presence (e.g. "in our office", "must commute", "on-site in [city]", "in-person"). Set "hybrid" only if explicitly stated. If the description is silent on location, output "remote".
 
-2. job_required_location: If on-site or hybrid, what city/country? Null if remote or unspecified.
+2. job_required_location: Only if on-site or hybrid AND a specific city/country is named. Null for remote or if no location is specified.
 
 3. job_core_function: In 1-2 sentences, what does this person ACTUALLY DO day-to-day? Go beyond the title — explain the real work.
 
-4. candidate_location_match: Does the candidate's location satisfy the job's location requirement? true/false/null-if-remote.
+4. candidate_location_match: true if remote (location doesn't matter), true if candidate is in the required location, false only if the job is explicitly on-site and candidate is clearly elsewhere. Default to true when arrangement is remote.
 
 5. candidate_actual_experience: In 1-2 sentences, what has this candidate ACTUALLY DONE based on resume and transcript? Be specific about real work, not just job titles.
 
