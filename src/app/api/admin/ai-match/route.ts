@@ -98,13 +98,18 @@ Respond with JSON only — no markdown, no text outside the JSON:
   "concerns": ["<specific gap, mismatch, or violated constraint>"]
 }`
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 600,
-    messages: [{ role: 'user', content: prompt }],
-  })
+  let text = ''
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  } catch (err: any) {
+    return { score: 0, summary: `AI error: ${err?.message ?? 'Unknown error'}`, strengths: [], concerns: [] }
+  }
 
-  const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
   try {
     const parsed = JSON.parse(text)
     return {
@@ -119,6 +124,10 @@ Respond with JSON only — no markdown, no text outside the JSON:
 }
 
 export async function POST(req: Request) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response('ANTHROPIC_API_KEY is not set in environment variables', { status: 500 })
+  }
+
   // Auth — admin only
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
