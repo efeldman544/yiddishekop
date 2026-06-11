@@ -55,10 +55,10 @@ export default function AdminSidebar() {
   }
 
   return (
-    <aside className="w-[220px] shrink-0 h-screen bg-white border-r border-gray-100 flex flex-col">
+    <aside className="dash-dark w-[220px] shrink-0 h-screen border-r flex flex-col">
       {/* Brand */}
-      <div className="px-5 h-14 flex items-center border-b border-gray-100 shrink-0">
-        <span className="font-bold text-[15px] tracking-tight text-gray-950">YiddisheKop</span>
+      <div className="px-5 h-14 flex items-center border-b border-inherit shrink-0">
+        <Link href="/dashboard/admin" className="dash-brand">Yiddishe<span>Kop</span></Link>
       </div>
 
       {/* Nav */}
@@ -69,13 +69,9 @@ export default function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+              className={`dash-nav-link${active ? ' active' : ''} flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors`}
             >
-              <span className={active ? 'text-indigo-600' : 'text-gray-400'}>{item.icon}</span>
+              <span className="dash-icon">{item.icon}</span>
               {item.label}
             </Link>
           )

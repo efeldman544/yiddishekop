@@ -19,7 +19,7 @@ export default function SignOutButton() {
       variant="ghost"
       size="sm"
       onClick={handleSignOut}
-      className="text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+      className="dash-link-dim hover:bg-[rgba(243,236,221,0.08)]"
     >
       Sign out
     </Button>

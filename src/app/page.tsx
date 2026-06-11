@@ -34,7 +34,7 @@ export default function LandingPage() {
           </nav>
           <div className="lp-nav-right">
             <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
-            <a href="#start" className="lp-btn lp-btn-gold">Start hiring</a>
+            <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
             <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function LandingPage() {
             <strong>strongest candidates</strong> — and the final call is always yours.
           </p>
           <div className="lp-hero-cta">
-            <a href="#start" className="lp-btn lp-btn-gold lp-btn-lg">Start hiring</a>
+            <Link href="/start-hiring" className="lp-btn lp-btn-gold lp-btn-lg">Start hiring</Link>
           </div>
           <div className="lp-hero-note">
             <span><span className="lp-dot" />Screened &amp; vetted first</span>
@@ -192,30 +192,8 @@ export default function LandingPage() {
           </div>
           <div className="lp-roles reveal">
             {['Bookkeeping', 'Accounting & finance', 'Admin & assistants', 'Sales', 'Customer support', 'Marketing', 'Operations', 'Project management'].map(role => (
-              <a key={role} href="#start" className="lp-role-chip">{role}</a>
+              <Link key={role} href="/start-hiring" className="lp-role-chip">{role}</Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PORTALS ── */}
-      <section className="lp-band" id="portals">
-        <div className="wrap">
-          <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">Already working with us?</div>
-            <h2>Log in to your portal.</h2>
-          </div>
-          <div className="lp-portals">
-            <div className="lp-portal reveal">
-              <h3>Employers</h3>
-              <p>Review your shortlist, watch candidate videos, and request meetings.</p>
-              <Link href="/login">Employer log in <span className="lp-portal-arrow" /></Link>
-            </div>
-            <div className="lp-portal reveal">
-              <h3>Candidates</h3>
-              <p>Track your application, book your screening call, and manage your profile.</p>
-              <Link href="/login">Candidate log in <span className="lp-portal-arrow" /></Link>
-            </div>
           </div>
         </div>
       </section>
@@ -248,8 +226,8 @@ export default function LandingPage() {
               </div>
               <div className="lp-foot-col">
                 <h4>Portals</h4>
-                <Link href="/login">Employer log in</Link>
-                <Link href="/login">Candidate log in</Link>
+                <Link href="/login">Log in</Link>
+                <Link href="/start-hiring">Start hiring</Link>
               </div>
               <div className="lp-foot-col">
                 <h4>Contact</h4>
