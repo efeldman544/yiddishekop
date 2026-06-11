@@ -7,7 +7,7 @@ export const maxDuration = 60
 // Constructed lazily — building at module level crashes the whole route when the key is missing
 let _anthropic: Anthropic | null = null
 function getAnthropic() {
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 5 })
   return _anthropic
 }
 
@@ -161,8 +161,8 @@ async function handle(req: Request) {
   const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
   if (!job) return new Response('Job not found', { status: 404 })
 
-  const regularPromises: Promise<{ candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }>[] = []
-  const videoPromises: typeof regularPromises = []
+  type ScoreResult = { candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }
+  const tasks: (() => Promise<ScoreResult>)[] = []
 
   // --- Regular candidates ---
   if (hasRegular) {
@@ -181,11 +181,11 @@ async function handle(req: Request) {
     }
 
     for (const c of candidates) {
-      regularPromises.push((async () => {
+      tasks.push(async () => {
         const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
         const aiResult = await scoreCandidate(c, job, resumeText, transcriptMap[c.id] ?? null)
         return { candidateId: c.id, ...aiResult }
-      })())
+      })
     }
   }
 
@@ -199,7 +199,7 @@ async function handle(req: Request) {
     if (vcErr) return new Response(`DB error fetching video candidates: ${vcErr.message}`, { status: 500 })
 
     for (const vc of videoCandidates ?? []) {
-      videoPromises.push((async () => {
+      tasks.push(async () => {
         const profileShape = {
           current_job_title: vc.current_job_title,
           location: vc.location,
@@ -211,10 +211,22 @@ async function handle(req: Request) {
         }
         const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
         return { candidateId: vc.id, ...aiResult }
-      })())
+      })
     }
   }
 
-  const results = await Promise.all([...regularPromises, ...videoPromises])
+  // Run with limited concurrency — org rate limit is 50 req/min, so don't fire everything at once
+  const CONCURRENCY = 4
+  const results: ScoreResult[] = []
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, async () => {
+      while (next < tasks.length) {
+        const task = tasks[next++]
+        results.push(await task())
+      }
+    })
+  )
+
   return Response.json({ results })
 }
