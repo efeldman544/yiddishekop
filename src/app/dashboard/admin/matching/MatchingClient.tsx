@@ -141,13 +141,18 @@ export default function MatchingClient({
   }, [scoredCandidates, aiScores])
 
   const hasAiForJob = scoredCandidates.some(c => aiScores[c.id])
+  const [aiError, setAiError] = useState<string | null>(null)
 
   async function runAiMatching() {
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
     setAiProgress(0)
+    setAiError(null)
+
     const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
     const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
+    console.log('[AI match] sending', { jobId: selectedJobId, candidateIds: candidateIds.length, videoCandidateIds: videoCandidateIds.length })
+
     try {
       const res = await fetch('/api/admin/ai-match', {
         method: 'POST',
@@ -160,10 +165,12 @@ export default function MatchingClient({
         for (const r of results) map[r.candidateId] = r
         setAiScores(prev => ({ ...prev, ...map }))
       } else {
-        // Allow retry on failure
+        const errText = await res.text().catch(() => `HTTP ${res.status}`)
+        setAiError(`AI scoring failed: ${errText}`)
         analyzedJobs.current.delete(selectedJobId)
       }
-    } catch {
+    } catch (e) {
+      setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
       analyzedJobs.current.delete(selectedJobId)
     } finally {
       setAiRunning(false)
@@ -255,11 +262,14 @@ export default function MatchingClient({
               )}
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar / error */}
             {aiRunning && (
               <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-violet-400 rounded-full animate-pulse w-full" />
               </div>
+            )}
+            {aiError && !aiRunning && (
+              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</div>
             )}
 
             <div className="flex items-center justify-between">

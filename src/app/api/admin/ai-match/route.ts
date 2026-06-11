@@ -3,6 +3,8 @@ import { createClient as adminSupabase } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { PDFParse } from 'pdf-parse'
 
+export const maxDuration = 60
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 function adminClient() {
@@ -67,13 +69,13 @@ ${transcript ? transcript.slice(0, 5000) : '(Not provided — rely on profile fi
 ━━━ INSTRUCTIONS ━━━
 Output a single JSON object. The fields BEFORE "score" force you to reason correctly before you commit to a number.
 
-1. job_work_arrangement: Read the full description. Is this "remote", "on-site", "hybrid", or "unspecified"? Look for phrases like "in our office", "must commute", a city/country requirement, "in-person", "work from home", etc.
+1. job_work_arrangement: Read the full description. Default is "remote" unless the description explicitly says otherwise. Only set "on-site" if the description clearly requires in-person presence (e.g. "in our office", "must commute", "on-site in [city]", "in-person"). Set "hybrid" only if explicitly stated. If the description is silent on location, output "remote".
 
-2. job_required_location: If on-site or hybrid, what city/country? Null if remote or unspecified.
+2. job_required_location: Only if on-site or hybrid AND a specific city/country is named. Null for remote or if no location is specified.
 
 3. job_core_function: In 1-2 sentences, what does this person ACTUALLY DO day-to-day? Go beyond the title — explain the real work.
 
-4. candidate_location_match: Does the candidate's location satisfy the job's location requirement? true/false/null-if-remote.
+4. candidate_location_match: true if remote (location doesn't matter), true if candidate is in the required location, false only if the job is explicitly on-site and candidate is clearly elsewhere. Default to true when arrangement is remote.
 
 5. candidate_actual_experience: In 1-2 sentences, what has this candidate ACTUALLY DONE based on resume and transcript? Be specific about real work, not just job titles.
 
@@ -96,13 +98,18 @@ Respond with JSON only — no markdown, no text outside the JSON:
   "concerns": ["<specific gap, mismatch, or violated constraint>"]
 }`
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1500,
-    messages: [{ role: 'user', content: prompt }],
-  })
+  let text = ''
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  } catch (err: any) {
+    return { score: 0, summary: `AI error: ${err?.message ?? 'Unknown error'}`, strengths: [], concerns: [] }
+  }
 
-  const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
   try {
     const parsed = JSON.parse(text)
     return {
@@ -117,6 +124,10 @@ Respond with JSON only — no markdown, no text outside the JSON:
 }
 
 export async function POST(req: Request) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response('ANTHROPIC_API_KEY is not set in environment variables', { status: 500 })
+  }
+
   // Auth — admin only
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -136,73 +147,60 @@ export async function POST(req: Request) {
   const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
   if (!job) return new Response('Job not found', { status: 404 })
 
-  const BATCH = 5
-  const results: { candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }[] = []
+  const regularPromises: Promise<{ candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }>[] = []
+  const videoPromises: typeof regularPromises = []
 
-  // --- Regular candidates (candidate_profiles + videos table for transcript) ---
+  // --- Regular candidates ---
   if (hasRegular) {
-    const { data: candidates } = await db
-      .from('candidate_profiles')
-      .select('*, profiles(email)')
-      .in('id', candidateIds)
+    const [{ data: candidates, error: candErr }, { data: videos }] = await Promise.all([
+      db.from('candidate_profiles').select('*').in('id', candidateIds),
+      db.from('videos').select('candidate_id, transcript').in('candidate_id', candidateIds)
+        .not('transcript', 'is', null).order('created_at', { ascending: false }),
+    ])
 
-    if (candidates?.length) {
-      const { data: videos } = await db
-        .from('videos')
-        .select('candidate_id, transcript')
-        .in('candidate_id', candidateIds)
-        .not('transcript', 'is', null)
-        .order('created_at', { ascending: false })
+    if (candErr) return new Response(`DB error fetching candidates: ${candErr.message}`, { status: 500 })
+    if (!candidates?.length) return new Response(`No candidates found for provided IDs (got ${candidateIds.length} IDs)`, { status: 404 })
 
-      const transcriptMap: Record<string, string> = {}
-      for (const v of videos ?? []) {
-        if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
-      }
+    const transcriptMap: Record<string, string> = {}
+    for (const v of videos ?? []) {
+      if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
+    }
 
-      for (let i = 0; i < candidates.length; i += BATCH) {
-        const batch = candidates.slice(i, i + BATCH)
-        const batchResults = await Promise.all(
-          batch.map(async (c) => {
-            const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
-            const transcript = transcriptMap[c.id] ?? null
-            const aiResult = await scoreCandidate(c, job, resumeText, transcript)
-            return { candidateId: c.id, ...aiResult }
-          })
-        )
-        results.push(...batchResults)
-      }
+    for (const c of candidates) {
+      regularPromises.push((async () => {
+        const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
+        const aiResult = await scoreCandidate(c, job, resumeText, transcriptMap[c.id] ?? null)
+        return { candidateId: c.id, ...aiResult }
+      })())
     }
   }
 
-  // --- Video-only candidates (transcript stored directly on video_candidates) ---
+  // --- Video-only candidates ---
   if (hasVideo) {
-    const { data: videoCandidates } = await db
+    const { data: videoCandidates, error: vcErr } = await db
       .from('video_candidates')
       .select('id, name, location, current_job_title, fields_worked_in, employment_type, transcript')
       .in('id', videoCandidateIds)
 
-    if (videoCandidates?.length) {
-      for (let i = 0; i < videoCandidates.length; i += BATCH) {
-        const batch = videoCandidates.slice(i, i + BATCH)
-        const batchResults = await Promise.all(
-          batch.map(async (vc) => {
-            const profileShape = {
-              current_job_title: vc.current_job_title,
-              location: vc.location,
-              fields_worked_in: vc.fields_worked_in ?? [],
-              employment_type: vc.employment_type ?? [],
-              languages: null, roles_seeking: null, years_experience: null,
-              education_level: null, tools_software: null,
-              us_hours_comfortable: null, remote_experience: null,
-            }
-            const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
-            return { candidateId: vc.id, ...aiResult }
-          })
-        )
-        results.push(...batchResults)
-      }
+    if (vcErr) return new Response(`DB error fetching video candidates: ${vcErr.message}`, { status: 500 })
+
+    for (const vc of videoCandidates ?? []) {
+      videoPromises.push((async () => {
+        const profileShape = {
+          current_job_title: vc.current_job_title,
+          location: vc.location,
+          fields_worked_in: vc.fields_worked_in ?? [],
+          employment_type: vc.employment_type ?? [],
+          languages: null, roles_seeking: null, years_experience: null,
+          education_level: null, tools_software: null,
+          us_hours_comfortable: null, remote_experience: null,
+        }
+        const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
+        return { candidateId: vc.id, ...aiResult }
+      })())
     }
   }
 
+  const results = await Promise.all([...regularPromises, ...videoPromises])
   return Response.json({ results })
 }
