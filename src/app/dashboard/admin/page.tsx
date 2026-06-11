@@ -167,7 +167,7 @@ export default function AdminDashboard() {
 
     if (search.trim()) {
       query = query.or(
-        `full_name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%,current_job_title.ilike.%${search}%`
+        `full_name.ilike.%${search}%,location.ilike.%${search}%,current_job_title.ilike.%${search}%`
       )
     }
     if (industries.length > 0) query = query.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
@@ -316,39 +316,35 @@ export default function AdminDashboard() {
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, email, location…"
+            placeholder="Search by name, location, job title…"
             className="pl-9"
           />
         </div>
 
         {/* Filters — flat, no box */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-medium text-gray-400 mr-0.5">Industry</span>
-            {visibleIndustries.map(ind => (
-              <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                  industries.includes(ind)
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
-                }`}>
-                {ind}
-              </button>
-            ))}
-            {hiddenIndustryCount > 0 && (
-              <button type="button" onClick={() => setIndustriesExpanded(true)}
-                className="px-2.5 py-1 rounded-full text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
-                +{hiddenIndustryCount} more
-              </button>
-            )}
-            {industriesExpanded && (
-              <button type="button" onClick={() => setIndustriesExpanded(false)}
-                className="px-2.5 py-1 rounded-full text-xs font-medium text-gray-400 hover:text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
-                Show less
-              </button>
-            )}
+          {/* Industry row — one line when collapsed, wraps when expanded */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-[11px] font-medium text-gray-400 shrink-0">Industry</span>
+            <div className={`flex gap-1.5 min-w-0 ${industriesExpanded ? 'flex-wrap' : 'overflow-hidden flex-nowrap'}`}>
+              {/* Selected first so they're always visible when collapsed */}
+              {[...industries, ...INDUSTRIES.filter(i => !industries.includes(i))].map(ind => (
+                <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                    industries.includes(ind)
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
+                  }`}>
+                  {ind}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setIndustriesExpanded(o => !o)}
+              className="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
+              {industriesExpanded ? 'Less' : 'More'}
+            </button>
             {industries.length > 0 && (
-              <button type="button" onClick={() => setIndustries([])} className="text-xs text-red-400 hover:text-red-600 transition-colors ml-1">
+              <button type="button" onClick={() => setIndustries([])} className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors">
                 Clear
               </button>
             )}
