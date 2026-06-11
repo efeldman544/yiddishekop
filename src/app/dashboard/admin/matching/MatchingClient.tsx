@@ -149,10 +149,8 @@ export default function MatchingClient({
     setAiProgress(0)
     setAiError(null)
 
-    // Only score top 15 candidates by rule score — enough for a meaningful ranking
-    const top15 = [...scoredCandidates].sort((a, b) => b.ruleScore - a.ruleScore).slice(0, 15)
-    const candidateIds = top15.filter(c => c.source === 'profile').map(c => c.id)
-    const videoCandidateIds = top15.filter(c => c.source === 'video').map(c => c.id)
+    const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
+    const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
 
     try {
       const res = await fetch('/api/admin/ai-match', {
