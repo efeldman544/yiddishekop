@@ -5,7 +5,12 @@ import { PDFParse } from 'pdf-parse'
 
 export const maxDuration = 60
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Constructed lazily — building at module level crashes the whole route when the key is missing
+let _anthropic: Anthropic | null = null
+function getAnthropic() {
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return _anthropic
+}
 
 function adminClient() {
   return adminSupabase(
@@ -100,7 +105,7 @@ Respond with JSON only — no markdown, no text outside the JSON:
 
   let text = ''
   try {
-    const message = await anthropic.messages.create({
+    const message = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
