@@ -178,6 +178,10 @@ export default function AdminDashboard() {
 
     const { data } = await query
     const list = (data as Candidate[]) ?? []
+    // Sort ignoring leading non-letter characters (e.g. "(evelyn ...)"),
+    // so names in parentheses don't jump to the top of the list
+    const sortKey = (name: string | null) => (name ?? '').replace(/^[^a-zA-Z֐-׿]+/, '').toLowerCase()
+    list.sort((a, b) => sortKey(a.full_name).localeCompare(sortKey(b.full_name)))
     setCandidates(list)
 
     if (list.length > 0) {
@@ -497,7 +501,7 @@ export default function AdminDashboard() {
                         onClick={() => toggleInterviewed(c.id, c.interviewed)}
                         className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                           c.interviewed
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                             : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-700'
                         }`}
                       >
