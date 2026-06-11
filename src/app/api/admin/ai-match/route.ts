@@ -35,20 +35,45 @@ async function scoreCandidate(
   resumeText: string | null,
   transcript: string | null,
 ): Promise<{ score: number; summary: string; strengths: string[]; concerns: string[] }> {
-  const prompt = `You are an expert recruitment specialist for a staffing agency. Evaluate how well this candidate matches the job opening. Be concise but insightful — go beyond keyword matching and reason about actual fit based on their experience, communication style in the interview, and resume depth.
+  const prompt = `You are a senior recruiter at a staffing agency evaluating whether a candidate is genuinely right for a job opening. Your goal is accurate fit assessment — not keyword matching.
+
+═══ STEP 1: CHECK HARD CONSTRAINTS ═══
+Evaluate these before anything else. A violated hard constraint caps the score.
+
+1. LOCATION: Read the job description carefully. If the job says "on-site", "in-office", or names a specific city/country, the candidate MUST be in that location. If they are not → score cannot exceed 20 regardless of other qualifications. Be strict: Jerusalem/Israel ≠ New York, London, Montreal, etc.
+
+2. EMPLOYMENT TYPE: If the job specifies Full Time and the candidate only wants Part Time (or vice versa), that is a hard mismatch → score cannot exceed 35.
+
+3. LANGUAGES: If the job requires a specific language the candidate doesn't have → score cannot exceed 40.
+
+═══ STEP 2: EVALUATE GENUINE FIT ═══
+Only if hard constraints are met, assess the real substance of fit:
+
+- Read what the job actually DOES — not just the title. "Donor Relations" means fundraising, nonprofit stakeholder management, donor stewardship. It is NOT the same as customer service or customer relations even though both have the word "relations". Reason about what the role requires.
+- Look at what the candidate has actually DONE in their career — their real experience, not surface-level title similarity.
+- Use the resume and interview transcript as primary evidence of capability. If those aren't available, be more conservative.
+- A candidate with tangentially related experience should score 40-55, not 70+.
+
+═══ SCORING GUIDE ═══
+90-100: Exceptional match — direct relevant experience, meets all requirements
+75-89:  Strong match — solid relevant background, minor gaps only
+55-74:  Reasonable fit — related experience but meaningful gaps
+35-54:  Stretch — tangential relevance, significant gaps
+0-34:   Poor fit, OR a hard constraint is violated (location/type/language)
 
 JOB OPENING:
 Title: ${job.job_title}
 Employment Type: ${job.employment_type ?? 'Not specified'}
+Location/On-site requirement: ${job.description?.match(/on.?site|in.?office|in.?person|jerusalem|israel|new york|remote|hybrid/gi)?.join(', ') ?? 'See description'}
 Languages Required: ${job.languages ?? 'Not specified'}
 Salary: ${job.salary ?? 'Not specified'}
 Hours: ${job.hours ?? 'Not specified'}
 Description: ${job.description ?? 'Not specified'}
 
 CANDIDATE PROFILE:
-Current Title: ${candidate.current_job_title ?? 'Unknown'}
+Name/Title: ${candidate.current_job_title ?? 'Unknown'}
 Location: ${candidate.location ?? 'Unknown'}
-Fields: ${(candidate.fields_worked_in ?? []).join(', ') || 'Not specified'}
+Fields Worked In: ${(candidate.fields_worked_in ?? []).join(', ') || 'Not specified'}
 Employment Types Available: ${(candidate.employment_type ?? []).join(', ') || 'Not specified'}
 Languages: ${candidate.languages ?? 'Not specified'}
 Roles Seeking: ${candidate.roles_seeking ?? 'Not specified'}
@@ -64,12 +89,12 @@ ${resumeText ?? 'Not available'}
 INTERVIEW TRANSCRIPT:
 ${transcript ? transcript.slice(0, 4000) : 'Not available'}
 
-Respond with a JSON object only — no markdown, no explanation outside the JSON:
+Think through hard constraints first, then genuine fit. Respond with JSON only — no markdown:
 {
   "score": <integer 0-100>,
-  "summary": "<2-3 sentence assessment>",
-  "strengths": ["<specific strength>", ...],
-  "concerns": ["<specific concern or gap>", ...]
+  "summary": "<2-3 sentences — lead with whether hard constraints are met, then genuine fit assessment>",
+  "strengths": ["<specific, evidence-based strength>", ...],
+  "concerns": ["<specific concern, gap, or violated constraint>", ...]
 }`
 
   const message = await anthropic.messages.create({

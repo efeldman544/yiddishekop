@@ -202,8 +202,8 @@ export default function JobsClient({
 
   function getEmployerDisplay(job: Job) {
     const emp = employers.find(e => e.id === job.employer_id)
-    const name = emp ? (emp.full_name || emp.id) : '—'
-    return { name, company: job.company_name ?? null }
+    if (emp) return { name: emp.full_name || emp.id, company: job.company_name ?? null }
+    return { name: job.company_name ?? '—', company: null }
   }
 
   return (
