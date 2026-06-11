@@ -112,20 +112,45 @@ export default function MatchingClient({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id ?? null)
   const [assignments, setAssignments] = useState(initialAssignments)
   const [toggling, setToggling] = useState<string | null>(null)
-  const [aiScores, setAiScores] = useState<Record<string, AiResult>>({})
+  // AI scores keyed by job, then candidate — cached scores for one job must not bleed into another
+  const [aiScoresByJob, setAiScoresByJob] = useState<Record<string, Record<string, AiResult>>>({})
   const [aiRunning, setAiRunning] = useState(false)
   const [aiProgress, setAiProgress] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
   const analyzedJobs = useRef<Set<string>>(new Set())
 
   const selectedJob = jobs.find(j => j.id === selectedJobId) ?? null
+  const aiScores = useMemo(
+    () => (selectedJobId ? aiScoresByJob[selectedJobId] : null) ?? {},
+    [selectedJobId, aiScoresByJob],
+  )
 
-  // Auto-run AI when switching to a job that hasn't been analyzed yet
-  useEffect(() => {
-    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
-    analyzedJobs.current.add(selectedJobId)
-    runAiMatching() // eslint-disable-line react-hooks/exhaustive-deps
-  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+  function mergeJobScores(jobId: string, scores: Record<string, AiResult>) {
+    setAiScoresByJob(prev => ({ ...prev, [jobId]: { ...prev[jobId], ...scores } }))
+  }
+
+  async function loadCachedOrRun(jobId: string) {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('candidate_ai_scores')
+      .select('candidate_id, score, summary, strengths, concerns, triage_only')
+      .eq('job_id', jobId)
+    if (data && data.length > 0) {
+      const map: Record<string, AiResult> = {}
+      for (const r of data) {
+        map[r.candidate_id] = {
+          score: r.score,
+          summary: r.summary ?? '',
+          strengths: Array.isArray(r.strengths) ? r.strengths : [],
+          concerns: Array.isArray(r.concerns) ? r.concerns : [],
+          triageOnly: r.triage_only || undefined,
+        }
+      }
+      mergeJobScores(jobId, map)
+    } else {
+      runAiMatching()
+    }
+  }
 
   const scoredCandidates = useMemo<ScoredCandidate[]>(() => {
     if (!selectedJob) return []
@@ -183,7 +208,7 @@ export default function MatchingClient({
         for (const r of triage?.results ?? []) {
           triageMap[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
         }
-        setAiScores(prev => ({ ...prev, ...triageMap }))
+        mergeJobScores(selectedJobId, triageMap)
         setAiProgress(50)
 
         const ranked = (triage?.results ?? []).slice().sort((a, b) => b.score - a.score).slice(0, DEEP_LIMIT)
@@ -198,7 +223,7 @@ export default function MatchingClient({
       })
       const deepMap: Record<string, AiResult> = {}
       for (const r of deep?.results ?? []) deepMap[r.candidateId] = r
-      setAiScores(prev => ({ ...prev, ...deepMap }))
+      mergeJobScores(selectedJobId, deepMap)
     } catch (e) {
       setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
       analyzedJobs.current.delete(selectedJobId)
@@ -207,6 +232,13 @@ export default function MatchingClient({
       setAiProgress(100)
     }
   }
+
+  // On job select: load cached scores from the DB; only run AI if nothing is cached yet
+  useEffect(() => {
+    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
+    analyzedJobs.current.add(selectedJobId)
+    loadCachedOrRun(selectedJobId)
+  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function isAssigned(candidateId: string) {
     return assignments.some(a => a.candidate_id === candidateId && a.job_id === selectedJobId)

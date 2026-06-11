@@ -224,11 +224,13 @@ async function handle(req: Request) {
   // ─── Triage stage: batch-score everyone cheaply, return quick scores only ───
   if (stage === 'triage') {
     const pool: any[] = []
+    const sourceOf: Record<string, 'profile' | 'video'> = {}
     if (hasRegular) {
       const { data } = await db
         .from('candidate_profiles')
         .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
         .in('id', candidateIds)
+      for (const c of data ?? []) sourceOf[c.id] = 'profile'
       pool.push(...(data ?? []))
     }
     if (hasVideo) {
@@ -236,6 +238,7 @@ async function handle(req: Request) {
         .from('video_candidates')
         .select('id, current_job_title, location, fields_worked_in, employment_type')
         .in('id', videoCandidateIds)
+      for (const c of data ?? []) sourceOf[c.id] = 'video'
       pool.push(...(data ?? []))
     }
 
@@ -255,13 +258,29 @@ async function handle(req: Request) {
       })
     )
 
+    // Cache triage scores (best effort — scoring already succeeded even if this fails)
+    await db.from('candidate_ai_scores').upsert(
+      Object.entries(scoreMap).map(([candidateId, score]) => ({
+        job_id: jobId,
+        candidate_id: candidateId,
+        source: sourceOf[candidateId] ?? 'profile',
+        score,
+        summary: null,
+        strengths: [],
+        concerns: [],
+        triage_only: true,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'job_id,candidate_id' },
+    )
+
     return Response.json({
       stage: 'triage',
       results: Object.entries(scoreMap).map(([candidateId, score]) => ({ candidateId, score })),
     })
   }
 
-  type ScoreResult = { candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }
+  type ScoreResult = { candidateId: string; source: 'profile' | 'video'; score: number; summary: string; strengths: string[]; concerns: string[] }
   const tasks: (() => Promise<ScoreResult>)[] = []
 
   // --- Regular candidates ---
@@ -284,7 +303,7 @@ async function handle(req: Request) {
       tasks.push(async () => {
         const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
         const aiResult = await scoreCandidate(c, job, resumeText, transcriptMap[c.id] ?? null)
-        return { candidateId: c.id, ...aiResult }
+        return { candidateId: c.id, source: 'profile' as const, ...aiResult }
       })
     }
   }
@@ -310,7 +329,7 @@ async function handle(req: Request) {
           us_hours_comfortable: null, remote_experience: null,
         }
         const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
-        return { candidateId: vc.id, ...aiResult }
+        return { candidateId: vc.id, source: 'video' as const, ...aiResult }
       })
     }
   }
@@ -327,6 +346,24 @@ async function handle(req: Request) {
       }
     })
   )
+
+  // Cache full scores (best effort — scoring already succeeded even if this fails)
+  if (results.length > 0) {
+    await db.from('candidate_ai_scores').upsert(
+      results.map(r => ({
+        job_id: jobId,
+        candidate_id: r.candidateId,
+        source: r.source,
+        score: r.score,
+        summary: r.summary,
+        strengths: r.strengths,
+        concerns: r.concerns,
+        triage_only: false,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'job_id,candidate_id' },
+    )
+  }
 
   return Response.json({ results })
 }
