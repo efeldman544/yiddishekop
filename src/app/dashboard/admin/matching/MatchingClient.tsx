@@ -119,6 +119,8 @@ export default function MatchingClient({
   const [expanded, setExpanded] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const analyzedJobs = useRef<Set<string>>(new Set())
+  // Frozen sort order — set after a full AI run so individual Analyze clicks don't reshuffle the list
+  const [frozenOrder, setFrozenOrder] = useState<Record<string, string[]>>({})
 
   const selectedJob = jobs.find(j => j.id === selectedJobId) ?? null
   const aiScores = useMemo(
@@ -148,6 +150,8 @@ export default function MatchingClient({
         }
       }
       mergeJobScores(jobId, map)
+      const order = data.slice().sort((a, b) => b.score - a.score).map(r => r.candidate_id)
+      setFrozenOrder(prev => ({ ...prev, [jobId]: order }))
     } else {
       runAiMatching()
     }
@@ -165,14 +169,19 @@ export default function MatchingClient({
     return candidates.map(c => ({ ...c, ...ruleScore(c, selectedJob) }))
   }, [selectedJob, candidates])
 
-  // Sort: AI score first if available, else rule score
+  // Sort by frozen order when available (set after full run) so Analyze clicks don't reshuffle
   const sortedCandidates = useMemo(() => {
+    const order = selectedJobId ? frozenOrder[selectedJobId] : undefined
+    if (order && order.length > 0) {
+      const rank = new Map(order.map((id, i) => [id, i]))
+      return [...scoredCandidates].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
+    }
     return [...scoredCandidates].sort((a, b) => {
       const aScore = aiScores[a.id]?.score ?? a.ruleScore
       const bScore = aiScores[b.id]?.score ?? b.ruleScore
       return bScore - aScore
     })
-  }, [scoredCandidates, aiScores])
+  }, [scoredCandidates, aiScores, frozenOrder, selectedJobId])
 
   const hasAiForJob = scoredCandidates.some(c => aiScores[c.id])
 
@@ -227,6 +236,15 @@ export default function MatchingClient({
       analyzedJobs.current.delete(jobId)
     } finally {
       setAiRunning(false)
+      // Freeze the sort order so Analyze clicks don't reshuffle the list
+      setAiScoresByJob(prev => {
+        const scores = prev[jobId] ?? {}
+        const order = Object.entries(scores)
+          .sort((a, b) => b[1].score - a[1].score)
+          .map(([id]) => id)
+        setFrozenOrder(p => ({ ...p, [jobId]: order }))
+        return prev
+      })
     }
   }
 
