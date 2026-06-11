@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoSection, { type Video } from './VideoSection'
 import AdminControls, { type Employer } from './AdminControls'
+import BackButton from './BackButton'
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
@@ -37,6 +38,8 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
 
   return (
     <main className="px-8 py-8 space-y-6">
+
+      <BackButton />
 
       <Card>
         <CardContent className="pt-6">
