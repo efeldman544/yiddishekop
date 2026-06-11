@@ -143,18 +143,21 @@ export async function POST(req: Request) {
 
   // --- Regular candidates ---
   if (hasRegular) {
-    const [{ data: candidates }, { data: videos }] = await Promise.all([
+    const [{ data: candidates, error: candErr }, { data: videos }] = await Promise.all([
       db.from('candidate_profiles').select('*').in('id', candidateIds),
       db.from('videos').select('candidate_id, transcript').in('candidate_id', candidateIds)
         .not('transcript', 'is', null).order('created_at', { ascending: false }),
     ])
+
+    if (candErr) return new Response(`DB error fetching candidates: ${candErr.message}`, { status: 500 })
+    if (!candidates?.length) return new Response(`No candidates found for provided IDs (got ${candidateIds.length} IDs)`, { status: 404 })
 
     const transcriptMap: Record<string, string> = {}
     for (const v of videos ?? []) {
       if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
     }
 
-    for (const c of candidates ?? []) {
+    for (const c of candidates) {
       regularPromises.push((async () => {
         const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
         const aiResult = await scoreCandidate(c, job, resumeText, transcriptMap[c.id] ?? null)
@@ -165,10 +168,12 @@ export async function POST(req: Request) {
 
   // --- Video-only candidates ---
   if (hasVideo) {
-    const { data: videoCandidates } = await db
+    const { data: videoCandidates, error: vcErr } = await db
       .from('video_candidates')
       .select('id, name, location, current_job_title, fields_worked_in, employment_type, transcript')
       .in('id', videoCandidateIds)
+
+    if (vcErr) return new Response(`DB error fetching video candidates: ${vcErr.message}`, { status: 500 })
 
     for (const vc of videoCandidates ?? []) {
       videoPromises.push((async () => {

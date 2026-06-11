@@ -151,6 +151,7 @@ export default function MatchingClient({
 
     const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
     const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
+    console.log('[AI match] sending', { jobId: selectedJobId, candidateIds: candidateIds.length, videoCandidateIds: videoCandidateIds.length })
 
     try {
       const res = await fetch('/api/admin/ai-match', {
