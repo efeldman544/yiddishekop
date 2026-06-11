@@ -37,6 +37,7 @@ type AiResult = {
   summary: string
   strengths: string[]
   concerns: string[]
+  triageOnly?: boolean
 }
 
 type Badge = { label: string; style: string }
@@ -143,32 +144,61 @@ export default function MatchingClient({
   const hasAiForJob = scoredCandidates.some(c => aiScores[c.id])
   const [aiError, setAiError] = useState<string | null>(null)
 
+  const DEEP_LIMIT = 20   // how many top candidates get full resume/transcript analysis
+  const TRIAGE_THRESHOLD = 25  // pools larger than this go through triage first
+
+  async function callAiMatch(body: object): Promise<{ results: any[] } | null> {
+    const res = await fetch('/api/admin/ai-match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => `HTTP ${res.status}`)
+      throw new Error(errText)
+    }
+    return res.json()
+  }
+
   async function runAiMatching() {
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
     setAiProgress(0)
     setAiError(null)
 
-    const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
-    const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
-    console.log('[AI match] sending', { jobId: selectedJobId, candidateIds: candidateIds.length, videoCandidateIds: videoCandidateIds.length })
+    const allProfile = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
+    const allVideo = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
+    const total = allProfile.length + allVideo.length
 
     try {
-      const res = await fetch('/api/admin/ai-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: selectedJobId, candidateIds, videoCandidateIds }),
-      })
-      if (res.ok) {
-        const { results } = await res.json()
-        const map: Record<string, AiResult> = {}
-        for (const r of results) map[r.candidateId] = r
-        setAiScores(prev => ({ ...prev, ...map }))
-      } else {
-        const errText = await res.text().catch(() => `HTTP ${res.status}`)
-        setAiError(`AI scoring failed: ${errText}`)
-        analyzedJobs.current.delete(selectedJobId)
+      let deepProfileIds = allProfile
+      let deepVideoIds = allVideo
+
+      // Large pool: triage everyone first with cheap batch scoring, then deep-score the top
+      if (total > TRIAGE_THRESHOLD) {
+        const triage = await callAiMatch({
+          jobId: selectedJobId, candidateIds: allProfile, videoCandidateIds: allVideo, stage: 'triage',
+        })
+        const triageMap: Record<string, AiResult> = {}
+        for (const r of triage?.results ?? []) {
+          triageMap[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
+        }
+        setAiScores(prev => ({ ...prev, ...triageMap }))
+        setAiProgress(50)
+
+        const ranked = (triage?.results ?? []).slice().sort((a, b) => b.score - a.score).slice(0, DEEP_LIMIT)
+        const topIds = new Set(ranked.map((r: any) => r.candidateId))
+        deepProfileIds = allProfile.filter(id => topIds.has(id))
+        deepVideoIds = allVideo.filter(id => topIds.has(id))
       }
+
+      // Deep scoring with resume + transcript on the (possibly narrowed) set
+      const deep = await callAiMatch({
+        jobId: selectedJobId, candidateIds: deepProfileIds, videoCandidateIds: deepVideoIds,
+      })
+      const deepMap: Record<string, AiResult> = {}
+      for (const r of deep?.results ?? []) deepMap[r.candidateId] = r
+      setAiScores(prev => ({ ...prev, ...deepMap }))
     } catch (e) {
       setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
       analyzedJobs.current.delete(selectedJobId)
@@ -314,8 +344,11 @@ export default function MatchingClient({
                               {assigned && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Assigned</span>
                               )}
-                              {ai && (
+                              {ai && !ai.triageOnly && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">AI scored</span>
+                              )}
+                              {ai?.triageOnly && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-gray-50 text-gray-500 border-gray-200">AI screened</span>
                               )}
                               {c.admin_tags?.map(tag => (
                                 <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">{tag}</span>
