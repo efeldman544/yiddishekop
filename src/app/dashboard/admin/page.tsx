@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -54,6 +54,80 @@ function industriesWithLegacyAliases(selected: string[], legacyAliases: Record<s
   return Array.from(expanded)
 }
 
+function IndustryFilter({ industries, toggleIndustry, clearIndustries }: {
+  industries: string[]
+  toggleIndustry: (v: string) => void
+  clearIndustries: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  // Sorted: selected first, then rest alphabetically
+  const sorted = [...industries, ...INDUSTRIES.filter(i => !industries.includes(i))]
+
+  return (
+    <div ref={ref} className="relative flex items-center gap-1.5">
+      <span className="text-[11px] font-medium text-gray-400 shrink-0">Industry</span>
+
+      {/* One-line strip — overflow hidden, selected chips shown first */}
+      <div className="flex gap-1.5 overflow-hidden" style={{ maxWidth: 520 }}>
+        {sorted.map(ind => (
+          <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
+            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              industries.includes(ind)
+                ? 'bg-indigo-600 text-white'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
+            }`}>
+            {ind}
+          </button>
+        ))}
+      </div>
+
+      {/* More button */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+          open
+            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+            : 'border-transparent text-indigo-500 hover:text-indigo-700 hover:bg-white hover:shadow-sm hover:border-gray-200'
+        }`}>
+        {industries.length > 0 ? `+${industries.length} selected` : 'More'}
+      </button>
+
+      {industries.length > 0 && (
+        <button type="button" onClick={clearIndustries} className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors">
+          Clear
+        </button>
+      )}
+
+      {/* Dropdown popover */}
+      {open && (
+        <div className="absolute top-full left-0 mt-2 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-[480px]">
+          <div className="flex flex-wrap gap-1.5">
+            {INDUSTRIES.map(ind => (
+              <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  industries.includes(ind)
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
+                }`}>
+                {ind}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const STATUS_OPTIONS = ['active', 'inactive', 'placed']
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 
@@ -76,7 +150,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [industries, setIndustries] = useState<string[]>([])
   const [legacyIndustryAliases, setLegacyIndustryAliases] = useState<Record<string, string[]>>({})
-  const [industriesExpanded, setIndustriesExpanded] = useState(false)
+
   const [status, setStatus] = useState('')
   const [employment, setEmployment] = useState('')
   const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
@@ -246,11 +320,6 @@ export default function AdminDashboard() {
     setIndustries(prev => prev.includes(val) ? prev.filter(i => i !== val) : [...prev, val])
   }
 
-  const INDUSTRY_PREVIEW_COUNT = 8
-  const visibleIndustries = industriesExpanded
-    ? INDUSTRIES
-    : INDUSTRIES.filter((ind, i) => industries.includes(ind) || i < INDUSTRY_PREVIEW_COUNT)
-  const hiddenIndustryCount = INDUSTRIES.length - visibleIndustries.length
 
   async function toggleJobAssignment(candidateId: string, jobId: string) {
     const key = `${candidateId}-${jobId}`
@@ -323,32 +392,12 @@ export default function AdminDashboard() {
 
         {/* Filters — flat, no box */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          {/* Industry row — one line when collapsed, wraps when expanded */}
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="text-[11px] font-medium text-gray-400 shrink-0">Industry</span>
-            <div className={`flex gap-1.5 min-w-0 ${industriesExpanded ? 'flex-wrap' : 'overflow-hidden flex-nowrap'}`}>
-              {/* Selected first so they're always visible when collapsed */}
-              {[...industries, ...INDUSTRIES.filter(i => !industries.includes(i))].map(ind => (
-                <button key={ind} type="button" onClick={() => toggleIndustry(ind)}
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                    industries.includes(ind)
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
-                  }`}>
-                  {ind}
-                </button>
-              ))}
-            </div>
-            <button type="button" onClick={() => setIndustriesExpanded(o => !o)}
-              className="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-500 hover:text-indigo-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200 transition-all">
-              {industriesExpanded ? 'Less' : 'More'}
-            </button>
-            {industries.length > 0 && (
-              <button type="button" onClick={() => setIndustries([])} className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors">
-                Clear
-              </button>
-            )}
-          </div>
+          {/* Industry — one line, overflow hidden; "More" opens a dropdown popover */}
+          <IndustryFilter
+            industries={industries}
+            toggleIndustry={toggleIndustry}
+            clearIndustries={() => setIndustries([])}
+          />
 
           <div className="w-px h-4 bg-gray-200 hidden sm:block" />
 
