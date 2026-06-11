@@ -203,6 +203,10 @@ async function handle(req: Request) {
     return new Response('ANTHROPIC_API_KEY is not set in environment variables', { status: 500 })
   }
 
+  const body = await req.json()
+  const { jobId, stage } = body
+  if (!jobId) return new Response('Missing jobId', { status: 400 })
+
   // Auth — admin only
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -210,54 +214,40 @@ async function handle(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
   if (profile?.role !== 'admin') return new Response('Forbidden', { status: 403 })
 
-  const body = await req.json()
-  const { jobId, stage } = body
-  if (!jobId) return new Response('Missing jobId', { status: 400 })
-
   const db = adminClient()
-  const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
-  if (!job) return new Response('Job not found', { status: 404 })
 
-  // ─── Batch Haiku triage — scores every candidate quickly from profile fields ───
+  // ─── Batch Haiku triage — each request scores exactly 25 candidates (1 Haiku call) ───
   if (stage === 'triage' || !stage) {
     const { candidateIds, videoCandidateIds } = body
     const hasRegular = Array.isArray(candidateIds) && candidateIds.length > 0
     const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
     if (!hasRegular && !hasVideo) return new Response('Missing candidate IDs', { status: 400 })
 
+    // Fetch job + all candidate data in parallel
+    const [jobResult, regularResult, videoResult] = await Promise.all([
+      db.from('job_requirements').select('*').eq('id', jobId).single(),
+      hasRegular
+        ? db.from('candidate_profiles')
+            .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
+            .in('id', candidateIds)
+        : Promise.resolve({ data: null }),
+      hasVideo
+        ? db.from('video_candidates')
+            .select('id, current_job_title, location, fields_worked_in, employment_type')
+            .in('id', videoCandidateIds)
+        : Promise.resolve({ data: null }),
+    ])
+
+    if (!jobResult.data) return new Response('Job not found', { status: 404 })
+    const job = jobResult.data
+
     const pool: Record<string, unknown>[] = []
     const sourceOf: Record<string, 'profile' | 'video'> = {}
+    for (const c of regularResult.data ?? []) { sourceOf[c.id] = 'profile'; pool.push(c) }
+    for (const c of videoResult.data ?? []) { sourceOf[c.id] = 'video'; pool.push(c) }
 
-    if (hasRegular) {
-      const { data } = await db
-        .from('candidate_profiles')
-        .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
-        .in('id', candidateIds)
-      for (const c of data ?? []) { sourceOf[c.id] = 'profile'; pool.push(c) }
-    }
-    if (hasVideo) {
-      const { data } = await db
-        .from('video_candidates')
-        .select('id, current_job_title, location, fields_worked_in, employment_type')
-        .in('id', videoCandidateIds)
-      for (const c of data ?? []) { sourceOf[c.id] = 'video'; pool.push(c) }
-    }
-
-    const GROUP = 25
-    const groups: Record<string, unknown>[][] = []
-    for (let i = 0; i < pool.length; i += GROUP) groups.push(pool.slice(i, i + GROUP))
-
-    const CONCURRENCY = 4
-    const scoreMap: Record<string, number> = {}
-    let next = 0
-    await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, groups.length) }, async () => {
-        while (next < groups.length) {
-          const group = groups[next++]
-          Object.assign(scoreMap, await triageBatch(group, job))
-        }
-      })
-    )
+    // Single Haiku call for the whole pool (caller sends ≤25 candidates per request)
+    const scoreMap = await triageBatch(pool, job)
 
     // Cache triage scores
     if (Object.keys(scoreMap).length > 0) {
@@ -284,6 +274,8 @@ async function handle(req: Request) {
 
   // ─── Deep single — Sonnet full analysis on one candidate, on demand ───
   if (stage === 'deep_single') {
+    const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
+    if (!job) return new Response('Job not found', { status: 404 })
     const { candidateId, source } = body
     if (!candidateId) return new Response('Missing candidateId', { status: 400 })
 
