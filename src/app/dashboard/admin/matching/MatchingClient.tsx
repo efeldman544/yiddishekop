@@ -194,49 +194,55 @@ export default function MatchingClient({
   }
 
   // Haiku batch — quick scores for all candidates from profile fields.
-  // Sends candidates in chunks of 100 so each serverless call stays under ~5s (Hobby-safe).
+  // Each request covers exactly 25 candidates (= 1 Haiku call, ~2s), well under any serverless limit.
+  // PARALLEL requests run concurrently so 500 candidates finish in ~25s total.
   async function runAiMatching() {
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
     setAiError(null)
 
-    const allProfile = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
-    const allVideo = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
-
-    // Combine, chunk into 100, fire sequentially so each request is short
     const all = [
-      ...allProfile.map(id => ({ id, source: 'profile' as const })),
-      ...allVideo.map(id => ({ id, source: 'video' as const })),
+      ...scoredCandidates.filter(c => c.source === 'profile').map(c => ({ id: c.id, source: 'profile' as const })),
+      ...scoredCandidates.filter(c => c.source === 'video').map(c => ({ id: c.id, source: 'video' as const })),
     ]
-    const CHUNK = 100
+
+    // 25 per chunk = 1 Haiku call = ~2s per serverless request (safe on any plan)
+    const CHUNK = 25
     const chunks: typeof all[] = []
     for (let i = 0; i < all.length; i += CHUNK) chunks.push(all.slice(i, i + CHUNK))
 
+    const PARALLEL = 4  // fire this many requests at once from the browser
     const jobId = selectedJobId
-    try {
-      for (const chunk of chunks) {
-        const profileIds = chunk.filter(c => c.source === 'profile').map(c => c.id)
-        const videoIds = chunk.filter(c => c.source === 'video').map(c => c.id)
-        const res = await postAiMatch({
-          jobId,
-          candidateIds: profileIds,
-          videoCandidateIds: videoIds,
-          stage: 'triage',
-        })
-        if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
-        const json = await res.json()
-        const map: Record<string, AiResult> = {}
-        for (const r of json.results ?? []) {
-          map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
-        }
-        mergeJobScores(jobId, map)
+
+    async function processChunk(chunk: typeof all) {
+      const profileIds = chunk.filter(c => c.source === 'profile').map(c => c.id)
+      const videoIds = chunk.filter(c => c.source === 'video').map(c => c.id)
+      const res = await postAiMatch({ jobId, candidateIds: profileIds, videoCandidateIds: videoIds, stage: 'triage' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      const json = await res.json()
+      const map: Record<string, AiResult> = {}
+      for (const r of json.results ?? []) {
+        map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
       }
+      mergeJobScores(jobId, map)
+    }
+
+    try {
+      // Process all chunks using a PARALLEL-wide concurrency pool
+      let next = 0
+      await Promise.all(
+        Array.from({ length: Math.min(PARALLEL, chunks.length) }, async () => {
+          while (next < chunks.length) {
+            await processChunk(chunks[next++])
+          }
+        })
+      )
     } catch (e) {
       setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
       analyzedJobs.current.delete(jobId)
     } finally {
       setAiRunning(false)
-      // Freeze the sort order so Analyze clicks don't reshuffle the list
+      // Freeze sort order so Analyze clicks don't reshuffle the list
       setAiScoresByJob(prev => {
         const scores = prev[jobId] ?? {}
         const order = Object.entries(scores)
