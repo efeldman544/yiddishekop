@@ -54,8 +54,6 @@ export default function LoginPage() {
       {/* Main */}
       <div className="auth-main">
         <div className="auth-box">
-          <Link href="/" className="auth-logo-mobile md:hidden">Yiddishe<span>Kop</span></Link>
-
           <h1 className="auth-heading">Welcome back</h1>
           <p className="auth-sub">Sign in to your account</p>
 

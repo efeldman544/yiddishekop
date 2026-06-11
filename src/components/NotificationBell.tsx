@@ -96,7 +96,7 @@ export default function NotificationBell({ candidatePath = '/dashboard/admin/can
                   key={n.id}
                   type="button"
                   onClick={() => handleClick(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-blue-50/60' : ''}`}
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-indigo-50/60' : ''}`}
                 >
                   <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
                     {n.message}

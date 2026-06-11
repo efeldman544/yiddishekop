@@ -21,7 +21,10 @@ export default function CandidateNav() {
           </Link>
         )}
       </div>
-      <SignOutButton />
+      <div className="flex items-center gap-3">
+        <Link href="/" className="dash-link-dim text-xs transition-colors hidden sm:block">← Main site</Link>
+        <SignOutButton />
+      </div>
     </header>
   )
 }

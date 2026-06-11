@@ -61,7 +61,7 @@ function ruleScore(candidate: MatchCandidate, job: MatchJob): { ruleScore: numbe
     const matched = jobLangs.filter(l => candLangs.includes(l))
     if (matched.length > 0) {
       score += Math.min(matched.length * 15, 30)
-      badges.push({ label: 'Languages', style: 'bg-blue-50 text-blue-700 border border-blue-200' })
+      badges.push({ label: 'Languages', style: 'bg-indigo-50 text-indigo-700 border border-indigo-200' })
     }
   }
   const jobTitleWords = job.job_title.toLowerCase().split(/\s+/).filter(w => w.length > 3)
@@ -239,7 +239,7 @@ export default function MatchingClient({
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{selectedJob.employment_type}</span>
                     )}
                     {selectedJob.languages && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{selectedJob.languages}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">{selectedJob.languages}</span>
                     )}
                   </div>
                 </div>

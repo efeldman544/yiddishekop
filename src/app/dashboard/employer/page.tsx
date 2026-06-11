@@ -135,7 +135,7 @@ export default function EmployerDashboard() {
                     <div className="flex items-center gap-3 flex-wrap mb-1">
                       <p className="text-lg font-bold text-gray-950 tracking-tight">{c.full_name ?? 'Unnamed'}</p>
                       {c.action === 'request_meeting' && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">Meeting requested</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">Meeting requested</span>
                       )}
                       {c.action === 'pass' && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">Passed</span>
@@ -146,7 +146,7 @@ export default function EmployerDashboard() {
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {c.fields_worked_in?.map(f => (
-                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
                       ))}
                       {c.employment_type?.map(e => (
                         <span key={e} className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e}</span>
@@ -186,7 +186,7 @@ export default function EmployerDashboard() {
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {c.fields_worked_in?.map(f => (
-                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
                       ))}
                     </div>
                   </div>

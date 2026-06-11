@@ -46,7 +46,7 @@ const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time', 'Contract']
 
 const STATUS_BADGE: Record<string, string> = {
   'Open':    'bg-green-100 text-green-700 border-green-200',
-  'Filled':  'bg-blue-100 text-blue-700 border-blue-200',
+  'Filled':  'bg-indigo-100 text-indigo-700 border-indigo-200',
   'On Hold': 'bg-yellow-100 text-yellow-700 border-yellow-200',
   'Closed':  'bg-gray-100 text-gray-500 border-gray-200',
 }
