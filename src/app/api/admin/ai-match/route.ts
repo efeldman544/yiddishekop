@@ -37,6 +37,66 @@ async function getResumeText(resumeUrl: string): Promise<string | null> {
   }
 }
 
+// ─── Stage 1: Triage — batch-score many candidates cheaply on profile fields only ───
+function triageCandidateLine(c: any): string {
+  return [
+    `ID: ${c.id}`,
+    `Title: ${c.current_job_title ?? '?'}`,
+    `Location: ${c.location ?? '?'}`,
+    `Fields: ${(c.fields_worked_in ?? []).join('/') || '?'}`,
+    `Emp types: ${(c.employment_type ?? []).join('/') || '?'}`,
+    `Langs: ${c.languages ?? '?'}`,
+    `Seeking: ${c.roles_seeking ?? '?'}`,
+    `Exp: ${c.years_experience ?? '?'}`,
+  ].join(' | ')
+}
+
+async function triageBatch(
+  candidates: any[],
+  job: any,
+): Promise<Record<string, number>> {
+  const prompt = `You are a recruiter doing a FIRST-PASS screen of candidates for a job. Score each candidate 0-100 on likely fit.
+
+━━━ JOB ━━━
+Title: ${job.job_title}
+Employment Type: ${job.employment_type ?? 'Not specified'}
+Languages Required: ${job.languages ?? 'Not specified'}
+Description:
+${(job.description ?? '(none)').slice(0, 3000)}
+
+━━━ RULES ━━━
+- Work arrangement defaults to REMOTE unless the description explicitly requires in-person presence. If remote, candidate location does not matter.
+- If the job is explicitly on-site in a specific place and the candidate is clearly elsewhere: score ≤ 20.
+- Similar-sounding titles are NOT the same role — judge by what the person actually does.
+- Scale: 85-100 direct fit, 65-84 strong, 45-64 related with gaps, 25-44 stretch, 0-24 poor.
+
+━━━ CANDIDATES ━━━
+${candidates.map(triageCandidateLine).join('\n')}
+
+Respond with JSON only — an array, one entry per candidate, same order:
+[{"id": "<candidate id>", "score": <0-100>}, ...]`
+
+  try {
+    const message = await getAnthropic().messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 2500,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const jsonStart = text.indexOf('[')
+    const jsonEnd = text.lastIndexOf(']')
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
+    const map: Record<string, number> = {}
+    for (const r of parsed) {
+      if (r?.id) map[r.id] = Math.min(100, Math.max(0, Number(r.score) || 0))
+    }
+    return map
+  } catch {
+    return {}
+  }
+}
+
+// ─── Stage 2: Deep scoring — full individual analysis with resume + transcript ───
 async function scoreCandidate(
   candidate: any,
   job: any,
@@ -149,7 +209,7 @@ async function handle(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
   if (profile?.role !== 'admin') return new Response('Forbidden', { status: 403 })
 
-  const { jobId, candidateIds, videoCandidateIds } = await req.json()
+  const { jobId, candidateIds, videoCandidateIds, stage } = await req.json()
   const hasRegular = Array.isArray(candidateIds) && candidateIds.length > 0
   const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
   if (!jobId || (!hasRegular && !hasVideo)) {
@@ -160,6 +220,46 @@ async function handle(req: Request) {
 
   const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
   if (!job) return new Response('Job not found', { status: 404 })
+
+  // ─── Triage stage: batch-score everyone cheaply, return quick scores only ───
+  if (stage === 'triage') {
+    const pool: any[] = []
+    if (hasRegular) {
+      const { data } = await db
+        .from('candidate_profiles')
+        .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
+        .in('id', candidateIds)
+      pool.push(...(data ?? []))
+    }
+    if (hasVideo) {
+      const { data } = await db
+        .from('video_candidates')
+        .select('id, current_job_title, location, fields_worked_in, employment_type')
+        .in('id', videoCandidateIds)
+      pool.push(...(data ?? []))
+    }
+
+    const GROUP = 25
+    const groups: any[][] = []
+    for (let i = 0; i < pool.length; i += GROUP) groups.push(pool.slice(i, i + GROUP))
+
+    const CONCURRENCY = 4
+    const scoreMap: Record<string, number> = {}
+    let next = 0
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, groups.length) }, async () => {
+        while (next < groups.length) {
+          const group = groups[next++]
+          Object.assign(scoreMap, await triageBatch(group, job))
+        }
+      })
+    )
+
+    return Response.json({
+      stage: 'triage',
+      results: Object.entries(scoreMap).map(([candidateId, score]) => ({ candidateId, score })),
+    })
+  }
 
   type ScoreResult = { candidateId: string; score: number; summary: string; strengths: string[]; concerns: string[] }
   const tasks: (() => Promise<ScoreResult>)[] = []
