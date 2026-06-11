@@ -60,8 +60,6 @@ export default function SignupPage() {
       {/* Main */}
       <div className="auth-main">
         <div className="auth-box">
-          <Link href="/" className="auth-logo-mobile">Yiddishe<span>Kop</span></Link>
-
           <h1 className="auth-heading">Create an account</h1>
           <p className="auth-sub">Join YiddisheKop today</p>
 

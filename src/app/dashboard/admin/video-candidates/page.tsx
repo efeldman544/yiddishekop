@@ -72,7 +72,7 @@ export default function VideoCandidatesPage() {
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {c.fields_worked_in?.map(f => (
-                      <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                      <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
                     ))}
                     {c.mux_playback_id && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">Video ✓</span>

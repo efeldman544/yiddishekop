@@ -33,7 +33,7 @@ export default async function AdminVideoCandidatePage({ params }: { params: Prom
         <p className="text-sm text-gray-400 mt-0.5">{[c.current_job_title, c.location].filter(Boolean).join(' · ')}</p>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {c.fields_worked_in?.map(f => (
-            <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+            <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
           ))}
           {c.employment_type?.map(e => (
             <span key={e} className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e}</span>

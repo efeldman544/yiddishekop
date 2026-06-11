@@ -2,9 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dashboardHref, setDashboardHref] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
+      const role = profile?.role ?? user.user_metadata?.role ?? 'candidate'
+      setDashboardHref(`/dashboard/${role}`)
+    })
+  }, [])
 
   useEffect(() => {
     const io = new IntersectionObserver(
@@ -33,7 +45,10 @@ export default function LandingPage() {
             <a href="#roles" onClick={closeMenu}>Roles</a>
           </nav>
           <div className="lp-nav-right">
-            <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
+            {dashboardHref
+              ? <Link href={dashboardHref} className="lp-btn lp-btn-ghost">My account</Link>
+              : <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
+            }
             <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
             <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
           </div>

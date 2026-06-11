@@ -60,12 +60,12 @@ const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 const STATUS_COLORS: Record<string, string> = {
   active:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
   inactive: 'bg-gray-100 text-gray-500 border border-gray-200',
-  placed:   'bg-blue-50 text-blue-600 border border-blue-200',
+  placed:   'bg-indigo-50 text-indigo-600 border border-indigo-200',
 }
 
 const JOB_STATUS_COLORS: Record<string, string> = {
   'Open':    'text-emerald-700',
-  'Filled':  'text-blue-600',
+  'Filled':  'text-indigo-600',
   'On Hold': 'text-amber-600',
   'Closed':  'text-gray-400',
 }
@@ -440,7 +440,7 @@ export default function AdminDashboard() {
                         {(c.fields_worked_in?.length > 0 || c.employment_type?.length > 0) && (
                           <div className="flex flex-wrap gap-1 mt-2.5">
                             {c.fields_worked_in?.map(f => (
-                              <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{f}</span>
+                              <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
                             ))}
                             {c.employment_type?.map(e => (
                               <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e}</span>
@@ -518,7 +518,7 @@ export default function AdminDashboard() {
                   {isExpanded && (
                     <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/80">
                       {jobs.length === 0 ? (
-                        <p className="text-xs text-gray-400">No open jobs found. <Link href="/dashboard/admin/jobs" className="text-blue-600 hover:underline">Add jobs →</Link></p>
+                        <p className="text-xs text-gray-400">No open jobs found. <Link href="/dashboard/admin/jobs" className="text-indigo-600 hover:underline">Add jobs →</Link></p>
                       ) : (
                         <div className="space-y-2.5">
                           {jobs.map(job => {
