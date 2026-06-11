@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as adminSupabase } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
-import { PDFParse } from 'pdf-parse'
 
 export const maxDuration = 60
 
@@ -28,6 +27,8 @@ async function getResumeText(resumeUrl: string): Promise<string | null> {
     const { data } = await supabase.storage.from('resumes').download(storagePath)
     if (!data) return null
     const buffer = Buffer.from(await data.arrayBuffer())
+    // Dynamic import — pdf-parse pulls in native canvas deps that can fail to load on Vercel
+    const { PDFParse } = await import('pdf-parse')
     const parser = new PDFParse({ data: buffer })
     const result = await parser.getText()
     return result.text.slice(0, 6000).trim() || null
@@ -129,6 +130,14 @@ Respond with JSON only — no markdown, no text outside the JSON:
 }
 
 export async function POST(req: Request) {
+  try {
+    return await handle(req)
+  } catch (err: any) {
+    return new Response(`ai-match crashed: ${err?.message ?? String(err)}`, { status: 500 })
+  }
+}
+
+async function handle(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response('ANTHROPIC_API_KEY is not set in environment variables', { status: 500 })
   }
