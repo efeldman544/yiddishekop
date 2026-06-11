@@ -167,7 +167,7 @@ Respond with JSON only — no markdown, no text outside the JSON:
   try {
     const message = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 600,
+      max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
     text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
@@ -177,7 +177,11 @@ Respond with JSON only — no markdown, no text outside the JSON:
   }
 
   try {
-    const parsed = JSON.parse(text)
+    // Extract the JSON object even if the model wrapped it in markdown fences or prose
+    const jsonStart = text.indexOf('{')
+    const jsonEnd = text.lastIndexOf('}')
+    if (jsonStart === -1 || jsonEnd <= jsonStart) throw new Error('no JSON object in response')
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
     return {
       score: Math.min(100, Math.max(0, Number(parsed.score) || 0)),
       summary: parsed.summary ?? '',
@@ -314,6 +318,11 @@ async function handle(req: Request) {
 
     if (!candidate) return new Response('Candidate not found', { status: 404 })
     const result = await scoreCandidate(candidate, job, resumeText, transcript)
+
+    // Don't cache failures as real scores — surface them so the client keeps the triage score
+    if (result.summary.startsWith('AI error:') || result.summary === 'Could not parse AI response.') {
+      return new Response(result.summary, { status: 502 })
+    }
 
     // Cache full score (best effort)
     try {
