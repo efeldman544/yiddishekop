@@ -31,13 +31,13 @@ export type Job = {
 }
 
 type FormState = {
-  employer_id: string; company_name: string; job_title: string; status: string
+  employer_id: string; employer_input: string; company_name: string; job_title: string; status: string
   employment_type: string; salary: string; hours: string; description: string
   languages: string; notes: string
 }
 
 const EMPTY_FORM: FormState = {
-  employer_id: '', company_name: '', job_title: '', status: 'Open',
+  employer_id: '', employer_input: '', company_name: '', job_title: '', status: 'Open',
   employment_type: '', salary: '', hours: '', description: '', languages: '', notes: '',
 }
 
@@ -82,8 +82,10 @@ export default function JobsClient({
 
   function openEdit(job: Job) {
     setEditingId(job.id)
+    const emp = employers.find(e => e.id === job.employer_id)
+    const empLabel = emp ? employerLabel(emp) : (job.company_name ?? '')
     setForm({
-      employer_id: job.employer_id ?? '', company_name: job.company_name ?? '',
+      employer_id: job.employer_id ?? '', employer_input: empLabel, company_name: job.company_name ?? '',
       job_title: job.job_title, status: job.status, employment_type: job.employment_type ?? '',
       salary: job.salary ?? '', hours: job.hours ?? '', description: job.description ?? '',
       languages: job.languages ?? '', notes: job.notes ?? '',
@@ -156,18 +158,22 @@ export default function JobsClient({
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  function handleEmployerChange(employerId: string) {
-    const emp = employers.find(e => e.id === employerId)
-    setForm(prev => ({ ...prev, employer_id: employerId, company_name: emp?.company_name ?? '' }))
+  function handleEmployerInput(value: string) {
+    const matched = employers.find(e => employerLabel(e).toLowerCase() === value.toLowerCase())
+    setForm(prev => ({
+      ...prev,
+      employer_input: value,
+      employer_id: matched ? matched.id : '',
+      company_name: matched ? (matched.company_name ?? '') : value,
+    }))
   }
 
   async function handleSave() {
     if (!form.job_title.trim()) { setError('Job title is required.'); return }
-    if (!form.employer_id) { setError('Please select an employer.'); return }
     setSaving(true); setError(null)
     const supabase = createClient()
     const payload = {
-      employer_id: form.employer_id, company_name: form.company_name.trim() || null,
+      employer_id: form.employer_id || null, company_name: form.company_name.trim() || null,
       job_title: form.job_title.trim(), status: form.status,
       employment_type: form.employment_type || null, salary: form.salary || null,
       hours: form.hours || null, description: form.description || null,
@@ -336,14 +342,19 @@ export default function JobsClient({
               )}
 
               <div className="space-y-1.5">
-                <Label>Employer <span className="text-destructive">*</span></Label>
-                <Select value={form.employer_id} onValueChange={handleEmployerChange}>
-                  <SelectTrigger><SelectValue placeholder="Select employer..." /></SelectTrigger>
-                  <SelectContent>
-                    {employers.map(emp => <SelectItem key={emp.id} value={emp.id}>{employerLabel(emp)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {employers.length === 0 && <p className="text-xs text-muted-foreground">No employer accounts found.</p>}
+                <Label htmlFor="employer_input">Employer</Label>
+                <input
+                  id="employer_input"
+                  list="employer-datalist"
+                  value={form.employer_input}
+                  onChange={e => handleEmployerInput(e.target.value)}
+                  placeholder="Type or select an employer…"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                  autoComplete="off"
+                />
+                <datalist id="employer-datalist">
+                  {employers.map(emp => <option key={emp.id} value={employerLabel(emp)} />)}
+                </datalist>
               </div>
 
               <div className="space-y-1.5">
