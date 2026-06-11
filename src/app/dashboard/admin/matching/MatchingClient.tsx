@@ -112,11 +112,12 @@ export default function MatchingClient({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id ?? null)
   const [assignments, setAssignments] = useState(initialAssignments)
   const [toggling, setToggling] = useState<string | null>(null)
-  // AI scores keyed by job, then candidate — cached scores for one job must not bleed into another
+  // AI scores keyed by job then candidate — scores from one job must not bleed into another
   const [aiScoresByJob, setAiScoresByJob] = useState<Record<string, Record<string, AiResult>>>({})
   const [aiRunning, setAiRunning] = useState(false)
-  const [aiProgress, setAiProgress] = useState(0)
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
   const analyzedJobs = useRef<Set<string>>(new Set())
 
   const selectedJob = jobs.find(j => j.id === selectedJobId) ?? null
@@ -152,6 +153,13 @@ export default function MatchingClient({
     }
   }
 
+  // On job select: load cached scores; only run AI fresh if nothing is cached
+  useEffect(() => {
+    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
+    analyzedJobs.current.add(selectedJobId)
+    loadCachedOrRun(selectedJobId)
+  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const scoredCandidates = useMemo<ScoredCandidate[]>(() => {
     if (!selectedJob) return []
     return candidates.map(c => ({ ...c, ...ruleScore(c, selectedJob) }))
@@ -167,78 +175,64 @@ export default function MatchingClient({
   }, [scoredCandidates, aiScores])
 
   const hasAiForJob = scoredCandidates.some(c => aiScores[c.id])
-  const [aiError, setAiError] = useState<string | null>(null)
 
-  const DEEP_LIMIT = 20   // how many top candidates get full resume/transcript analysis
-  const TRIAGE_THRESHOLD = 25  // pools larger than this go through triage first
-
-  async function callAiMatch(body: object): Promise<{ results: any[] } | null> {
-    const res = await fetch('/api/admin/ai-match', {
+  async function postAiMatch(body: object): Promise<Response> {
+    return fetch('/api/admin/ai-match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!res.ok) {
-      const errText = await res.text().catch(() => `HTTP ${res.status}`)
-      throw new Error(errText)
-    }
-    return res.json()
   }
 
+  // Haiku batch — quick scores for all candidates from profile fields
   async function runAiMatching() {
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
-    setAiProgress(0)
     setAiError(null)
 
-    const allProfile = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
-    const allVideo = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
-    const total = allProfile.length + allVideo.length
+    const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
+    const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
 
     try {
-      let deepProfileIds = allProfile
-      let deepVideoIds = allVideo
-
-      // Large pool: triage everyone first with cheap batch scoring, then deep-score the top
-      if (total > TRIAGE_THRESHOLD) {
-        const triage = await callAiMatch({
-          jobId: selectedJobId, candidateIds: allProfile, videoCandidateIds: allVideo, stage: 'triage',
-        })
-        const triageMap: Record<string, AiResult> = {}
-        for (const r of triage?.results ?? []) {
-          triageMap[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
-        }
-        mergeJobScores(selectedJobId, triageMap)
-        setAiProgress(50)
-
-        const ranked = (triage?.results ?? []).slice().sort((a, b) => b.score - a.score).slice(0, DEEP_LIMIT)
-        const topIds = new Set(ranked.map((r: any) => r.candidateId))
-        deepProfileIds = allProfile.filter(id => topIds.has(id))
-        deepVideoIds = allVideo.filter(id => topIds.has(id))
+      const res = await postAiMatch({ jobId: selectedJobId, candidateIds, videoCandidateIds, stage: 'triage' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      const json = await res.json()
+      const map: Record<string, AiResult> = {}
+      for (const r of json.results ?? []) {
+        map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
       }
-
-      // Deep scoring with resume + transcript on the (possibly narrowed) set
-      const deep = await callAiMatch({
-        jobId: selectedJobId, candidateIds: deepProfileIds, videoCandidateIds: deepVideoIds,
-      })
-      const deepMap: Record<string, AiResult> = {}
-      for (const r of deep?.results ?? []) deepMap[r.candidateId] = r
-      mergeJobScores(selectedJobId, deepMap)
+      mergeJobScores(selectedJobId, map)
     } catch (e) {
       setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
       analyzedJobs.current.delete(selectedJobId)
     } finally {
       setAiRunning(false)
-      setAiProgress(100)
     }
   }
 
-  // On job select: load cached scores from the DB; only run AI if nothing is cached yet
-  useEffect(() => {
-    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
-    analyzedJobs.current.add(selectedJobId)
-    loadCachedOrRun(selectedJobId)
-  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Sonnet deep analysis — full resume + transcript for one candidate, on demand
+  async function analyzeSingle(candidateId: string, source: 'profile' | 'video') {
+    if (!selectedJobId) return
+    setAnalyzingId(candidateId)
+    try {
+      const res = await postAiMatch({ jobId: selectedJobId, candidateId, source, stage: 'deep_single' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      const json = await res.json()
+      mergeJobScores(selectedJobId, {
+        [candidateId]: {
+          score: json.score,
+          summary: json.summary ?? '',
+          strengths: Array.isArray(json.strengths) ? json.strengths : [],
+          concerns: Array.isArray(json.concerns) ? json.concerns : [],
+        },
+      })
+      setExpanded(candidateId)
+    } catch (e) {
+      setAiError(`Deep analysis failed: ${e instanceof Error ? e.message : 'Network error'}`)
+    } finally {
+      setAnalyzingId(null)
+    }
+  }
 
   function isAssigned(candidateId: string) {
     return assignments.some(a => a.candidate_id === candidateId && a.job_id === selectedJobId)
@@ -418,10 +412,20 @@ export default function MatchingClient({
                             )}
                           </div>
 
-                          <Button size="sm" variant={assigned ? 'default' : 'outline'}
-                            disabled={toggling === key} onClick={() => toggleAssign(c.id)} className="shrink-0">
-                            {toggling === key ? '…' : assigned ? 'Assigned ✓' : 'Assign'}
-                          </Button>
+                          <div className="flex flex-col gap-1.5 shrink-0">
+                            {ai?.triageOnly && (
+                              <Button size="sm" variant="outline"
+                                disabled={analyzingId === c.id}
+                                onClick={() => analyzeSingle(c.id, c.source)}
+                                className="text-violet-600 border-violet-200 hover:bg-violet-50">
+                                {analyzingId === c.id ? 'Analyzing…' : 'Analyze'}
+                              </Button>
+                            )}
+                            <Button size="sm" variant={assigned ? 'default' : 'outline'}
+                              disabled={toggling === key} onClick={() => toggleAssign(c.id)}>
+                              {toggling === key ? '…' : assigned ? 'Assigned ✓' : 'Assign'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
 

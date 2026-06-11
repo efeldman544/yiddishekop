@@ -37,14 +37,14 @@ async function getResumeText(resumeUrl: string): Promise<string | null> {
   }
 }
 
-// ─── Stage 1: Triage — batch-score many candidates cheaply on profile fields only ───
-function triageCandidateLine(c: any): string {
+// ─── Batch Haiku triage — profile fields only, 25 candidates per call ───
+function triageCandidateLine(c: Record<string, unknown>): string {
   return [
     `ID: ${c.id}`,
     `Title: ${c.current_job_title ?? '?'}`,
     `Location: ${c.location ?? '?'}`,
-    `Fields: ${(c.fields_worked_in ?? []).join('/') || '?'}`,
-    `Emp types: ${(c.employment_type ?? []).join('/') || '?'}`,
+    `Fields: ${(c.fields_worked_in as string[] ?? []).join('/') || '?'}`,
+    `Emp types: ${(c.employment_type as string[] ?? []).join('/') || '?'}`,
     `Langs: ${c.languages ?? '?'}`,
     `Seeking: ${c.roles_seeking ?? '?'}`,
     `Exp: ${c.years_experience ?? '?'}`,
@@ -52,8 +52,8 @@ function triageCandidateLine(c: any): string {
 }
 
 async function triageBatch(
-  candidates: any[],
-  job: any,
+  candidates: Record<string, unknown>[],
+  job: Record<string, unknown>,
 ): Promise<Record<string, number>> {
   const prompt = `You are a recruiter doing a FIRST-PASS screen of candidates for a job. Score each candidate 0-100 on likely fit.
 
@@ -62,7 +62,7 @@ Title: ${job.job_title}
 Employment Type: ${job.employment_type ?? 'Not specified'}
 Languages Required: ${job.languages ?? 'Not specified'}
 Description:
-${(job.description ?? '(none)').slice(0, 3000)}
+${((job.description as string) ?? '(none)').slice(0, 3000)}
 
 ━━━ RULES ━━━
 - Work arrangement defaults to REMOTE unless the description explicitly requires in-person presence. If remote, candidate location does not matter.
@@ -96,10 +96,10 @@ Respond with JSON only — an array, one entry per candidate, same order:
   }
 }
 
-// ─── Stage 2: Deep scoring — full individual analysis with resume + transcript ───
+// ─── Single Sonnet deep analysis — full resume + transcript, one candidate ───
 async function scoreCandidate(
-  candidate: any,
-  job: any,
+  candidate: Record<string, unknown>,
+  job: Record<string, unknown>,
   resumeText: string | null,
   transcript: string | null,
 ): Promise<{ score: number; summary: string; strengths: string[]; concerns: string[] }> {
@@ -117,8 +117,8 @@ ${job.description ?? '(No description provided)'}
 ━━━ CANDIDATE ━━━
 Current Title: ${candidate.current_job_title ?? 'Unknown'}
 Location: ${candidate.location ?? 'Unknown'}
-Fields Worked In: ${(candidate.fields_worked_in ?? []).join(', ') || 'Not specified'}
-Employment Types Available: ${(candidate.employment_type ?? []).join(', ') || 'Not specified'}
+Fields Worked In: ${(candidate.fields_worked_in as string[] ?? []).join(', ') || 'Not specified'}
+Employment Types Available: ${(candidate.employment_type as string[] ?? []).join(', ') || 'Not specified'}
 Languages: ${candidate.languages ?? 'Not specified'}
 Roles Seeking: ${candidate.roles_seeking ?? 'Not specified'}
 Years Experience: ${candidate.years_experience ?? 'Unknown'}
@@ -130,26 +130,25 @@ Remote Experience: ${candidate.remote_experience === true ? 'Yes' : candidate.re
 ${resumeText ?? '(Not provided — rely on profile fields above)'}
 
 ━━━ INTERVIEW TRANSCRIPT ━━━
-${transcript ? transcript.slice(0, 5000) : '(Not provided — rely on profile fields and resume)'}
+${transcript ? (transcript as string).slice(0, 5000) : '(Not provided — rely on profile fields and resume)'}
 
 ━━━ INSTRUCTIONS ━━━
 Output a single JSON object. The fields BEFORE "score" force you to reason correctly before you commit to a number.
 
-1. job_work_arrangement: Read the full description. Default is "remote" unless the description explicitly says otherwise. Only set "on-site" if the description clearly requires in-person presence (e.g. "in our office", "must commute", "on-site in [city]", "in-person"). Set "hybrid" only if explicitly stated. If the description is silent on location, output "remote".
+1. job_work_arrangement: Read the full description. Default is "remote" unless the description explicitly says otherwise. Only set "on-site" if the description clearly requires in-person presence. Set "hybrid" only if explicitly stated.
 
 2. job_required_location: Only if on-site or hybrid AND a specific city/country is named. Null for remote or if no location is specified.
 
-3. job_core_function: In 1-2 sentences, what does this person ACTUALLY DO day-to-day? Go beyond the title — explain the real work.
+3. job_core_function: In 1-2 sentences, what does this person ACTUALLY DO day-to-day?
 
-4. candidate_location_match: true if remote (location doesn't matter), true if candidate is in the required location, false only if the job is explicitly on-site and candidate is clearly elsewhere. Default to true when arrangement is remote.
+4. candidate_location_match: true if remote, true if candidate is in the required location, false only if the job is explicitly on-site and candidate is clearly elsewhere.
 
-5. candidate_actual_experience: In 1-2 sentences, what has this candidate ACTUALLY DONE based on resume and transcript? Be specific about real work, not just job titles.
+5. candidate_actual_experience: In 1-2 sentences, what has this candidate ACTUALLY DONE based on resume and transcript?
 
-6. score: Integer 0-100. Apply these hard caps STRICTLY:
+6. score: Integer 0-100.
    - On-site job + candidate NOT in required location → score MUST be ≤ 20
-   - Employment type mismatch (e.g. job is Full Time, candidate only wants Part Time) → score MUST be ≤ 35
-   - "Similar-sounding" titles are NOT the same role. Donor relations ≠ customer service. Fundraising coordinator ≠ sales rep. Score based on actual overlap in what the person does.
-   Scale: 85-100 direct fit, 65-84 strong, 45-64 related with gaps, 25-44 stretch, 0-24 poor or constraint violated.
+   - Employment type mismatch → score MUST be ≤ 35
+   - Scale: 85-100 direct fit, 65-84 strong, 45-64 related with gaps, 25-44 stretch, 0-24 poor.
 
 Respond with JSON only — no markdown, no text outside the JSON:
 {
@@ -172,8 +171,9 @@ Respond with JSON only — no markdown, no text outside the JSON:
       messages: [{ role: 'user', content: prompt }],
     })
     text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-  } catch (err: any) {
-    return { score: 0, summary: `AI error: ${err?.message ?? 'Unknown error'}`, strengths: [], concerns: [] }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return { score: 0, summary: `AI error: ${msg}`, strengths: [], concerns: [] }
   }
 
   try {
@@ -192,8 +192,9 @@ Respond with JSON only — no markdown, no text outside the JSON:
 export async function POST(req: Request) {
   try {
     return await handle(req)
-  } catch (err: any) {
-    return new Response(`ai-match crashed: ${err?.message ?? String(err)}`, { status: 500 })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return new Response(`ai-match crashed: ${msg}`, { status: 500 })
   }
 }
 
@@ -209,41 +210,41 @@ async function handle(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
   if (profile?.role !== 'admin') return new Response('Forbidden', { status: 403 })
 
-  const { jobId, candidateIds, videoCandidateIds, stage } = await req.json()
-  const hasRegular = Array.isArray(candidateIds) && candidateIds.length > 0
-  const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
-  if (!jobId || (!hasRegular && !hasVideo)) {
-    return new Response('Missing jobId or candidate IDs', { status: 400 })
-  }
+  const body = await req.json()
+  const { jobId, stage } = body
+  if (!jobId) return new Response('Missing jobId', { status: 400 })
 
   const db = adminClient()
-
   const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
   if (!job) return new Response('Job not found', { status: 404 })
 
-  // ─── Triage stage: batch-score everyone cheaply, return quick scores only ───
-  if (stage === 'triage') {
-    const pool: any[] = []
+  // ─── Batch Haiku triage — scores every candidate quickly from profile fields ───
+  if (stage === 'triage' || !stage) {
+    const { candidateIds, videoCandidateIds } = body
+    const hasRegular = Array.isArray(candidateIds) && candidateIds.length > 0
+    const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
+    if (!hasRegular && !hasVideo) return new Response('Missing candidate IDs', { status: 400 })
+
+    const pool: Record<string, unknown>[] = []
     const sourceOf: Record<string, 'profile' | 'video'> = {}
+
     if (hasRegular) {
       const { data } = await db
         .from('candidate_profiles')
         .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
         .in('id', candidateIds)
-      for (const c of data ?? []) sourceOf[c.id] = 'profile'
-      pool.push(...(data ?? []))
+      for (const c of data ?? []) { sourceOf[c.id] = 'profile'; pool.push(c) }
     }
     if (hasVideo) {
       const { data } = await db
         .from('video_candidates')
         .select('id, current_job_title, location, fields_worked_in, employment_type')
         .in('id', videoCandidateIds)
-      for (const c of data ?? []) sourceOf[c.id] = 'video'
-      pool.push(...(data ?? []))
+      for (const c of data ?? []) { sourceOf[c.id] = 'video'; pool.push(c) }
     }
 
     const GROUP = 25
-    const groups: any[][] = []
+    const groups: Record<string, unknown>[][] = []
     for (let i = 0; i < pool.length; i += GROUP) groups.push(pool.slice(i, i + GROUP))
 
     const CONCURRENCY = 4
@@ -258,112 +259,88 @@ async function handle(req: Request) {
       })
     )
 
-    // Cache triage scores (best effort — scoring already succeeded even if this fails)
-    await db.from('candidate_ai_scores').upsert(
-      Object.entries(scoreMap).map(([candidateId, score]) => ({
-        job_id: jobId,
-        candidate_id: candidateId,
-        source: sourceOf[candidateId] ?? 'profile',
-        score,
-        summary: null,
-        strengths: [],
-        concerns: [],
-        triage_only: true,
-        updated_at: new Date().toISOString(),
-      })),
-      { onConflict: 'job_id,candidate_id' },
-    )
+    // Cache triage scores
+    if (Object.keys(scoreMap).length > 0) {
+      await db.from('candidate_ai_scores').upsert(
+        Object.entries(scoreMap).map(([candidateId, score]) => ({
+          job_id: jobId,
+          candidate_id: candidateId,
+          source: sourceOf[candidateId] ?? 'profile',
+          score,
+          summary: null,
+          strengths: [],
+          concerns: [],
+          triage_only: true,
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: 'job_id,candidate_id' },
+      )
+    }
 
     return Response.json({
-      stage: 'triage',
       results: Object.entries(scoreMap).map(([candidateId, score]) => ({ candidateId, score })),
     })
   }
 
-  type ScoreResult = { candidateId: string; source: 'profile' | 'video'; score: number; summary: string; strengths: string[]; concerns: string[] }
-  const tasks: (() => Promise<ScoreResult>)[] = []
+  // ─── Deep single — Sonnet full analysis on one candidate, on demand ───
+  if (stage === 'deep_single') {
+    const { candidateId, source } = body
+    if (!candidateId) return new Response('Missing candidateId', { status: 400 })
 
-  // --- Regular candidates ---
-  if (hasRegular) {
-    const [{ data: candidates, error: candErr }, { data: videos }] = await Promise.all([
-      db.from('candidate_profiles').select('*').in('id', candidateIds),
-      db.from('videos').select('candidate_id, transcript').in('candidate_id', candidateIds)
-        .not('transcript', 'is', null).order('created_at', { ascending: false }),
-    ])
+    let candidate: Record<string, unknown> | null = null
+    let resumeText: string | null = null
+    let transcript: string | null = null
 
-    if (candErr) return new Response(`DB error fetching candidates: ${candErr.message}`, { status: 500 })
-    if (!candidates?.length) return new Response(`No candidates found for provided IDs (got ${candidateIds.length} IDs)`, { status: 404 })
-
-    const transcriptMap: Record<string, string> = {}
-    for (const v of videos ?? []) {
-      if (!transcriptMap[v.candidate_id]) transcriptMap[v.candidate_id] = v.transcript
-    }
-
-    for (const c of candidates) {
-      tasks.push(async () => {
-        const resumeText = c.resume_url ? await getResumeText(c.resume_url) : null
-        const aiResult = await scoreCandidate(c, job, resumeText, transcriptMap[c.id] ?? null)
-        return { candidateId: c.id, source: 'profile' as const, ...aiResult }
-      })
-    }
-  }
-
-  // --- Video-only candidates ---
-  if (hasVideo) {
-    const { data: videoCandidates, error: vcErr } = await db
-      .from('video_candidates')
-      .select('id, name, location, current_job_title, fields_worked_in, employment_type, transcript')
-      .in('id', videoCandidateIds)
-
-    if (vcErr) return new Response(`DB error fetching video candidates: ${vcErr.message}`, { status: 500 })
-
-    for (const vc of videoCandidates ?? []) {
-      tasks.push(async () => {
-        const profileShape = {
-          current_job_title: vc.current_job_title,
-          location: vc.location,
-          fields_worked_in: vc.fields_worked_in ?? [],
-          employment_type: vc.employment_type ?? [],
-          languages: null, roles_seeking: null, years_experience: null,
-          education_level: null, tools_software: null,
-          us_hours_comfortable: null, remote_experience: null,
-        }
-        const aiResult = await scoreCandidate(profileShape, job, null, vc.transcript ?? null)
-        return { candidateId: vc.id, source: 'video' as const, ...aiResult }
-      })
-    }
-  }
-
-  // Run with limited concurrency — org rate limit is 50 req/min, so don't fire everything at once
-  const CONCURRENCY = 4
-  const results: ScoreResult[] = []
-  let next = 0
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, async () => {
-      while (next < tasks.length) {
-        const task = tasks[next++]
-        results.push(await task())
+    if (source === 'video') {
+      const { data } = await db
+        .from('video_candidates')
+        .select('id, name, location, current_job_title, fields_worked_in, employment_type, transcript')
+        .eq('id', candidateId)
+        .single()
+      if (!data) return new Response('Candidate not found', { status: 404 })
+      transcript = data.transcript ?? null
+      candidate = {
+        current_job_title: data.current_job_title,
+        location: data.location,
+        fields_worked_in: data.fields_worked_in ?? [],
+        employment_type: data.employment_type ?? [],
+        languages: null, roles_seeking: null, years_experience: null,
+        education_level: null, tools_software: null,
+        us_hours_comfortable: null, remote_experience: null,
       }
-    })
-  )
+    } else {
+      const [{ data: cp }, { data: videos }] = await Promise.all([
+        db.from('candidate_profiles').select('*').eq('id', candidateId).single(),
+        db.from('videos').select('transcript').eq('candidate_id', candidateId)
+          .not('transcript', 'is', null).order('created_at', { ascending: false }).limit(1),
+      ])
+      if (!cp) return new Response('Candidate not found', { status: 404 })
+      candidate = cp
+      resumeText = cp.resume_url ? await getResumeText(cp.resume_url) : null
+      transcript = videos?.[0]?.transcript ?? null
+    }
 
-  // Cache full scores (best effort — scoring already succeeded even if this fails)
-  if (results.length > 0) {
+    if (!candidate) return new Response('Candidate not found', { status: 404 })
+    const result = await scoreCandidate(candidate, job, resumeText, transcript)
+
+    // Cache full score, overwriting any existing triage-only entry
     await db.from('candidate_ai_scores').upsert(
-      results.map(r => ({
+      [{
         job_id: jobId,
-        candidate_id: r.candidateId,
-        source: r.source,
-        score: r.score,
-        summary: r.summary,
-        strengths: r.strengths,
-        concerns: r.concerns,
+        candidate_id: candidateId,
+        source: source ?? 'profile',
+        score: result.score,
+        summary: result.summary,
+        strengths: result.strengths,
+        concerns: result.concerns,
         triage_only: false,
         updated_at: new Date().toISOString(),
-      })),
+      }],
       { onConflict: 'job_id,candidate_id' },
     )
+
+    return Response.json({ candidateId, ...result })
   }
 
-  return Response.json({ results })
+  return new Response(`Unknown stage: ${stage}`, { status: 400 })
 }
