@@ -3,6 +3,8 @@ import { createClient as adminSupabase } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { PDFParse } from 'pdf-parse'
 
+export const maxDuration = 60
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 function adminClient() {
