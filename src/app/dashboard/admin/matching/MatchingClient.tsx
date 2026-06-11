@@ -184,27 +184,47 @@ export default function MatchingClient({
     })
   }
 
-  // Haiku batch — quick scores for all candidates from profile fields
+  // Haiku batch — quick scores for all candidates from profile fields.
+  // Sends candidates in chunks of 100 so each serverless call stays under ~5s (Hobby-safe).
   async function runAiMatching() {
     if (!selectedJobId || aiRunning) return
     setAiRunning(true)
     setAiError(null)
 
-    const candidateIds = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
-    const videoCandidateIds = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
+    const allProfile = scoredCandidates.filter(c => c.source === 'profile').map(c => c.id)
+    const allVideo = scoredCandidates.filter(c => c.source === 'video').map(c => c.id)
 
+    // Combine, chunk into 100, fire sequentially so each request is short
+    const all = [
+      ...allProfile.map(id => ({ id, source: 'profile' as const })),
+      ...allVideo.map(id => ({ id, source: 'video' as const })),
+    ]
+    const CHUNK = 100
+    const chunks: typeof all[] = []
+    for (let i = 0; i < all.length; i += CHUNK) chunks.push(all.slice(i, i + CHUNK))
+
+    const jobId = selectedJobId
     try {
-      const res = await postAiMatch({ jobId: selectedJobId, candidateIds, videoCandidateIds, stage: 'triage' })
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
-      const json = await res.json()
-      const map: Record<string, AiResult> = {}
-      for (const r of json.results ?? []) {
-        map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
+      for (const chunk of chunks) {
+        const profileIds = chunk.filter(c => c.source === 'profile').map(c => c.id)
+        const videoIds = chunk.filter(c => c.source === 'video').map(c => c.id)
+        const res = await postAiMatch({
+          jobId,
+          candidateIds: profileIds,
+          videoCandidateIds: videoIds,
+          stage: 'triage',
+        })
+        if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+        const json = await res.json()
+        const map: Record<string, AiResult> = {}
+        for (const r of json.results ?? []) {
+          map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
+        }
+        mergeJobScores(jobId, map)
       }
-      mergeJobScores(selectedJobId, map)
     } catch (e) {
       setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
-      analyzedJobs.current.delete(selectedJobId)
+      analyzedJobs.current.delete(jobId)
     } finally {
       setAiRunning(false)
     }
