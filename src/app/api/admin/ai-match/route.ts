@@ -35,71 +35,70 @@ async function scoreCandidate(
   resumeText: string | null,
   transcript: string | null,
 ): Promise<{ score: number; summary: string; strengths: string[]; concerns: string[] }> {
-  const prompt = `You are a senior recruiter at a staffing agency evaluating whether a candidate is genuinely right for a job opening. Your goal is accurate fit assessment — not keyword matching.
+  const prompt = `You are a recruiter evaluating a candidate for a job. Work through this carefully and systematically.
 
-═══ STEP 1: CHECK HARD CONSTRAINTS ═══
-Evaluate these before anything else. A violated hard constraint caps the score.
-
-1. LOCATION: Read the job description carefully. If the job says "on-site", "in-office", or names a specific city/country, the candidate MUST be in that location. If they are not → score cannot exceed 20 regardless of other qualifications. Be strict: Jerusalem/Israel ≠ New York, London, Montreal, etc.
-
-2. EMPLOYMENT TYPE: If the job specifies Full Time and the candidate only wants Part Time (or vice versa), that is a hard mismatch → score cannot exceed 35.
-
-3. LANGUAGES: If the job requires a specific language the candidate doesn't have → score cannot exceed 40.
-
-═══ STEP 2: EVALUATE GENUINE FIT ═══
-Only if hard constraints are met, assess the real substance of fit:
-
-- Read what the job actually DOES — not just the title. "Donor Relations" means fundraising, nonprofit stakeholder management, donor stewardship. It is NOT the same as customer service or customer relations even though both have the word "relations". Reason about what the role requires.
-- Look at what the candidate has actually DONE in their career — their real experience, not surface-level title similarity.
-- Use the resume and interview transcript as primary evidence of capability. If those aren't available, be more conservative.
-- A candidate with tangentially related experience should score 40-55, not 70+.
-
-═══ SCORING GUIDE ═══
-90-100: Exceptional match — direct relevant experience, meets all requirements
-75-89:  Strong match — solid relevant background, minor gaps only
-55-74:  Reasonable fit — related experience but meaningful gaps
-35-54:  Stretch — tangential relevance, significant gaps
-0-34:   Poor fit, OR a hard constraint is violated (location/type/language)
-
-JOB OPENING:
+━━━ JOB ━━━
 Title: ${job.job_title}
 Employment Type: ${job.employment_type ?? 'Not specified'}
-Location/On-site requirement: ${job.description?.match(/on.?site|in.?office|in.?person|jerusalem|israel|new york|remote|hybrid/gi)?.join(', ') ?? 'See description'}
+Hours/Week: ${job.hours ?? 'Not specified'}
 Languages Required: ${job.languages ?? 'Not specified'}
 Salary: ${job.salary ?? 'Not specified'}
-Hours: ${job.hours ?? 'Not specified'}
-Description: ${job.description ?? 'Not specified'}
+Full Description:
+${job.description ?? '(No description provided)'}
 
-CANDIDATE PROFILE:
-Name/Title: ${candidate.current_job_title ?? 'Unknown'}
+━━━ CANDIDATE ━━━
+Current Title: ${candidate.current_job_title ?? 'Unknown'}
 Location: ${candidate.location ?? 'Unknown'}
 Fields Worked In: ${(candidate.fields_worked_in ?? []).join(', ') || 'Not specified'}
 Employment Types Available: ${(candidate.employment_type ?? []).join(', ') || 'Not specified'}
 Languages: ${candidate.languages ?? 'Not specified'}
 Roles Seeking: ${candidate.roles_seeking ?? 'Not specified'}
-Years Experience: ${candidate.years_experience ?? 'Not specified'}
-Education: ${candidate.education_level ?? 'Not specified'}
+Years Experience: ${candidate.years_experience ?? 'Unknown'}
+Education: ${candidate.education_level ?? 'Unknown'}
 Tools & Software: ${candidate.tools_software ?? 'Not specified'}
-US Hours Comfortable: ${candidate.us_hours_comfortable === true ? 'Yes' : candidate.us_hours_comfortable === false ? 'No' : 'Unknown'}
 Remote Experience: ${candidate.remote_experience === true ? 'Yes' : candidate.remote_experience === false ? 'No' : 'Unknown'}
 
-RESUME:
-${resumeText ?? 'Not available'}
+━━━ RESUME ━━━
+${resumeText ?? '(Not provided — rely on profile fields above)'}
 
-INTERVIEW TRANSCRIPT:
-${transcript ? transcript.slice(0, 4000) : 'Not available'}
+━━━ INTERVIEW TRANSCRIPT ━━━
+${transcript ? transcript.slice(0, 5000) : '(Not provided — rely on profile fields and resume)'}
 
-Think through hard constraints first, then genuine fit. Respond with JSON only — no markdown:
+━━━ INSTRUCTIONS ━━━
+Output a single JSON object. The fields BEFORE "score" force you to reason correctly before you commit to a number.
+
+1. job_work_arrangement: Read the full description. Is this "remote", "on-site", "hybrid", or "unspecified"? Look for phrases like "in our office", "must commute", a city/country requirement, "in-person", "work from home", etc.
+
+2. job_required_location: If on-site or hybrid, what city/country? Null if remote or unspecified.
+
+3. job_core_function: In 1-2 sentences, what does this person ACTUALLY DO day-to-day? Go beyond the title — explain the real work.
+
+4. candidate_location_match: Does the candidate's location satisfy the job's location requirement? true/false/null-if-remote.
+
+5. candidate_actual_experience: In 1-2 sentences, what has this candidate ACTUALLY DONE based on resume and transcript? Be specific about real work, not just job titles.
+
+6. score: Integer 0-100. Apply these hard caps STRICTLY:
+   - On-site job + candidate NOT in required location → score MUST be ≤ 20
+   - Employment type mismatch (e.g. job is Full Time, candidate only wants Part Time) → score MUST be ≤ 35
+   - "Similar-sounding" titles are NOT the same role. Donor relations ≠ customer service. Fundraising coordinator ≠ sales rep. Score based on actual overlap in what the person does.
+   Scale: 85-100 direct fit, 65-84 strong, 45-64 related with gaps, 25-44 stretch, 0-24 poor or constraint violated.
+
+Respond with JSON only — no markdown, no text outside the JSON:
 {
-  "score": <integer 0-100>,
-  "summary": "<2-3 sentences — lead with whether hard constraints are met, then genuine fit assessment>",
-  "strengths": ["<specific, evidence-based strength>", ...],
-  "concerns": ["<specific concern, gap, or violated constraint>", ...]
+  "job_work_arrangement": "remote|on-site|hybrid|unspecified",
+  "job_required_location": "<city/country or null>",
+  "job_core_function": "<what this role actually does>",
+  "candidate_location_match": true|false|null,
+  "candidate_actual_experience": "<what they have actually done>",
+  "score": <0-100>,
+  "summary": "<2-3 sentences: state location requirement + whether candidate meets it, then genuine fit>",
+  "strengths": ["<evidence-based strength from resume/transcript/profile>"],
+  "concerns": ["<specific gap, mismatch, or violated constraint>"]
 }`
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 512,
+    max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }],
   })
 
