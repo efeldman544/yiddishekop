@@ -223,48 +223,48 @@ async function handle(req: Request) {
     const hasVideo = Array.isArray(videoCandidateIds) && videoCandidateIds.length > 0
     if (!hasRegular && !hasVideo) return new Response('Missing candidate IDs', { status: 400 })
 
-    // Fetch job + all candidate data in parallel
-    const [jobResult, regularResult, videoResult] = await Promise.all([
-      db.from('job_requirements').select('*').eq('id', jobId).single(),
-      hasRegular
-        ? db.from('candidate_profiles')
-            .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
-            .in('id', candidateIds)
-        : Promise.resolve({ data: null }),
-      hasVideo
-        ? db.from('video_candidates')
-            .select('id, current_job_title, location, fields_worked_in, employment_type')
-            .in('id', videoCandidateIds)
-        : Promise.resolve({ data: null }),
-    ])
-
-    if (!jobResult.data) return new Response('Job not found', { status: 404 })
-    const job = jobResult.data
+    const { data: job } = await db.from('job_requirements').select('*').eq('id', jobId).single()
+    if (!job) return new Response('Job not found', { status: 404 })
 
     const pool: Record<string, unknown>[] = []
     const sourceOf: Record<string, 'profile' | 'video'> = {}
-    for (const c of regularResult.data ?? []) { sourceOf[c.id] = 'profile'; pool.push(c) }
-    for (const c of videoResult.data ?? []) { sourceOf[c.id] = 'video'; pool.push(c) }
+
+    if (hasRegular) {
+      const { data } = await db
+        .from('candidate_profiles')
+        .select('id, current_job_title, location, fields_worked_in, employment_type, languages, roles_seeking, years_experience')
+        .in('id', candidateIds)
+      for (const c of data ?? []) { sourceOf[c.id] = 'profile'; pool.push(c) }
+    }
+    if (hasVideo) {
+      const { data } = await db
+        .from('video_candidates')
+        .select('id, current_job_title, location, fields_worked_in, employment_type')
+        .in('id', videoCandidateIds)
+      for (const c of data ?? []) { sourceOf[c.id] = 'video'; pool.push(c) }
+    }
 
     // Single Haiku call for the whole pool (caller sends ≤25 candidates per request)
     const scoreMap = await triageBatch(pool, job)
 
-    // Cache triage scores
+    // Cache triage scores (best effort — scoring already succeeded even if this fails)
     if (Object.keys(scoreMap).length > 0) {
-      await db.from('candidate_ai_scores').upsert(
-        Object.entries(scoreMap).map(([candidateId, score]) => ({
-          job_id: jobId,
-          candidate_id: candidateId,
-          source: sourceOf[candidateId] ?? 'profile',
-          score,
-          summary: null,
-          strengths: [],
-          concerns: [],
-          triage_only: true,
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: 'job_id,candidate_id' },
-      )
+      try {
+        await db.from('candidate_ai_scores').upsert(
+          Object.entries(scoreMap).map(([candidateId, score]) => ({
+            job_id: jobId,
+            candidate_id: candidateId,
+            source: sourceOf[candidateId] ?? 'profile',
+            score,
+            summary: null,
+            strengths: [],
+            concerns: [],
+            triage_only: true,
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: 'job_id,candidate_id' },
+        )
+      } catch { /* cache failure is non-fatal */ }
     }
 
     return Response.json({
@@ -315,21 +315,23 @@ async function handle(req: Request) {
     if (!candidate) return new Response('Candidate not found', { status: 404 })
     const result = await scoreCandidate(candidate, job, resumeText, transcript)
 
-    // Cache full score, overwriting any existing triage-only entry
-    await db.from('candidate_ai_scores').upsert(
-      [{
-        job_id: jobId,
-        candidate_id: candidateId,
-        source: source ?? 'profile',
-        score: result.score,
-        summary: result.summary,
-        strengths: result.strengths,
-        concerns: result.concerns,
-        triage_only: false,
-        updated_at: new Date().toISOString(),
-      }],
-      { onConflict: 'job_id,candidate_id' },
-    )
+    // Cache full score (best effort)
+    try {
+      await db.from('candidate_ai_scores').upsert(
+        [{
+          job_id: jobId,
+          candidate_id: candidateId,
+          source: source ?? 'profile',
+          score: result.score,
+          summary: result.summary,
+          strengths: result.strengths,
+          concerns: result.concerns,
+          triage_only: false,
+          updated_at: new Date().toISOString(),
+        }],
+        { onConflict: 'job_id,candidate_id' },
+      )
+    } catch { /* cache failure is non-fatal */ }
 
     return Response.json({ candidateId, ...result })
   }
