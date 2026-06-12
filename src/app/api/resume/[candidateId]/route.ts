@@ -147,11 +147,11 @@ export async function GET(
       const ctx = canvas.getContext('2d')
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
       // Some PDFs use non-standard font encodings that cause pdfjs to pass a
       // numeric glyph ID where it expects a string (e.g. "55876.replace is not
       // a function"). We catch per-page so the rest of the document still renders.
       try {
+        // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
         await page.render({ canvasContext: ctx, viewport }).promise
       } catch (renderErr) {
         console.warn(`pdfjs render warning page ${pageNum}:`, renderErr)
