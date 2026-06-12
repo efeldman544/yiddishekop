@@ -49,25 +49,28 @@ export async function updateSession(request: NextRequest) {
     return redirectWithCookies('/login')
   }
 
-  // Role-based route guards for /dashboard/[role]
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  // Role-based route guards — only /dashboard/[role] paths need the role
+  // lookup, so skip the extra DB roundtrip everywhere else
+  if (/^\/dashboard\/(candidate|employer|admin)/.test(pathname)) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
 
-  const role = profile?.role ?? user.user_metadata?.role
+    const role = profile?.role ?? user.user_metadata?.role
 
-  if (pathname.startsWith('/dashboard/candidate') && role !== 'candidate') {
-    return redirectWithCookies('/dashboard')
-  }
+    if (pathname.startsWith('/dashboard/candidate') && role !== 'candidate') {
+      return redirectWithCookies('/dashboard')
+    }
 
-  if (pathname.startsWith('/dashboard/employer') && role !== 'employer') {
-    return redirectWithCookies('/dashboard')
-  }
+    if (pathname.startsWith('/dashboard/employer') && role !== 'employer') {
+      return redirectWithCookies('/dashboard')
+    }
 
-  if (pathname.startsWith('/dashboard/admin') && role !== 'admin') {
-    return redirectWithCookies('/dashboard')
+    if (pathname.startsWith('/dashboard/admin') && role !== 'admin') {
+      return redirectWithCookies('/dashboard')
+    }
   }
 
   return supabaseResponse
