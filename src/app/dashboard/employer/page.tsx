@@ -70,6 +70,7 @@ export default function EmployerDashboard() {
       const { data: videoData } = await supabase
         .from('video_candidates')
         .select('id, name, location, current_job_title, fields_worked_in, mux_playback_id')
+        .in('id', candidateIds)
         .order('created_at', { ascending: false })
       setVideoCandidates((videoData ?? []) as VideoCandidate[])
 
