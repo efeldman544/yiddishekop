@@ -35,9 +35,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Redirects must carry over any cookies getUser() set while refreshing the
+  // session — otherwise the browser keeps a stale (already-rotated) refresh
+  // token and every subsequent request bounces back to /login in a loop
+  function redirectWithCookies(to: string) {
+    const response = NextResponse.redirect(new URL(to, request.url))
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
+    return response
+  }
+
   // Not logged in → redirect to login
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return redirectWithCookies('/login')
   }
 
   // Role-based route guards for /dashboard/[role]
@@ -50,15 +59,15 @@ export async function updateSession(request: NextRequest) {
   const role = profile?.role ?? user.user_metadata?.role
 
   if (pathname.startsWith('/dashboard/candidate') && role !== 'candidate') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return redirectWithCookies('/dashboard')
   }
 
   if (pathname.startsWith('/dashboard/employer') && role !== 'employer') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return redirectWithCookies('/dashboard')
   }
 
   if (pathname.startsWith('/dashboard/admin') && role !== 'admin') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return redirectWithCookies('/dashboard')
   }
 
   return supabaseResponse
