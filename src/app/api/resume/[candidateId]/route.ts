@@ -151,7 +151,9 @@ export async function GET(
         lines.get(key)!.push(item)
       }
 
-      ctx.fillStyle = '#000000'
+      // Collect redaction boxes for this page, merging adjacent ones on the same
+      // line into a single clean pill instead of several choppy rectangles
+      const boxes: Rect[] = []
       for (const lineItems of lines.values()) {
         lineItems.sort((a, b) => a.rect.x - b.rect.x)
         // Join without separators so contact info split across items still matches
@@ -161,13 +163,51 @@ export async function GET(
           spans.push({ start: joined.length, end: joined.length + item.str.length, item })
           joined += item.str
         }
+        const lineBoxes: Rect[] = []
         for (const [mStart, mEnd] of contactRanges(joined)) {
           for (const span of spans) {
             if (span.end > mStart && span.start < mEnd) {
-              const r = span.item.rect
-              ctx.fillRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4)
+              lineBoxes.push({ ...span.item.rect })
             }
           }
+        }
+        // Merge boxes on this line that touch or overlap horizontally
+        lineBoxes.sort((a, b) => a.x - b.x)
+        for (const b of lineBoxes) {
+          const last = boxes[boxes.length - 1]
+          if (last && Math.abs(last.y - b.y) < 6 && b.x <= last.x + last.w + 12) {
+            last.w = Math.max(last.w, b.x + b.w - last.x)
+            last.h = Math.max(last.h, b.h)
+          } else {
+            boxes.push(b)
+          }
+        }
+      }
+
+      // Soft gray pills with a subtle "Contact hidden" hint on wide boxes
+      for (const r of boxes) {
+        const x = r.x - 4, y = r.y - 3, w = r.w + 8, h = r.h + 6
+        const radius = Math.min(h / 2, 10)
+        ctx.beginPath()
+        ctx.moveTo(x + radius, y)
+        ctx.arcTo(x + w, y, x + w, y + h, radius)
+        ctx.arcTo(x + w, y + h, x, y + h, radius)
+        ctx.arcTo(x, y + h, x, y, radius)
+        ctx.arcTo(x, y, x + w, y, radius)
+        ctx.closePath()
+        ctx.fillStyle = '#eef0f3'
+        ctx.fill()
+        ctx.strokeStyle = '#d7dbe0'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        const label = 'Contact hidden'
+        const fontSize = Math.min(h * 0.45, 20)
+        ctx.font = `500 ${fontSize}px sans-serif`
+        if (ctx.measureText(label).width < w - 16) {
+          ctx.fillStyle = '#9aa1ab'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(label, x + (w - ctx.measureText(label).width) / 2, y + h / 2 + 1)
         }
       }
 
