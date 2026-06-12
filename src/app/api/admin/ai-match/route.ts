@@ -31,8 +31,16 @@ async function getResumeText(resumeUrl: string): Promise<string | null> {
       if (!data) return null
       buffer = Buffer.from(await data.arrayBuffer())
     } else if (resumeUrl.startsWith('http')) {
-      // External link (e.g. admin-imported Wix files) — fetch directly
-      const res = await fetch(resumeUrl, { signal: AbortSignal.timeout(8000) })
+      // External link (e.g. admin-imported Wix files) — some hosts reject
+      // non-browser requests, so send browser-like headers
+      const res = await fetch(resumeUrl, {
+        signal: AbortSignal.timeout(8000),
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+          'Accept': 'application/pdf,application/octet-stream,*/*',
+        },
+      })
       if (!res.ok) return null
       buffer = Buffer.from(await res.arrayBuffer())
     }

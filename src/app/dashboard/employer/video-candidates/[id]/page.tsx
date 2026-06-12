@@ -12,6 +12,30 @@ export default async function EmployerVideoCandidatePage({ params }: { params: P
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Employers may only view video candidates assigned to one of their jobs
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single<{ role: string }>()
+
+  if (profile?.role !== 'admin') {
+    const { data: myJobs } = await supabase
+      .from('job_requirements')
+      .select('id')
+      .eq('employer_id', user.id)
+    const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
+    const { data: assignment } = jobIds.length > 0
+      ? await supabase
+          .from('candidate_job_assignments')
+          .select('id')
+          .in('job_id', jobIds)
+          .eq('candidate_id', id)
+          .maybeSingle()
+      : { data: null }
+    if (!assignment) notFound()
+  }
+
   const { data } = await supabase
     .from('video_candidates')
     .select('id, name, location, current_job_title, fields_worked_in, employment_type, mux_playback_id')
