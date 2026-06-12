@@ -30,23 +30,27 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: myJobs } = await supabase.from('job_requirements').select('id').eq('employer_id', user.id)
-  const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
-  if (jobIds.length === 0) notFound()
-
-  const { data: match } = await supabase
-    .from('candidate_job_assignments')
-    .select('id, action, proposed_times')
-    .in('job_id', jobIds)
-    .eq('candidate_id', id)
-    .maybeSingle()
-  if (!match) notFound()
-
-  const [{ data: candidate }, { data: videos }, { data: meetingData }] = await Promise.all([
+  // One roundtrip: the assignment lookup verifies job ownership via the join,
+  // and the candidate/video fetches don't depend on it so they run in parallel
+  const [{ data: matches }, { data: candidate }, { data: videos }] = await Promise.all([
+    supabase
+      .from('candidate_job_assignments')
+      .select('id, action, proposed_times, job_requirements!inner(employer_id)')
+      .eq('job_requirements.employer_id', user.id)
+      .eq('candidate_id', id)
+      .limit(1),
     supabase.from('candidate_profiles').select('*').eq('id', id).single<CandidateProfile>(),
     supabase.from('videos').select('*').eq('candidate_id', id).order('created_at', { ascending: false }).limit(1),
-    supabase.from('meeting_requests').select('scheduled_at, meeting_link, notes').eq('assignment_id', match.id).maybeSingle(),
   ])
+
+  const match = matches?.[0]
+  if (!match) notFound()
+
+  const { data: meetingData } = await supabase
+    .from('meeting_requests')
+    .select('scheduled_at, meeting_link, notes')
+    .eq('assignment_id', match.id)
+    .maybeSingle()
 
   if (!candidate) notFound()
 

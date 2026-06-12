@@ -169,8 +169,14 @@ export async function GET(
 
   try {
     // pdfjs + node canvas — external packages, imported dynamically (see next.config.ts)
+    // pdfjs 6 draws glyphs through Path2D/DOMMatrix, which Node lacks —
+    // @napi-rs/canvas provides compatible ones, set before pdfjs loads
+    const { createCanvas, Path2D, DOMMatrix, ImageData } = await import('@napi-rs/canvas')
+    const g = globalThis as Record<string, unknown>
+    g.Path2D ??= Path2D
+    g.DOMMatrix ??= DOMMatrix
+    g.ImageData ??= ImageData
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    const { createCanvas } = await import('@napi-rs/canvas')
     const { createRequire } = await import('module')
     // Standard 14 fonts for PDFs that reference them without embedding
     const standardFontDataUrl = createRequire(import.meta.url)
@@ -202,8 +208,16 @@ export async function GET(
       }
 
       // Locate contact info: group text items into lines, regex the joined text,
-      // map matched character ranges back to the items they span
-      const textContent = await page.getTextContent()
+      // map matched character ranges back to the items they span.
+      // If the text layer can't be read we can't locate contact info on this
+      // page, so refuse rather than risk serving it unredacted.
+      let textContent: Awaited<ReturnType<typeof page.getTextContent>>
+      try {
+        textContent = await page.getTextContent()
+      } catch (textErr) {
+        console.error(`text extraction failed on page ${pageNum}:`, textErr)
+        return new NextResponse('This PDF has corrupted font data and cannot be auto-redacted — please re-save or re-print it as a fresh PDF', { status: 422 })
+      }
       type Item = { str: string; rect: Rect }
       const items: Item[] = []
 
@@ -289,7 +303,7 @@ export async function GET(
       outPage.drawImage(embedded, { x: 0, y: 0, width: viewport.width / SCALE, height: viewport.height / SCALE })
     }
 
-    await doc.destroy()
+    await doc.loadingTask.destroy()
 
     // A scanned PDF has no text layer — we can't locate contact info, so refuse rather than leak
     if (totalTextLength < 50) {
