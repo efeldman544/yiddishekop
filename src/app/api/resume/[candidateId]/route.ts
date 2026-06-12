@@ -78,20 +78,46 @@ export async function GET(
     if (downloadError || !fileBlob) return new NextResponse('Failed to fetch resume', { status: 502 })
     buffer = Buffer.from(await fileBlob.arrayBuffer())
   } else if (cp.resume_url.startsWith('http')) {
-    let res: Response
-    try {
-      res = await fetch(cp.resume_url, { signal: AbortSignal.timeout(10000) })
-    } catch {
-      return new NextResponse('Failed to fetch resume from external link', { status: 502 })
+    // Some hosts (e.g. Wix usrfiles) reject non-browser requests, so send
+    // browser-like headers and retry once on transient failures
+    const fetchExternal = () => fetch(cp.resume_url!, {
+      signal: AbortSignal.timeout(15000),
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'application/pdf,application/octet-stream,*/*',
+      },
+    })
+    let res: Response | null = null
+    let lastError = ''
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await fetchExternal()
+        if (res.ok) break
+        lastError = `link returned ${res.status}`
+        res = null
+      } catch (e) {
+        lastError = e instanceof Error && e.name === 'TimeoutError' ? 'link timed out' : 'link unreachable'
+      }
     }
-    if (!res.ok) return new NextResponse('Failed to fetch resume from external link', { status: 502 })
+    if (!res) {
+      return new NextResponse(`Failed to fetch resume from external link (${lastError})`, { status: 502 })
+    }
     buffer = Buffer.from(await res.arrayBuffer())
   } else {
     return new NextResponse('Invalid resume URL', { status: 500 })
   }
 
   if (!buffer.subarray(0, 1024).toString('latin1').includes('%PDF')) {
-    return new NextResponse('Only PDF resumes can be viewed in redacted mode', { status: 415 })
+    // Tell the admin what the link actually served so they can fix the URL
+    const head = buffer.subarray(0, 512).toString('latin1')
+    let kind = 'an unsupported file type'
+    if (/<!doctype html|<html/i.test(head)) {
+      kind = 'a web page, not a file — the resume link should point directly to the PDF'
+    } else if (head.startsWith('PK')) {
+      kind = 'a Word document (.docx) — please convert it to PDF'
+    }
+    return new NextResponse(`This resume link serves ${kind}. Only PDF resumes can be viewed in redacted mode.`, { status: 415 })
   }
 
   try {
@@ -226,7 +252,12 @@ export async function GET(
         'Cache-Control': 'private, max-age=300',
       },
     })
-  } catch {
-    return new NextResponse('Could not process PDF', { status: 422 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('Resume redaction failed:', msg)
+    if (/password|encrypt/i.test(msg)) {
+      return new NextResponse('This PDF is password-protected and cannot be redacted', { status: 422 })
+    }
+    return new NextResponse(`Could not process PDF (${msg.slice(0, 200)})`, { status: 422 })
   }
 }
