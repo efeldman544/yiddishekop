@@ -158,13 +158,13 @@ export default function JobsClient({
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  function handleEmployerInput(value: string) {
-    const matched = employers.find(e => employerLabel(e).toLowerCase() === value.toLowerCase())
+  function handleEmployerSelect(value: string) {
+    const matched = value && value !== '_none' ? employers.find(e => e.id === value) : undefined
     setForm(prev => ({
       ...prev,
-      employer_input: value,
       employer_id: matched ? matched.id : '',
-      company_name: matched ? (matched.company_name ?? '') : value,
+      employer_input: matched ? employerLabel(matched) : '',
+      ...(matched?.company_name ? { company_name: matched.company_name } : {}),
     }))
   }
 
@@ -342,19 +342,16 @@ export default function JobsClient({
               )}
 
               <div className="space-y-1.5">
-                <Label htmlFor="employer_input">Employer</Label>
-                <input
-                  id="employer_input"
-                  list="employer-datalist"
-                  value={form.employer_input}
-                  onChange={e => handleEmployerInput(e.target.value)}
-                  placeholder="Type or select an employer…"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-                  autoComplete="off"
-                />
-                <datalist id="employer-datalist">
-                  {employers.map(emp => <option key={emp.id} value={employerLabel(emp)} />)}
-                </datalist>
+                <Label>Employer account</Label>
+                <Select value={form.employer_id || '_none'} onValueChange={handleEmployerSelect}>
+                  <SelectTrigger><SelectValue placeholder="Select employer…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">— No employer account —</SelectItem>
+                    {employers.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>{employerLabel(emp)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
