@@ -46,6 +46,12 @@ async function getResumeText(resumeUrl: string): Promise<string | null> {
     }
 
     if (!buffer || buffer.length === 0) return null
+    // Word documents (.docx) — extract plain text directly
+    if (buffer.subarray(0, 2).toString('latin1') === 'PK') {
+      const mammoth = (await import('mammoth')).default
+      const { value } = await mammoth.extractRawText({ buffer })
+      return value.slice(0, 6000).trim() || null
+    }
     // Dynamic import — pdf-parse pulls in native canvas deps that can fail to load on Vercel
     const { PDFParse } = await import('pdf-parse')
     const parser = new PDFParse({ data: buffer })

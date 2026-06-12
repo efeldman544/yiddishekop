@@ -12,6 +12,43 @@ const PHONE_RES = [
 
 type Rect = { x: number; y: number; w: number; h: number }
 
+// Convert a .docx to PDF: mammoth → styled HTML → headless Chromium print.
+// The result flows through the same pdfjs redaction pipeline as native PDFs.
+async function docxToPdf(docx: Buffer): Promise<Buffer> {
+  const mammoth = (await import('mammoth')).default
+  const { value: html } = await mammoth.convertToHtml({ buffer: docx })
+
+  const chromium = (await import('@sparticuz/chromium')).default
+  const puppeteer = await import('puppeteer-core')
+  // CHROME_EXECUTABLE_PATH lets local dev point at an installed Chrome;
+  // on Vercel @sparticuz/chromium unpacks its own binary to /tmp
+  const executablePath = process.env.CHROME_EXECUTABLE_PATH || await chromium.executablePath()
+  const browser = await puppeteer.launch({ args: chromium.args, executablePath, headless: true })
+  try {
+    const page = await browser.newPage()
+    await page.setContent(
+      `<!doctype html><html><head><meta charset="utf-8"><style>
+        body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.45; color: #111; margin: 0; }
+        h1, h2, h3 { line-height: 1.25; margin: 0.6em 0 0.3em; }
+        p { margin: 0.35em 0; }
+        ul, ol { margin: 0.35em 0; padding-left: 1.4em; }
+        table { border-collapse: collapse; margin: 0.5em 0; }
+        td, th { border: 1px solid #ccc; padding: 3px 8px; vertical-align: top; }
+        img { max-width: 100%; }
+      </style></head><body>${html}</body></html>`,
+      { waitUntil: 'load' },
+    )
+    const pdf = await page.pdf({
+      format: 'letter',
+      margin: { top: '0.75in', bottom: '0.75in', left: '0.8in', right: '0.8in' },
+      printBackground: true,
+    })
+    return Buffer.from(pdf)
+  } finally {
+    await browser.close()
+  }
+}
+
 // Find character ranges of contact info in a line of text
 function contactRanges(line: string): [number, number][] {
   const ranges: [number, number][] = []
@@ -101,7 +138,10 @@ export async function GET(
       }
     }
     if (!res) {
-      return new NextResponse(`Failed to fetch resume from external link (${lastError})`, { status: 502 })
+      const hint = lastError.includes('403')
+        ? `The resume link is access-restricted (${lastError}). Upload the file directly to storage or use a publicly accessible link.`
+        : `Failed to fetch resume from external link (${lastError}).`
+      return new NextResponse(hint, { status: 502 })
     }
     buffer = Buffer.from(await res.arrayBuffer())
   } else {
@@ -109,15 +149,22 @@ export async function GET(
   }
 
   if (!buffer.subarray(0, 1024).toString('latin1').includes('%PDF')) {
-    // Tell the admin what the link actually served so they can fix the URL
     const head = buffer.subarray(0, 512).toString('latin1')
-    let kind = 'an unsupported file type'
-    if (/<!doctype html|<html/i.test(head)) {
-      kind = 'a web page, not a file — the resume link should point directly to the PDF'
-    } else if (head.startsWith('PK')) {
-      kind = 'a Word document (.docx) — please convert it to PDF'
+    if (head.startsWith('PK')) {
+      // Word document — convert to PDF, then redact it like any other PDF
+      try {
+        buffer = await docxToPdf(buffer)
+      } catch (e) {
+        console.error('docx conversion failed:', e)
+        return new NextResponse('Could not convert this Word document to PDF', { status: 422 })
+      }
+    } else if (head.startsWith('\xD0\xCF\x11\xE0')) {
+      return new NextResponse('This resume is a legacy .doc file — please re-save it as .docx or PDF', { status: 415 })
+    } else if (/<!doctype html|<html/i.test(head)) {
+      return new NextResponse('This resume link serves a web page, not a file — the link should point directly to the document.', { status: 415 })
+    } else {
+      return new NextResponse('This resume link serves an unsupported file type. Only PDF and Word resumes are supported.', { status: 415 })
     }
-    return new NextResponse(`This resume link serves ${kind}. Only PDF resumes can be viewed in redacted mode.`, { status: 415 })
   }
 
   try {
@@ -144,8 +191,15 @@ export async function GET(
       const ctx = canvas.getContext('2d')
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
-      await page.render({ canvasContext: ctx, viewport }).promise
+      // Some PDFs use non-standard font encodings that cause pdfjs to pass a
+      // numeric glyph ID where it expects a string (e.g. "55876.replace is not
+      // a function"). We catch per-page so the rest of the document still renders.
+      try {
+        // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
+        await page.render({ canvasContext: ctx, viewport }).promise
+      } catch (renderErr) {
+        console.warn(`pdfjs render warning page ${pageNum}:`, renderErr)
+      }
 
       // Locate contact info: group text items into lines, regex the joined text,
       // map matched character ranges back to the items they span
