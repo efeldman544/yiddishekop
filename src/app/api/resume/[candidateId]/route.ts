@@ -184,7 +184,7 @@ export async function GET(
         }
       }
 
-      // Soft gray pills with a subtle "Contact hidden" hint on wide boxes
+      // Soft gray pills over contact info
       for (const r of boxes) {
         const x = r.x - 4, y = r.y - 3, w = r.w + 8, h = r.h + 6
         const radius = Math.min(h / 2, 10)
@@ -200,15 +200,6 @@ export async function GET(
         ctx.strokeStyle = '#d7dbe0'
         ctx.lineWidth = 1.5
         ctx.stroke()
-
-        const label = 'Contact hidden'
-        const fontSize = Math.min(h * 0.45, 20)
-        ctx.font = `500 ${fontSize}px sans-serif`
-        if (ctx.measureText(label).width < w - 16) {
-          ctx.fillStyle = '#9aa1ab'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(label, x + (w - ctx.measureText(label).width) / 2, y + h / 2 + 1)
-        }
       }
 
       const png = canvas.toBuffer('image/png')

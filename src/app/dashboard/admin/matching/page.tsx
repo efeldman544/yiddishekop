@@ -16,7 +16,7 @@ export default async function AdminMatchingPage({
   const [{ data: jobData }, { data: candidateData }, { data: assignmentData }, { data: videoData }] = await Promise.all([
     supabase
       .from('job_requirements')
-      .select('id, job_title, employment_type, languages, description, status, company_name, employer_id')
+      .select('id, job_title, employment_type, languages, description, status, company_name, employer_id, employer_profiles(company_name)')
       .in('status', ['Open', 'On Hold'])
       .order('created_at', { ascending: false }),
     supabase
@@ -32,6 +32,36 @@ export default async function AdminMatchingPage({
       .select('id, name, location, current_job_title, fields_worked_in, employment_type')
       .order('created_at', { ascending: false }),
   ])
+
+  // Resolve company name: job's own field → employer profile's company → employer's full name
+  const missingNameEmployerIds = (jobData ?? [])
+    .filter((j: any) => !j.company_name && !j.employer_profiles?.company_name && j.employer_id)
+    .map((j: any) => j.employer_id)
+  const employerNameMap: Record<string, string> = {}
+  if (missingNameEmployerIds.length > 0) {
+    const { data: employerProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', missingNameEmployerIds)
+    for (const p of employerProfiles ?? []) {
+      if (p.full_name) employerNameMap[p.id] = p.full_name
+    }
+  }
+
+  const jobs: MatchJob[] = (jobData ?? []).map((j: any) => ({
+    id: j.id,
+    job_title: j.job_title,
+    employment_type: j.employment_type,
+    languages: j.languages,
+    description: j.description,
+    status: j.status,
+    employer_id: j.employer_id,
+    company_name:
+      j.company_name
+      || j.employer_profiles?.company_name
+      || (j.employer_id ? employerNameMap[j.employer_id] : null)
+      || null,
+  }))
 
   const regularCandidates: MatchCandidate[] = (candidateData ?? []).map((c: any) => ({
     ...c,
@@ -63,7 +93,7 @@ export default async function AdminMatchingPage({
         </div>
       ) : (
         <MatchingClient
-          jobs={(jobData as MatchJob[]) ?? []}
+          jobs={jobs}
           candidates={[...regularCandidates, ...videoCandidates]}
           initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
         />
