@@ -101,7 +101,10 @@ export async function GET(
       }
     }
     if (!res) {
-      return new NextResponse(`Failed to fetch resume from external link (${lastError})`, { status: 502 })
+      const hint = lastError.includes('403')
+        ? `The resume link is access-restricted (${lastError}). Upload the file directly to storage or use a publicly accessible link.`
+        : `Failed to fetch resume from external link (${lastError}).`
+      return new NextResponse(hint, { status: 502 })
     }
     buffer = Buffer.from(await res.arrayBuffer())
   } else {
@@ -145,7 +148,14 @@ export async function GET(
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
-      await page.render({ canvasContext: ctx, viewport }).promise
+      // Some PDFs use non-standard font encodings that cause pdfjs to pass a
+      // numeric glyph ID where it expects a string (e.g. "55876.replace is not
+      // a function"). We catch per-page so the rest of the document still renders.
+      try {
+        await page.render({ canvasContext: ctx, viewport }).promise
+      } catch (renderErr) {
+        console.warn(`pdfjs render warning page ${pageNum}:`, renderErr)
+      }
 
       // Locate contact info: group text items into lines, regex the joined text,
       // map matched character ranges back to the items they span
