@@ -20,13 +20,24 @@ function adminClient() {
 
 async function getResumeText(resumeUrl: string): Promise<string | null> {
   try {
+    let buffer: Buffer | null = null
+
     const storageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resumes/`
-    const storagePath = resumeUrl.startsWith(storageBase) ? resumeUrl.slice(storageBase.length) : null
-    if (!storagePath) return null
-    const supabase = adminClient()
-    const { data } = await supabase.storage.from('resumes').download(storagePath)
-    if (!data) return null
-    const buffer = Buffer.from(await data.arrayBuffer())
+    if (resumeUrl.startsWith(storageBase)) {
+      // Supabase storage — download through the admin client
+      const storagePath = resumeUrl.slice(storageBase.length)
+      const supabase = adminClient()
+      const { data } = await supabase.storage.from('resumes').download(storagePath)
+      if (!data) return null
+      buffer = Buffer.from(await data.arrayBuffer())
+    } else if (resumeUrl.startsWith('http')) {
+      // External link (e.g. admin-imported Wix files) — fetch directly
+      const res = await fetch(resumeUrl, { signal: AbortSignal.timeout(8000) })
+      if (!res.ok) return null
+      buffer = Buffer.from(await res.arrayBuffer())
+    }
+
+    if (!buffer || buffer.length === 0) return null
     // Dynamic import — pdf-parse pulls in native canvas deps that can fail to load on Vercel
     const { PDFParse } = await import('pdf-parse')
     const parser = new PDFParse({ data: buffer })
