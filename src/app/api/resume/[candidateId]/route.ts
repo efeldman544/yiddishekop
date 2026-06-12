@@ -58,22 +58,40 @@ export async function GET(
 
   if (!cp?.resume_url) return new NextResponse('No resume found', { status: 404 })
 
-  // Extract the storage path from the public URL
+  // Supabase storage URL → download via client; external link → fetch directly
   const storageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resumes/`
-  const storagePath = cp.resume_url.startsWith(storageBase)
-    ? cp.resume_url.slice(storageBase.length)
-    : null
+  let buffer: Buffer
+  let contentType = ''
+  let pathForExt = cp.resume_url
 
-  if (!storagePath) return new NextResponse('Invalid resume URL', { status: 500 })
+  if (cp.resume_url.startsWith(storageBase)) {
+    const storagePath = cp.resume_url.slice(storageBase.length)
+    pathForExt = storagePath
+    const { data: fileBlob, error: downloadError } = await supabase.storage.from('resumes').download(storagePath)
+    if (downloadError || !fileBlob) return new NextResponse('Failed to fetch resume', { status: 502 })
+    contentType = fileBlob.type ?? ''
+    buffer = Buffer.from(await fileBlob.arrayBuffer())
+  } else if (cp.resume_url.startsWith('http')) {
+    // External link (e.g. admin-imported files)
+    let res: Response
+    try {
+      res = await fetch(cp.resume_url, { signal: AbortSignal.timeout(10000) })
+    } catch {
+      return new NextResponse('Failed to fetch resume from external link', { status: 502 })
+    }
+    if (!res.ok) return new NextResponse('Failed to fetch resume from external link', { status: 502 })
+    contentType = res.headers.get('content-type') ?? ''
+    buffer = Buffer.from(await res.arrayBuffer())
+  } else {
+    return new NextResponse('Invalid resume URL', { status: 500 })
+  }
 
-  const { data: fileBlob, error: downloadError } = await supabase.storage.from('resumes').download(storagePath)
-  if (downloadError || !fileBlob) return new NextResponse('Failed to fetch resume', { status: 502 })
-
-  const contentType = fileBlob.type ?? ''
-  const buffer = Buffer.from(await fileBlob.arrayBuffer())
+  const looksLikePdf = contentType.includes('pdf')
+    || pathForExt.toLowerCase().includes('.pdf')
+    || buffer.subarray(0, 5).toString().startsWith('%PDF')
 
   let text: string
-  if (contentType.includes('pdf') || storagePath.toLowerCase().endsWith('.pdf')) {
+  if (looksLikePdf) {
     try {
       const parser = new PDFParse({ data: buffer })
       const result = await parser.getText()
