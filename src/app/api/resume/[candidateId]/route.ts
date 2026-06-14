@@ -49,24 +49,107 @@ async function docxToPdf(docx: Buffer): Promise<Buffer> {
   }
 }
 
-// Wrap an image resume (JPG/PNG) in a single-page PDF sized to the image and stamp
-// a notice on it. Image resumes have no text layer, so there's nothing to redact and
-// no reason to route them through the (heavier, image-rendering) pdfjs pipeline —
-// we build the viewable PDF directly with pdf-lib.
-async function imageToStampedPdf(img: Buffer, kind: 'jpg' | 'png'): Promise<Buffer> {
+// OCR-redact an image resume (JPG/PNG): run tesseract to locate emails/phones, draw
+// gray pills over them on canvas, then wrap in a PDF. Falls back to a warning stamp
+// if OCR errors out.
+async function imageToRedactedPdf(img: Buffer): Promise<Buffer> {
+  type OcrBox = { x: number; y: number; w: number; h: number }
+  let ocrBoxes: OcrBox[] = []
+  let ocrFailed = false
+
+  try {
+    const { createWorker } = await import('tesseract.js')
+    // OEM 1 = LSTM_ONLY (fast, accurate for printed text).
+    // cachePath /tmp persists the downloaded traineddata across warm Lambda invocations.
+    const worker = await createWorker('eng', 1, { cachePath: '/tmp', logger: () => {} })
+    try {
+      const { data } = await worker.recognize(img)
+      type TWord = { text: string; bbox: { x0: number; y0: number; x1: number; y1: number } }
+      const words = (data as unknown as { words: TWord[] }).words
+
+      // Group words into visual lines by comparing y-center proximity
+      const lines: TWord[][] = []
+      for (const word of [...words].sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0)) {
+        const midY = (word.bbox.y0 + word.bbox.y1) / 2
+        const lineH = word.bbox.y1 - word.bbox.y0
+        const existing = lines.find(l => Math.abs((l[0].bbox.y0 + l[0].bbox.y1) / 2 - midY) < lineH * 0.7)
+        if (existing) existing.push(word)
+        else lines.push([word])
+      }
+
+      for (const line of lines) {
+        line.sort((a, b) => a.bbox.x0 - b.bbox.x0)
+        let joined = ''
+        const spans: { start: number; end: number; bbox: TWord['bbox'] }[] = []
+        for (const w of line) {
+          if (joined) joined += ' '
+          spans.push({ start: joined.length, end: joined.length + w.text.length, bbox: w.bbox })
+          joined += w.text
+        }
+        for (const [mStart, mEnd] of contactRanges(joined)) {
+          const hit = spans.filter(s => s.end > mStart && s.start < mEnd)
+          if (hit.length > 0) {
+            ocrBoxes.push({
+              x: Math.min(...hit.map(s => s.bbox.x0)),
+              y: Math.min(...hit.map(s => s.bbox.y0)),
+              w: Math.max(...hit.map(s => s.bbox.x1)) - Math.min(...hit.map(s => s.bbox.x0)),
+              h: Math.max(...hit.map(s => s.bbox.y1)) - Math.min(...hit.map(s => s.bbox.y0)),
+            })
+          }
+        }
+      }
+    } finally {
+      await worker.terminate()
+    }
+  } catch (ocrErr) {
+    console.warn('OCR redaction failed, serving with notice:', ocrErr)
+    ocrFailed = true
+  }
+
+  // Draw redaction boxes on a canvas copy of the image
+  const { createCanvas, loadImage } = await import('@napi-rs/canvas')
+  const image = await loadImage(img)
+  const canvas = createCanvas(image.width, image.height)
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(image, 0, 0)
+
+  const PAD = 5
+  for (const b of ocrBoxes) {
+    const x = b.x - PAD, y = b.y - PAD, bw = b.w + PAD * 2, bh = b.h + PAD * 2
+    const r = Math.min(bh / 2, 8)
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.arcTo(x + bw, y, x + bw, y + bh, r)
+    ctx.arcTo(x + bw, y + bh, x, y + bh, r)
+    ctx.arcTo(x, y + bh, x, y, r)
+    ctx.arcTo(x, y, x + bw, y, r)
+    ctx.closePath()
+    ctx.fillStyle = '#eef0f3'
+    ctx.fill()
+    ctx.strokeStyle = '#d7dbe0'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+  }
+
+  const pngBuf = canvas.toBuffer('image/png')
+
+  // Embed in a letter-sized PDF, fitting the image proportionally
   const pdf = await PDFDocument.create()
-  const embedded = kind === 'png' ? await pdf.embedPng(img) : await pdf.embedJpg(img)
-  // Fit within letter dimensions, preserving aspect ratio (never upscale past 1x)
-  const scale = Math.min(612 / embedded.width, 792 / embedded.height, 1)
-  const w = embedded.width * scale
-  const h = embedded.height * scale
-  const page = pdf.addPage([w, h])
-  page.drawImage(embedded, { x: 0, y: 0, width: w, height: h })
-  const font = await pdf.embedFont(StandardFonts.Helvetica)
-  page.drawRectangle({ x: 0, y: h - 24, width: w, height: 24, color: rgb(0.98, 0.93, 0.73) })
-  page.drawText('Image resume — contact information could not be redacted automatically', {
-    x: 8, y: h - 16, size: 8, font, color: rgb(0.45, 0.35, 0.05),
-  })
+  const embedded = await pdf.embedPng(pngBuf)
+  const scale = Math.min(612 / image.width, 792 / image.height, 1)
+  const pw = image.width * scale
+  const ph = image.height * scale
+  const page = pdf.addPage([pw, ph])
+  page.drawImage(embedded, { x: 0, y: 0, width: pw, height: ph })
+
+  if (ocrFailed) {
+    const font = await pdf.embedFont(StandardFonts.Helvetica)
+    page.drawRectangle({ x: 0, y: ph - 24, width: pw, height: 24, color: rgb(0.98, 0.93, 0.73) })
+    page.drawText('Image resume — contact information could not be redacted automatically', {
+      x: 8, y: ph - 16, size: 8, font, color: rgb(0.45, 0.35, 0.05),
+    })
+  }
+
   return Buffer.from(await pdf.save())
 }
 
@@ -183,12 +266,12 @@ export async function GET(
       // Image resume (JPG/PNG) — serve it as a viewable, stamped PDF directly.
       // No text layer means nothing to redact, so we skip the pdfjs pipeline.
       try {
-        const imgPdf = await imageToStampedPdf(buffer, head.startsWith('\x89PNG') ? 'png' : 'jpg')
+        const imgPdf = await imageToRedactedPdf(buffer)
         const name = String(cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
         return new NextResponse(Buffer.from(imgPdf), {
           headers: {
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="${name} - Resume.pdf"`,
+            'Content-Disposition': `inline; filename="${name} - Resume (redacted).pdf"`,
             'Cache-Control': 'private, max-age=300',
           },
         })
