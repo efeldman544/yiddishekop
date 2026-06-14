@@ -177,13 +177,26 @@ export async function GET(
     g.DOMMatrix ??= DOMMatrix
     g.ImageData ??= ImageData
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    const { createRequire } = await import('module')
-    const pdfjsPkg = createRequire(import.meta.url).resolve('pdfjs-dist/package.json')
-    // Standard 14 fonts and CID-to-Unicode CMaps (needed for CJK/multi-byte fonts).
-    // Without cMapUrl, pdfjs passes raw CID integers as glyph "names" and crashes
-    // when font code calls .replace() on them (e.g. "55876.replace is not a function").
-    const standardFontDataUrl = pdfjsPkg.replace('package.json', 'standard_fonts/')
-    const cMapUrl = pdfjsPkg.replace('package.json', 'cmaps/')
+    const fs = await import('node:fs')
+    const nodePath = await import('node:path')
+    // Locate pdfjs's bundled standard fonts + CID-to-Unicode CMaps on disk.
+    // We must NOT use createRequire(import.meta.url).resolve('pdfjs-dist/package.json'):
+    // Turbopack statically folds that call into pdfjs's numeric module id, so
+    // `pkg.replace('package.json', ...)` compiled to `55876.replace(...)` and threw
+    // "55876.replace is not a function" on EVERY resume. Anchor on the filesystem
+    // instead — these dirs are shipped via outputFileTracingIncludes (next.config.ts).
+    const pdfjsAsset = (sub: string): string | undefined => {
+      for (const base of [
+        nodePath.join(process.cwd(), 'node_modules/pdfjs-dist'),
+        nodePath.join(process.cwd(), '.next/server/node_modules/pdfjs-dist'),
+      ]) {
+        const dir = nodePath.join(base, sub)
+        if (fs.existsSync(dir)) return dir + '/'
+      }
+      return undefined
+    }
+    const standardFontDataUrl = pdfjsAsset('standard_fonts')
+    const cMapUrl = pdfjsAsset('cmaps')
 
     const doc = await pdfjs.getDocument({
       data: new Uint8Array(buffer),
