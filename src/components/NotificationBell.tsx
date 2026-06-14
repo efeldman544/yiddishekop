@@ -19,10 +19,13 @@ export default function NotificationBell({ candidatePath = '/dashboard/admin/can
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    async function load() {
-      const supabase = createClient()
+    const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data } = await supabase
         .from('notifications')
         .select('*')
@@ -30,19 +33,24 @@ export default function NotificationBell({ candidatePath = '/dashboard/admin/can
         .order('created_at', { ascending: false })
         .limit(20)
       setNotifications((data as Notification[]) ?? [])
-    }
-    load()
-  }, [])
 
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`notifications-${candidatePath}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-        setNotifications(prev => [payload.new as Notification, ...prev])
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+      // Only subscribe to this user's own notifications — without the filter every
+      // user would receive everyone's inserts pushed into their bell.
+      channel = supabase
+        .channel(`notifications-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            const incoming = payload.new as Notification
+            setNotifications(prev => prev.some(n => n.id === incoming.id) ? prev : [incoming, ...prev])
+          }
+        )
+        .subscribe()
+    }
+
+    init()
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
   useEffect(() => {

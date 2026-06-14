@@ -540,6 +540,28 @@ input, textarea, select {
 .auth-dark .auth-select:focus { border-color: var(--lp-gold); }
 .auth-dark .auth-select option { background: var(--lp-ink-2); color: var(--lp-cream); }
 
+/* The /start-hiring form reuses the auth field classes but lives inside the .lp
+   landing theme, not .auth-dark — re-scope the same dark-field styling to .lp so
+   the inputs aren't unstyled white boxes with invisible text. */
+.lp .auth-label { display: block; font-size: 13px; font-weight: 500; color: var(--lp-cream-dim); margin-bottom: 7px; }
+.lp .auth-input {
+  width: 100%; padding: 11px 14px; border-radius: 4px; font-size: 15px; font-family: inherit;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--lp-line); color: var(--lp-cream);
+  outline: none; transition: border-color .2s; display: block;
+}
+.lp .auth-input::placeholder { color: rgba(201,193,174,0.4); }
+.lp .auth-input:focus { border-color: var(--lp-gold); }
+.lp textarea.auth-input { resize: vertical; line-height: 1.6; min-height: 120px; }
+.lp .auth-select {
+  width: 100%; padding: 11px 14px; border-radius: 4px; font-size: 15px; font-family: inherit;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--lp-line); color: var(--lp-cream);
+  outline: none; transition: border-color .2s; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23C9C1AE' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
+}
+.lp .auth-select:focus { border-color: var(--lp-gold); }
+.lp .auth-select option { background: var(--lp-ink-2); color: var(--lp-cream); }
+
 /* ─── Dashboard chrome — dark ink sidebar/headers matching the landing page ── */
 
 .dash-dark {

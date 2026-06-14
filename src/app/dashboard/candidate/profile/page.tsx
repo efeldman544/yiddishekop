@@ -328,10 +328,10 @@ export default function CandidateProfilePage() {
                 className="border-2 border-dashed border-border rounded-lg px-6 py-8 text-center cursor-pointer hover:border-ring transition-colors"
               >
                 <p className="text-sm font-medium">Click to upload your resume</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, DOC, or DOCX — max 5MB</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF, Word, or image (JPG/PNG) — max 5MB</p>
               </div>
             )}
-            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => setResumeFile(e.target.files?.[0] ?? null)} />
+            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden" onChange={e => setResumeFile(e.target.files?.[0] ?? null)} />
           </CardContent>
         </Card>
 

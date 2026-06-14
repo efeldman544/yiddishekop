@@ -49,6 +49,27 @@ async function docxToPdf(docx: Buffer): Promise<Buffer> {
   }
 }
 
+// Wrap an image resume (JPG/PNG) in a single-page PDF sized to the image and stamp
+// a notice on it. Image resumes have no text layer, so there's nothing to redact and
+// no reason to route them through the (heavier, image-rendering) pdfjs pipeline —
+// we build the viewable PDF directly with pdf-lib.
+async function imageToStampedPdf(img: Buffer, kind: 'jpg' | 'png'): Promise<Buffer> {
+  const pdf = await PDFDocument.create()
+  const embedded = kind === 'png' ? await pdf.embedPng(img) : await pdf.embedJpg(img)
+  // Fit within letter dimensions, preserving aspect ratio (never upscale past 1x)
+  const scale = Math.min(612 / embedded.width, 792 / embedded.height, 1)
+  const w = embedded.width * scale
+  const h = embedded.height * scale
+  const page = pdf.addPage([w, h])
+  page.drawImage(embedded, { x: 0, y: 0, width: w, height: h })
+  const font = await pdf.embedFont(StandardFonts.Helvetica)
+  page.drawRectangle({ x: 0, y: h - 24, width: w, height: 24, color: rgb(0.98, 0.93, 0.73) })
+  page.drawText('Image resume — contact information could not be redacted automatically', {
+    x: 8, y: h - 16, size: 8, font, color: rgb(0.45, 0.35, 0.05),
+  })
+  return Buffer.from(await pdf.save())
+}
+
 // Find character ranges of contact info in a line of text
 function contactRanges(line: string): [number, number][] {
   const ranges: [number, number][] = []
@@ -158,12 +179,29 @@ export async function GET(
         console.error('docx conversion failed:', e)
         return new NextResponse('Could not convert this Word document to PDF', { status: 422 })
       }
+    } else if (head.startsWith('\xFF\xD8\xFF') || head.startsWith('\x89PNG')) {
+      // Image resume (JPG/PNG) — serve it as a viewable, stamped PDF directly.
+      // No text layer means nothing to redact, so we skip the pdfjs pipeline.
+      try {
+        const imgPdf = await imageToStampedPdf(buffer, head.startsWith('\x89PNG') ? 'png' : 'jpg')
+        const name = String(cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
+        return new NextResponse(Buffer.from(imgPdf), {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="${name} - Resume.pdf"`,
+            'Cache-Control': 'private, max-age=300',
+          },
+        })
+      } catch (e) {
+        console.error('image conversion failed:', e)
+        return new NextResponse('Could not open this image resume. Progressive JPEGs are not supported — please re-save it as a standard JPG, PNG, or PDF.', { status: 422 })
+      }
     } else if (head.startsWith('\xD0\xCF\x11\xE0')) {
       return new NextResponse('This resume is a legacy .doc file — please re-save it as .docx or PDF', { status: 415 })
     } else if (/<!doctype html|<html/i.test(head)) {
       return new NextResponse('This resume link serves a web page, not a file — the link should point directly to the document.', { status: 415 })
     } else {
-      return new NextResponse('This resume link serves an unsupported file type. Only PDF and Word resumes are supported.', { status: 415 })
+      return new NextResponse('This resume link serves an unsupported file type. Only PDF, Word, and image resumes are supported.', { status: 415 })
     }
   }
 
