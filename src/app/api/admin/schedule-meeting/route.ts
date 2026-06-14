@@ -79,6 +79,8 @@ export async function POST(req: Request) {
     hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
   })
 
+  const { data: admins } = await admin.from('profiles').select('id').eq('role', 'admin')
+
   await admin.from('notifications').insert([
     {
       user_id: employer_id,
@@ -94,6 +96,13 @@ export async function POST(req: Request) {
       candidate_id,
       read: false,
     },
+    ...(admins ?? []).map((a: { id: string }) => ({
+      user_id: a.id,
+      type: 'meeting_scheduled',
+      message: `Meeting confirmed: ${employerName} + ${candidateName} on ${dateStr}`,
+      candidate_id,
+      read: false,
+    })),
   ])
 
   return Response.json({ id: meeting.id })

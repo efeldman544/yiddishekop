@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 export const maxDuration = 60
 
@@ -330,9 +330,17 @@ export async function GET(
 
     await doc.loadingTask.destroy()
 
-    // A scanned PDF has no text layer — we can't locate contact info, so refuse rather than leak
+    // Scanned PDFs have no extractable text, so we can't locate and redact contact info.
+    // Rather than refusing to serve the resume at all, stamp a visible notice on the first
+    // page and serve the rendered image as-is so employers can still read the resume.
     if (totalTextLength < 50) {
-      return new NextResponse('This resume is a scanned image and cannot be auto-redacted', { status: 422 })
+      const firstPage = out.getPages()[0]
+      const { width, height } = firstPage.getSize()
+      const font = await out.embedFont(StandardFonts.Helvetica)
+      firstPage.drawRectangle({ x: 0, y: height - 28, width, height: 28, color: rgb(0.98, 0.93, 0.73) })
+      firstPage.drawText('Scanned document — contact information could not be redacted automatically', {
+        x: 10, y: height - 18, size: 9, font, color: rgb(0.45, 0.35, 0.05),
+      })
     }
 
     const pdfBytes = await out.save()

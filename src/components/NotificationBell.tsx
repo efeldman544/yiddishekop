@@ -58,7 +58,7 @@ export default function NotificationBell({ candidatePath = '/dashboard/admin/can
     await supabase.from('notifications').update({ read: true }).eq('id', n.id)
     setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
     setOpen(false)
-    if (n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
+    if (candidatePath && n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
   }
 
   const unreadCount = notifications.filter(n => !n.read).length
