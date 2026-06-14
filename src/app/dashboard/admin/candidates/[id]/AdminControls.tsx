@@ -10,8 +10,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 
 const ALL_INDUSTRIES = [
-  'Accounting', 'Admin', 'Customer Support', 'Design',
-  'Education', 'Healthcare', 'Marketing', 'Sales', 'Tech/Software', 'Other',
+  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
+  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
+  'Education & Training', 'Engineering', 'Healthcare & Medical',
+  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
+  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
+  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
+  'Sales & Business Development', 'Technology & Software', 'Other',
 ]
 
 const STATUS_OPTIONS = ['active', 'inactive', 'placed']

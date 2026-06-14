@@ -206,7 +206,15 @@ export default function LandingPage() {
             <p>Full-time or part-time, working in your hours.</p>
           </div>
           <div className="lp-roles reveal">
-            {['Bookkeeping', 'Accounting & finance', 'Admin & assistants', 'Sales', 'Customer support', 'Marketing', 'Operations', 'Project management'].map(role => (
+            {[
+              'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
+              'Construction & Engineering', 'Customer Service', 'Data & Analytics',
+              'Education & Training', 'Engineering', 'Healthcare & Medical',
+              'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
+              'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
+              'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
+              'Sales & Business Development', 'Technology & Software',
+            ].map(role => (
               <Link key={role} href="/start-hiring" className="lp-role-chip">{role}</Link>
             ))}
           </div>

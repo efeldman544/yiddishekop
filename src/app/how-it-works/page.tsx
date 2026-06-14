@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import LpHeader from '@/components/LpHeader'
 
 export const metadata: Metadata = {
   title: 'How It Works | YiddisheKop Remote Staffing',
@@ -9,14 +10,7 @@ export const metadata: Metadata = {
 export default function HowItWorksPage() {
   return (
     <div className="lp">
-      <header>
-        <div className="wrap lp-nav">
-          <Link href="/" className="lp-logo">Yiddishe<span>Kop</span></Link>
-          <div className="lp-nav-right">
-            <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
-          </div>
-        </div>
-      </header>
+      <LpHeader />
 
       <section style={{ padding: '80px 0 60px' }}>
         <div className="wrap">
