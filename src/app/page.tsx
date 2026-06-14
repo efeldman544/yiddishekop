@@ -40,8 +40,8 @@ export default function LandingPage() {
         <div className="wrap lp-nav">
           <div className="lp-logo">Yiddishe<span>Kop</span></div>
           <nav className={`lp-nav-links${menuOpen ? ' open' : ''}`} id="menu">
-            <a href="#problem" onClick={closeMenu}>Why us</a>
-            <a href="#how" onClick={closeMenu}>How it works</a>
+            <Link href="/why-us" onClick={closeMenu}>Why us</Link>
+            <Link href="/how-it-works" onClick={closeMenu}>How it works</Link>
             <a href="#roles" onClick={closeMenu}>Roles</a>
           </nav>
           <div className="lp-nav-right">
@@ -187,7 +187,7 @@ export default function LandingPage() {
             </div>
             <div className="lp-proof reveal">
               <h3>Placements that last.</h3>
-              <p>One of our placements is still in the role nearly a year later — because the fit was right from the start.</p>
+              <p>Our placements stick. Clients tell us their hires are still going strong months later — because the fit was right from the start.</p>
             </div>
             <div className="lp-proof reveal">
               <h3>The clips do the convincing.</h3>
@@ -235,8 +235,8 @@ export default function LandingPage() {
             <div className="lp-foot-cols">
               <div className="lp-foot-col">
                 <h4>Company</h4>
-                <a href="#problem">Why us</a>
-                <a href="#how">How it works</a>
+                <Link href="/why-us">Why us</Link>
+                <Link href="/how-it-works">How it works</Link>
                 <a href="#roles">Roles</a>
               </div>
               <div className="lp-foot-col">

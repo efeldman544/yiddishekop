@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import NotificationBell from '@/components/NotificationBell'
 import SignOutButton from '@/components/SignOutButton'
 
 export default function CandidateNav() {
@@ -23,6 +24,7 @@ export default function CandidateNav() {
       </div>
       <div className="flex items-center gap-3">
         <Link href="/" className="dash-link-dim text-xs transition-colors hidden sm:block">← Main site</Link>
+        <NotificationBell candidatePath="" />
         <SignOutButton />
       </div>
     </header>

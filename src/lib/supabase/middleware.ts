@@ -5,7 +5,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — always accessible, skip Supabase entirely
-  const publicPaths = ['/', '/login', '/signup', '/start-hiring', '/privacy-policy', '/auth/callback', '/api/webhooks', '/api/start-hiring']
+  const publicPaths = ['/', '/login', '/signup', '/start-hiring', '/privacy-policy', '/why-us', '/how-it-works', '/auth/callback', '/api/webhooks', '/api/start-hiring']
   if (publicPaths.some((p) => pathname === p || (p !== '/' && pathname.startsWith(p)))) {
     return NextResponse.next({ request })
   }

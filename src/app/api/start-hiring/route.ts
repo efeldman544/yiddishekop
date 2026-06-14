@@ -35,5 +35,18 @@ export async function POST(req: Request) {
     return new Response(error.message, { status: 500 })
   }
 
+  const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin')
+  if (admins?.length) {
+    await db.from('notifications').insert(
+      admins.map((a: { id: string }) => ({
+        user_id: a.id,
+        type: 'new_lead',
+        message: `New hiring inquiry: ${contact_name}${company_name ? ` (${company_name})` : ''} — ${role_title}`,
+        candidate_id: null,
+        read: false,
+      }))
+    )
+  }
+
   return Response.json({ ok: true })
 }
