@@ -178,28 +178,40 @@ export async function GET(
     g.ImageData ??= ImageData
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
     const { createRequire } = await import('module')
-    // Standard 14 fonts for PDFs that reference them without embedding
-    const standardFontDataUrl = createRequire(import.meta.url)
-      .resolve('pdfjs-dist/package.json')
-      .replace('package.json', 'standard_fonts/')
+    const pdfjsPkg = createRequire(import.meta.url).resolve('pdfjs-dist/package.json')
+    // Standard 14 fonts and CID-to-Unicode CMaps (needed for CJK/multi-byte fonts).
+    // Without cMapUrl, pdfjs passes raw CID integers as glyph "names" and crashes
+    // when font code calls .replace() on them (e.g. "55876.replace is not a function").
+    const standardFontDataUrl = pdfjsPkg.replace('package.json', 'standard_fonts/')
+    const cMapUrl = pdfjsPkg.replace('package.json', 'cmaps/')
 
-    const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), standardFontDataUrl }).promise
+    const doc = await pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      standardFontDataUrl,
+      cMapUrl,
+      cMapPacked: true,
+    }).promise
     const SCALE = 2 // ~144dpi rendering for crisp text
     const out = await PDFDocument.create()
 
     let totalTextLength = 0
 
     for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-      const page = await doc.getPage(pageNum)
+      // getPage() can trigger font-table parsing; keep it inside a guard so a
+      // bad page doesn't abort the whole document
+      let page: Awaited<ReturnType<typeof doc.getPage>>
+      try {
+        page = await doc.getPage(pageNum)
+      } catch (pageErr) {
+        console.warn(`pdfjs getPage warning page ${pageNum}:`, pageErr)
+        continue
+      }
       const viewport = page.getViewport({ scale: SCALE })
 
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
       const ctx = canvas.getContext('2d')
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      // Some PDFs use non-standard font encodings that cause pdfjs to pass a
-      // numeric glyph ID where it expects a string (e.g. "55876.replace is not
-      // a function"). We catch per-page so the rest of the document still renders.
       try {
         // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
         await page.render({ canvasContext: ctx, viewport }).promise

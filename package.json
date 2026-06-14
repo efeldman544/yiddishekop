@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
+    "@napi-rs/canvas": "^0.1.80",
     "@mux/mux-node": "^14.0.1",
     "@mux/mux-player-react": "^3.13.0",
     "@sparticuz/chromium": "^149.0.0",
