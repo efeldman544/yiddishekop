@@ -311,7 +311,7 @@ export async function GET(
     }
 
     const pdfBytes = await out.save()
-    const name = (cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
+    const name = String(cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
@@ -322,10 +322,18 @@ export async function GET(
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    console.error('Resume redaction failed:', msg)
+    const stack = e instanceof Error && e.stack ? e.stack : ''
+    console.error('Resume redaction failed:', stack || msg)
     if (/password|encrypt/i.test(msg)) {
       return new NextResponse('This PDF is password-protected and cannot be redacted', { status: 422 })
     }
-    return new NextResponse(`Could not process PDF (${msg.slice(0, 200)})`, { status: 422 })
+    // Diagnostic detail: which build served this and where it threw, so
+    // failures are traceable to an exact line instead of a guess
+    const build = (process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)
+    const frames = stack.split('\n').slice(1, 4).map(f => f.trim()).join(' | ')
+    return new NextResponse(
+      `Could not process PDF (${msg.slice(0, 200)}) [build ${build}] ${frames.slice(0, 500)}`,
+      { status: 422 },
+    )
   }
 }
