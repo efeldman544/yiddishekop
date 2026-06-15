@@ -11,19 +11,21 @@ export default function EmployerNav() {
 
   return (
     <header className="dash-dark h-14 border-b px-6 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-5">
-        <Link href="/dashboard/employer" className="dash-brand">Yiddishe<span>Kop</span></Link>
+      <div className="flex items-center gap-4">
+        <Link href="/" className="dash-brand">Yiddishe<span>Kop</span></Link>
         {!isRoot && (
           <Link
             href="/dashboard/employer"
-            className="dash-link-dim text-sm transition-colors"
+            className="flex items-center gap-1.5 dash-link-dim text-sm transition-colors"
           >
-            ← Dashboard
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Dashboard
           </Link>
         )}
       </div>
       <div className="flex items-center gap-3">
-        <Link href="/" className="dash-link-dim text-xs transition-colors hidden sm:block">← Main site</Link>
         <NotificationBell candidatePath="/dashboard/employer/candidates" />
         <SignOutButton />
       </div>

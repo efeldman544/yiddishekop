@@ -68,15 +68,11 @@ export default function AdminSidebar() {
     <aside className="dash-dark w-[220px] shrink-0 h-screen border-r flex flex-col">
       {/* Brand */}
       <div className="px-5 h-14 flex items-center border-b border-inherit shrink-0">
-        <Link href="/dashboard/admin" className="dash-brand">Yiddishe<span>Kop</span></Link>
+        <Link href="/" className="dash-brand">Yiddishe<span>Kop</span></Link>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <Link href="/" className="dash-link-dim flex items-center gap-2 px-3 py-2 text-xs mb-2 hover:text-[var(--lp-cream)] transition-colors">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Main site
-        </Link>
         {NAV.map(item => {
           const active = isActive(item.href, item.exact)
           return (
