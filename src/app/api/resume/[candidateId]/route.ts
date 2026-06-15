@@ -219,14 +219,23 @@ export async function GET(
     if (downloadError || !fileBlob) return new NextResponse('Failed to fetch resume', { status: 502 })
     buffer = Buffer.from(await fileBlob.arrayBuffer())
   } else if (cp.resume_url.startsWith('http')) {
-    // Some hosts (e.g. Wix usrfiles) reject non-browser requests, so send
-    // browser-like headers and retry once on transient failures
+    // Some hosts (Wix, Squarespace, many CDNs) block hotlinked/non-browser
+    // fetches with a 403. Sending a full set of browser-like headers — crucially
+    // a Referer matching the file's own origin — defeats most of that protection.
+    let origin = ''
+    try { origin = new URL(cp.resume_url).origin } catch {}
     const fetchExternal = () => fetch(cp.resume_url!, {
       signal: AbortSignal.timeout(15000),
       redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept': 'application/pdf,application/octet-stream,*/*',
+        'Accept': 'application/pdf,image/avif,image/webp,image/png,image/jpeg,application/octet-stream,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        ...(origin ? { 'Referer': origin + '/' } : {}),
       },
     })
     let res: Response | null = null
