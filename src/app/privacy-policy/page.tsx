@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import LpAuthButton from '@/components/LpAuthButton'
 
 export const metadata = {
   title: 'Privacy Policy — YiddisheKop',
@@ -11,7 +12,7 @@ export default function PrivacyPolicyPage() {
         <div className="wrap lp-nav">
           <Link href="/" className="lp-logo">Yiddishe<span>Kop</span></Link>
           <div className="lp-nav-right">
-            <Link href="/login" className="lp-btn lp-btn-ghost" style={{ fontSize: 14 }}>Log in</Link>
+            <LpAuthButton style={{ fontSize: 14 }} />
           </div>
         </div>
       </header>

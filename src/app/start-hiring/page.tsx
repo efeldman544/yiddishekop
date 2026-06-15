@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import LpAuthButton from '@/components/LpAuthButton'
 
 type FormState = {
   contact_name: string
@@ -82,7 +83,7 @@ export default function StartHiringPage() {
         <div className="wrap lp-nav">
           <Link href="/" className="lp-logo">Yiddishe<span>Kop</span></Link>
           <div className="lp-nav-right">
-            <Link href="/login" className="lp-btn lp-btn-ghost" style={{ fontSize: 14 }}>Log in</Link>
+            <LpAuthButton style={{ fontSize: 14 }} />
           </div>
         </div>
       </header>
