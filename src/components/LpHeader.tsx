@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import LpAuthButton from '@/components/LpAuthButton'
 
 export default function LpHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -17,7 +18,7 @@ export default function LpHeader() {
           <Link href="/#roles" onClick={closeMenu}>Roles</Link>
         </nav>
         <div className="lp-nav-right">
-          <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
+          <LpAuthButton />
           <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
           <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
         </div>
