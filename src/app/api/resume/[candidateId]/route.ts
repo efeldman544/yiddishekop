@@ -251,13 +251,10 @@ export async function GET(
       }
     }
     if (!res) {
-      // If the external host blocked our server (403), redirect the browser
-      // directly to the original URL — the employer's browser may be able to
-      // open it even if our server-side fetch couldn't.
-      if (lastError.includes('403') && cp.resume_url) {
-        return NextResponse.redirect(cp.resume_url)
-      }
-      return new NextResponse(`Failed to fetch resume from external link (${lastError}).`, { status: 502 })
+      const hint = lastError.includes('403')
+        ? `This resume is hosted on an external site that blocked our server (${lastError}). Ask the candidate to re-upload their resume directly through their profile — that stores it securely and lets it load normally.`
+        : `Failed to fetch resume from external link (${lastError}).`
+      return new NextResponse(hint, { status: 502 })
     }
     buffer = Buffer.from(await res.arrayBuffer())
   } else {
