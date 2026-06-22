@@ -251,10 +251,13 @@ export async function GET(
       }
     }
     if (!res) {
-      const hint = lastError.includes('403')
-        ? `The resume link is access-restricted (${lastError}). Upload the file directly to storage or use a publicly accessible link.`
-        : `Failed to fetch resume from external link (${lastError}).`
-      return new NextResponse(hint, { status: 502 })
+      // If the external host blocked our server (403), redirect the browser
+      // directly to the original URL — the employer's browser may be able to
+      // open it even if our server-side fetch couldn't.
+      if (lastError.includes('403') && cp.resume_url) {
+        return NextResponse.redirect(cp.resume_url)
+      }
+      return new NextResponse(`Failed to fetch resume from external link (${lastError}).`, { status: 502 })
     }
     buffer = Buffer.from(await res.arrayBuffer())
   } else {
