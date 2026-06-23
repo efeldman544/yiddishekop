@@ -252,7 +252,7 @@ export async function GET(
     }
     if (!res) {
       const hint = lastError.includes('403')
-        ? `The resume link is access-restricted (${lastError}). Upload the file directly to storage or use a publicly accessible link.`
+        ? `This resume is hosted on an external site that blocked our server (${lastError}). Ask the candidate to re-upload their resume directly through their profile — that stores it securely and lets it load normally.`
         : `Failed to fetch resume from external link (${lastError}).`
       return new NextResponse(hint, { status: 502 })
     }

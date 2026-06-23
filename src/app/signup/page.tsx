@@ -79,11 +79,11 @@ export default function SignupPage() {
               <input id="password" name="password" type="password" required minLength={8} placeholder="••••••••" className="auth-input" />
             </div>
             <div className="auth-field">
-              <label htmlFor="role" className="auth-label">I am a…</label>
+              <label htmlFor="role" className="auth-label">I am…</label>
               <select id="role" value={role} onChange={e => setRole(e.target.value as Role)} className="auth-select">
-                <option value="">Select a role</option>
-                <option value="candidate">Candidate — looking for work</option>
-                <option value="employer">Employer — hiring talent</option>
+                <option value="">Select one</option>
+                <option value="candidate">I&apos;m looking for work</option>
+                <option value="employer">I&apos;m hiring</option>
               </select>
             </div>
             <button type="submit" disabled={loading} className="auth-btn">

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Warm dark background with rounded corners, matching --lp-ink-2 -->
+  <rect width="32" height="32" rx="7" fill="#16150F"/>
+  <!-- Bold geometric Y in brand gold (#C9A24B) -->
+  <polyline points="5,5 16,15 27,5" stroke="#C9A24B" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line x1="16" y1="15" x2="16" y2="27" stroke="#C9A24B" stroke-width="4.5" stroke-linecap="round"/>
+</svg>
