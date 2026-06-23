@@ -21,7 +21,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "YiddisheKop — Pre-screened remote staff you can actually trust",
+  title: "YiddisheKop",
   description: "We screen, vet, and video-interview every candidate before they reach your inbox. You get a shortlist of the strongest people — on video — and the final call is always yours.",
 };
 
