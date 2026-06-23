@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage() {
               },
               {
                 title: '9. Contact',
-                body: 'For questions about this policy or your data, contact us at: YiddisheKop · 631 494 3567 · yiddishekop.net',
+                body: 'For questions about this policy or your data, contact us at: YiddisheKop · 631 494 3567 · info@yiddishekop.app',
               },
             ].map(({ title, body }) => (
               <div key={title}>

@@ -91,6 +91,7 @@ export default function WhyUsPage() {
               <div className="lp-foot-col">
                 <h4>Contact</h4>
                 <a href="tel:6314943567">631 494 3567</a>
+                <a href="mailto:info@yiddishekop.app">info@yiddishekop.app</a>
               </div>
             </div>
           </div>
