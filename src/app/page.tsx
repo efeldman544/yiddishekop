@@ -1,59 +1,28 @@
-'use client'
-
-import { useState, useEffect } from 'react'
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import LpHeader from '@/components/LpHeader'
+import RevealObserver from '@/components/RevealObserver'
+
+export const metadata: Metadata = {
+  title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
+  description: 'Stop interviewing the wrong people. YiddisheKop screens, vets, and video-interviews remote candidates from the frum community — you get a shortlist of the strongest people, on video, and the final call is always yours.',
+  openGraph: {
+    title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
+    description: 'Stop interviewing the wrong people. YiddisheKop screens, vets, and video-interviews remote candidates — you get a shortlist of the strongest, on video.',
+    url: 'https://yiddishekop.app',
+    siteName: 'YiddisheKop',
+    locale: 'en_US',
+    type: 'website',
+  },
+}
 
 export default function LandingPage() {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [dashboardHref, setDashboardHref] = useState<string | null>(null)
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
-      const role = profile?.role ?? user.user_metadata?.role ?? 'candidate'
-      setDashboardHref(`/dashboard/${role}`)
-    })
-  }, [])
-
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) }
-        })
-      },
-      { threshold: 0.12 }
-    )
-    document.querySelectorAll('.lp .reveal').forEach(el => io.observe(el))
-    return () => io.disconnect()
-  }, [])
-
-  function closeMenu() { setMenuOpen(false) }
-
   return (
     <div className="lp">
+      <RevealObserver />
+
       {/* ── NAV ── */}
-      <header>
-        <div className="wrap lp-nav">
-          <div className="lp-logo">Yiddishe<span>Kop</span></div>
-          <nav className={`lp-nav-links${menuOpen ? ' open' : ''}`} id="menu">
-            <Link href="/why-us" onClick={closeMenu}>Why us</Link>
-            <Link href="/how-it-works" onClick={closeMenu}>How it works</Link>
-            <a href="#roles" onClick={closeMenu}>Roles</a>
-          </nav>
-          <div className="lp-nav-right">
-            {dashboardHref
-              ? <Link href={dashboardHref} className="lp-btn lp-btn-ghost">My account</Link>
-              : <Link href="/login" className="lp-btn lp-btn-ghost">Log in</Link>
-            }
-            <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
-            <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
-          </div>
-        </div>
-      </header>
+      <LpHeader />
 
       {/* ── HERO ── */}
       <section className="lp-hero">
