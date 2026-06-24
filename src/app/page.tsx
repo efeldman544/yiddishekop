@@ -4,7 +4,7 @@ import LpHeader from '@/components/LpHeader'
 import RevealObserver from '@/components/RevealObserver'
 
 export const metadata: Metadata = {
-  title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
+  title: 'YiddisheKop',
   description: 'Stop interviewing the wrong people. YiddisheKop screens, vets, and video-interviews remote candidates from the frum community — you get a shortlist of the strongest people, on video, and the final call is always yours.',
   openGraph: {
     title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
