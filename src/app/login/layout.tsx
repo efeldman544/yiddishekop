@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Log In | YiddisheKop',
+  title: 'YiddisheKop',
   description: 'Log in to your YiddisheKop account.',
 }
 

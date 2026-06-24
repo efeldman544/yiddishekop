@@ -3,7 +3,7 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 
 export const metadata: Metadata = {
-  title: 'How It Works | YiddisheKop Remote Staffing',
+  title: 'YiddisheKop',
   description: 'Tell us the role, we screen and record video interviews, you watch and choose. Three steps to a confident hire — no sifting, no wasted interviews.',
 }
 
