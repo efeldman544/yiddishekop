@@ -3,7 +3,7 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 
 export const metadata: Metadata = {
-  title: 'YiddisheKop',
+  title: 'Why Us | YiddisheKop',
   description: 'Stop guessing on résumés. YiddisheKop vets, interviews, and delivers remote candidates who are actually worth your time — and actually last.',
 }
 

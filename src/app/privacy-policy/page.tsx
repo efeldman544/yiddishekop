@@ -2,7 +2,7 @@ import Link from 'next/link'
 import LpAuthButton from '@/components/LpAuthButton'
 
 export const metadata = {
-  title: 'YiddisheKop',
+  title: 'Privacy Policy | YiddisheKop',
   description: 'How YiddisheKop collects, uses, and protects your personal information.',
 }
 

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'YiddisheKop',
   description: 'Stop interviewing the wrong people. YiddisheKop screens, vets, and video-interviews remote candidates from the frum community — you get a shortlist of the strongest people, on video, and the final call is always yours.',
   openGraph: {
-    title: 'YiddisheKop',
+    title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
     description: 'Stop interviewing the wrong people. YiddisheKop screens, vets, and video-interviews remote candidates — you get a shortlist of the strongest, on video.',
     url: 'https://yiddishekop.app',
     siteName: 'YiddisheKop',

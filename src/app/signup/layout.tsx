@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'YiddisheKop',
+  title: 'Sign Up | YiddisheKop',
   description: 'Create your YiddisheKop account to find pre-screened remote staff or search for remote opportunities.',
 }
 
