@@ -158,13 +158,13 @@ export default function JobsClient({
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  function handleEmployerSelect(value: string) {
-    const matched = value && value !== '_none' ? employers.find(e => e.id === value) : undefined
+  function handleEmployerInput(value: string) {
+    const matched = employers.find(e => employerLabel(e) === value)
     setForm(prev => ({
       ...prev,
+      employer_input: value,
       employer_id: matched ? matched.id : '',
-      employer_input: matched ? employerLabel(matched) : '',
-      ...(matched?.company_name ? { company_name: matched.company_name } : {}),
+      company_name: matched?.company_name ?? (prev.company_name || value),
     }))
   }
 
@@ -342,16 +342,22 @@ export default function JobsClient({
               )}
 
               <div className="space-y-1.5">
-                <Label>Employer account</Label>
-                <Select value={form.employer_id || '_none'} onValueChange={handleEmployerSelect}>
-                  <SelectTrigger><SelectValue placeholder="Select employer…" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">— No employer account —</SelectItem>
-                    {employers.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>{employerLabel(emp)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="employer_input">Employer</Label>
+                <Input
+                  id="employer_input"
+                  list="employer-suggestions"
+                  value={form.employer_input}
+                  onChange={e => handleEmployerInput(e.target.value)}
+                  placeholder="Type or select employer…"
+                />
+                <datalist id="employer-suggestions">
+                  {employers.map(emp => (
+                    <option key={emp.id} value={employerLabel(emp)} />
+                  ))}
+                </datalist>
+                {form.employer_id && (
+                  <p className="text-xs text-muted-foreground">Linked to employer account</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
