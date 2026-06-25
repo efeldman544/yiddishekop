@@ -34,3 +34,16 @@ create policy "Admins read job leads"
         and profiles.role = 'admin'
     )
   );
+
+-- Only admins can delete job leads
+drop policy if exists "Admins delete job leads" on public.job_leads;
+create policy "Admins delete job leads"
+  on public.job_leads for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'admin'
+    )
+  );

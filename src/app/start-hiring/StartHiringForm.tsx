@@ -55,6 +55,12 @@ export default function StartHiringForm() {
   }
 
   if (submitted) {
+    const signupParams = new URLSearchParams({
+      role: 'employer',
+      email: form.email,
+      name: form.contact_name,
+    })
+
     return (
       <div className="lp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '48px 24px' }}>
         <div style={{ maxWidth: 520, textAlign: 'center' }}>
@@ -65,10 +71,25 @@ export default function StartHiringForm() {
           <p style={{ fontSize: 17, color: 'var(--lp-cream-dim)', lineHeight: 1.65, marginBottom: 36 }}>
             Thanks, {form.contact_name.split(' ')[0]}. We&apos;ll review your requirements and be in touch shortly with next steps.
           </p>
+
+          <div style={{ background: 'rgba(201,162,75,0.08)', border: '1px solid rgba(201,162,75,0.2)', borderRadius: 12, padding: '24px 28px', marginBottom: 36, textAlign: 'left' }}>
+            <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--lp-cream)', marginBottom: 8 }}>Create your employer account</p>
+            <p style={{ fontSize: 14, color: 'var(--lp-cream-dim)', lineHeight: 1.6, marginBottom: 20 }}>
+              Track your candidates, review shortlists, and manage your open roles — all in one place.
+            </p>
+            <Link
+              href={`/signup?${signupParams.toString()}`}
+              className="lp-btn lp-btn-gold"
+              style={{ display: 'inline-block', padding: '11px 24px', fontSize: 14 }}
+            >
+              Create account →
+            </Link>
+          </div>
+
           <p style={{ fontSize: 14.5, color: 'var(--lp-cream-dim)' }}>
             Questions? Call us at <a href="tel:6314943567" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>631 494 3567</a>
           </p>
-          <div style={{ marginTop: 40 }}>
+          <div style={{ marginTop: 28 }}>
             <Link href="/" style={{ color: 'var(--lp-cream-dim)', fontSize: 14 }}>← Back to home</Link>
           </div>
         </div>
