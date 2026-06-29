@@ -54,6 +54,21 @@ export async function POST(req: Request) {
     await db.from('employer_profiles').upsert({ id: userData.user.id, company_name })
   }
 
+  // Link any unclaimed hire requests submitted with this email to the new
+  // account so the request and the account don't become two separate records.
+  const { data: requestJobs } = await db
+    .from('job_requirements')
+    .select('id')
+    .is('employer_id', null)
+    .eq('source', 'request')
+    .ilike('contact_email', email)
+  if (requestJobs?.length) {
+    await db
+      .from('job_requirements')
+      .update({ employer_id: userData.user.id, updated_at: new Date().toISOString() })
+      .in('id', requestJobs.map((j: { id: string }) => j.id))
+  }
+
   return Response.json({
     id: userData.user.id,
     email,

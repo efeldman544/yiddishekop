@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ type Badge = { label: string; style: string }
 type ScoredCandidate = MatchCandidate & { ruleScore: number; badges: Badge[] }
 
 const JOB_STATUS_BADGE: Record<string, string> = {
+  'New':     'bg-amber-50 text-amber-700 border border-amber-200',
   'Open':    'bg-emerald-50 text-emerald-700 border border-emerald-200',
   'On Hold': 'bg-amber-50 text-amber-700 border border-amber-200',
 }
@@ -109,7 +111,14 @@ export default function MatchingClient({
   candidates: MatchCandidate[]
   initialAssignments: { candidate_id: string; job_id: string }[]
 }) {
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id ?? null)
+  // Selected job is mirrored in the URL (?job=<id>) so navigating into a
+  // candidate and pressing Back returns you to the same job, not jobs[0].
+  const searchParams = useSearchParams()
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(() => {
+    const fromUrl = searchParams.get('job')
+    if (fromUrl && jobs.some(j => j.id === fromUrl)) return fromUrl
+    return jobs[0]?.id ?? null
+  })
   const [assignments, setAssignments] = useState(initialAssignments)
   const [toggling, setToggling] = useState<string | null>(null)
   // AI scores keyed by job then candidate — scores from one job must not bleed into another
@@ -163,6 +172,17 @@ export default function MatchingClient({
     analyzedJobs.current.add(selectedJobId)
     loadCachedOrRun(selectedJobId)
   }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep ?job=<id> in the URL in sync with the selected job (via replaceState so
+  // it doesn't add history entries or re-run the server fetch). Pressing Back
+  // from a candidate page then restores this exact job.
+  useEffect(() => {
+    if (!selectedJobId) return
+    const sp = new URLSearchParams(window.location.search)
+    if (sp.get('job') === selectedJobId) return
+    sp.set('job', selectedJobId)
+    window.history.replaceState(null, '', `${window.location.pathname}?${sp.toString()}`)
+  }, [selectedJobId])
 
   const scoredCandidates = useMemo<ScoredCandidate[]>(() => {
     if (!selectedJob) return []

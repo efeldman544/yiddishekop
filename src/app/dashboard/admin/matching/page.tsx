@@ -17,7 +17,7 @@ export default async function AdminMatchingPage({
     supabase
       .from('job_requirements')
       .select('id, job_title, employment_type, languages, description, status, company_name, employer_id, employer_profiles(company_name)')
-      .in('status', ['Open', 'On Hold'])
+      .in('status', ['New', 'Open', 'On Hold'])
       .order('created_at', { ascending: false }),
     supabase
       .from('candidate_profiles')

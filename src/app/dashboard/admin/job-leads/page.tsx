@@ -5,15 +5,17 @@ import { createClient } from '@/lib/supabase/client'
 
 type Lead = {
   id: string
-  contact_name: string
-  email: string
-  phone: string | null
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
   company_name: string | null
-  role_title: string
+  job_title: string
   employment_type: string | null
   hours: string | null
   salary: string | null
   description: string | null
+  status: string
+  employer_id: string | null
   created_at: string
 }
 
@@ -26,8 +28,9 @@ export default function JobLeadsPage() {
     async function load() {
       const supabase = createClient()
       const { data } = await supabase
-        .from('job_leads')
-        .select('*')
+        .from('job_requirements')
+        .select('id, contact_name, contact_email, contact_phone, company_name, job_title, employment_type, hours, salary, description, status, employer_id, created_at')
+        .eq('source', 'request')
         .order('created_at', { ascending: false })
       setLeads((data as Lead[]) ?? [])
       setLoading(false)
@@ -37,7 +40,7 @@ export default function JobLeadsPage() {
 
   async function handleDelete(id: string) {
     const supabase = createClient()
-    const { error } = await supabase.from('job_leads').delete().eq('id', id)
+    const { error } = await supabase.from('job_requirements').delete().eq('id', id)
     if (!error) {
       setLeads(prev => prev.filter(l => l.id !== id))
     }
@@ -61,12 +64,17 @@ export default function JobLeadsPage() {
             <div key={lead.id} className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-semibold text-gray-900 text-lg">{lead.contact_name}
+                  <p className="font-semibold text-gray-900 text-lg">{lead.contact_name ?? 'Unknown'}
                     {lead.company_name && <span className="font-normal text-gray-400"> · {lead.company_name}</span>}
                   </p>
-                  <p className="text-sm font-medium text-indigo-700 mt-0.5">{lead.role_title}</p>
+                  <p className="text-sm font-medium text-indigo-700 mt-0.5">{lead.job_title}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  {lead.employer_id ? (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Account linked</span>
+                  ) : (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">No account yet</span>
+                  )}
                   <p className="text-xs text-gray-400">
                     {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
@@ -97,8 +105,8 @@ export default function JobLeadsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                <div><span className="text-gray-400">Email: </span><a href={`mailto:${lead.email}`} className="text-indigo-600 underline underline-offset-2">{lead.email}</a></div>
-                {lead.phone && <div><span className="text-gray-400">Phone: </span><a href={`tel:${lead.phone}`} className="text-indigo-600">{lead.phone}</a></div>}
+                {lead.contact_email && <div><span className="text-gray-400">Email: </span><a href={`mailto:${lead.contact_email}`} className="text-indigo-600 underline underline-offset-2">{lead.contact_email}</a></div>}
+                {lead.contact_phone && <div><span className="text-gray-400">Phone: </span><a href={`tel:${lead.contact_phone}`} className="text-indigo-600">{lead.contact_phone}</a></div>}
                 {lead.employment_type && <div><span className="text-gray-400">Type: </span>{lead.employment_type}</div>}
                 {lead.hours && <div><span className="text-gray-400">Hours/week: </span>{lead.hours}</div>}
                 {lead.salary && <div><span className="text-gray-400">Budget: </span>{lead.salary}</div>}
