@@ -45,6 +45,7 @@ type Badge = { label: string; style: string }
 type ScoredCandidate = MatchCandidate & { ruleScore: number; badges: Badge[] }
 
 const JOB_STATUS_BADGE: Record<string, string> = {
+  'New':     'bg-amber-50 text-amber-700 border border-amber-200',
   'Open':    'bg-emerald-50 text-emerald-700 border border-emerald-200',
   'On Hold': 'bg-amber-50 text-amber-700 border border-amber-200',
 }

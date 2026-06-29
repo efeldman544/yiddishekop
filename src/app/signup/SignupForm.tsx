@@ -46,6 +46,12 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
     if (data.user) {
       const { error: upsertError } = await supabase.from('profiles').upsert({ id: data.user.id, email, full_name, role })
       if (upsertError) console.error('Profile upsert failed:', upsertError.message)
+
+      // Link any hire requests this person already submitted (matched by email)
+      // so their requested role shows up in their dashboard, not as a duplicate.
+      if (role === 'employer') {
+        await fetch('/api/auth/link-jobs', { method: 'POST' }).catch(() => {})
+      }
     }
 
     router.push(`/dashboard/${role}`)

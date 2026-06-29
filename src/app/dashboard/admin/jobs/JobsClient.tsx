@@ -41,10 +41,11 @@ const EMPTY_FORM: FormState = {
   employment_type: '', salary: '', hours: '', description: '', languages: '', notes: '',
 }
 
-const STATUS_OPTIONS = ['Open', 'Filled', 'On Hold', 'Closed']
+const STATUS_OPTIONS = ['New', 'Open', 'Filled', 'On Hold', 'Closed']
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time', 'Contract']
 
 const STATUS_BADGE: Record<string, string> = {
+  'New':     'bg-amber-100 text-amber-700 border-amber-200',
   'Open':    'bg-green-100 text-green-700 border-green-200',
   'Filled':  'bg-indigo-100 text-indigo-700 border-indigo-200',
   'On Hold': 'bg-yellow-100 text-yellow-700 border-yellow-200',

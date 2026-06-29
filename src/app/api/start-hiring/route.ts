@@ -18,20 +18,39 @@ export async function POST(req: Request) {
   }
 
   const db = adminClient()
-  const { error } = await db.from('job_leads').insert({
-    contact_name: contact_name.trim(),
-    email: email.trim(),
-    phone: phone?.trim() || null,
+
+  // If an employer account already exists for this email, link the new job to
+  // it straight away so the request and the account never become two records.
+  const emailNorm = email.trim().toLowerCase()
+  const { data: existing } = await db
+    .from('profiles')
+    .select('id')
+    .eq('role', 'employer')
+    .ilike('email', emailNorm)
+    .maybeSingle()
+  const employerId = existing?.id ?? null
+
+  // A hire request is a job_requirements row with status 'New' and source
+  // 'request'. The requester's contact details live on the row until they have
+  // an account (employer_id is then filled in by the link-jobs step).
+  const { error } = await db.from('job_requirements').insert({
+    employer_id: employerId,
+    job_title: role_title.trim(),
     company_name: company_name?.trim() || null,
-    role_title: role_title.trim(),
+    contact_name: contact_name.trim(),
+    contact_email: email.trim(),
+    contact_phone: phone?.trim() || null,
     employment_type: employment_type || null,
     hours: hours?.trim() || null,
     salary: salary?.trim() || null,
     description: description?.trim() || null,
+    status: 'New',
+    source: 'request',
+    updated_at: new Date().toISOString(),
   })
 
   if (error) {
-    console.error('job_leads insert error:', error.message)
+    console.error('job request insert error:', error.message)
     return new Response(error.message, { status: 500 })
   }
 
