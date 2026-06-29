@@ -20,6 +20,7 @@ type Lead = {
 export default function JobLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -33,6 +34,15 @@ export default function JobLeadsPage() {
     }
     load()
   }, [])
+
+  async function handleDelete(id: string) {
+    const supabase = createClient()
+    const { error } = await supabase.from('job_leads').delete().eq('id', id)
+    if (!error) {
+      setLeads(prev => prev.filter(l => l.id !== id))
+    }
+    setConfirmDelete(null)
+  }
 
   return (
     <main className="px-8 py-8 space-y-5">
@@ -56,9 +66,35 @@ export default function JobLeadsPage() {
                   </p>
                   <p className="text-sm font-medium text-indigo-700 mt-0.5">{lead.role_title}</p>
                 </div>
-                <p className="text-xs text-gray-400 shrink-0">
-                  {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
+                <div className="flex items-center gap-3 shrink-0">
+                  <p className="text-xs text-gray-400">
+                    {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                  {confirmDelete === lead.id ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleDelete(lead.id)}
+                        className="text-xs font-medium text-white bg-red-500 hover:bg-red-600 px-2.5 py-1 rounded-md transition-colors"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(lead.id)}
+                      className="text-xs text-gray-300 hover:text-red-400 transition-colors"
+                      title="Delete inquiry"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 <div><span className="text-gray-400">Email: </span><a href={`mailto:${lead.email}`} className="text-indigo-600 underline underline-offset-2">{lead.email}</a></div>
