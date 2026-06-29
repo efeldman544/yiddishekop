@@ -27,6 +27,10 @@ export type Job = {
   description: string | null
   languages: string | null
   notes: string | null
+  source: string | null
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
   created_at: string
 }
 
@@ -34,11 +38,13 @@ type FormState = {
   employer_id: string; employer_input: string; company_name: string; job_title: string; status: string
   employment_type: string; salary: string; hours: string; description: string
   languages: string; notes: string
+  contact_name: string; contact_email: string; contact_phone: string
 }
 
 const EMPTY_FORM: FormState = {
   employer_id: '', employer_input: '', company_name: '', job_title: '', status: 'Open',
   employment_type: '', salary: '', hours: '', description: '', languages: '', notes: '',
+  contact_name: '', contact_email: '', contact_phone: '',
 }
 
 const STATUS_OPTIONS = ['New', 'Open', 'Filled', 'On Hold', 'Closed']
@@ -90,6 +96,7 @@ export default function JobsClient({
       job_title: job.job_title, status: job.status, employment_type: job.employment_type ?? '',
       salary: job.salary ?? '', hours: job.hours ?? '', description: job.description ?? '',
       languages: job.languages ?? '', notes: job.notes ?? '',
+      contact_name: job.contact_name ?? '', contact_email: job.contact_email ?? '', contact_phone: job.contact_phone ?? '',
     })
     setError(null); setPanelOpen(true)
   }
@@ -179,6 +186,9 @@ export default function JobsClient({
       employment_type: form.employment_type || null, salary: form.salary || null,
       hours: form.hours || null, description: form.description || null,
       languages: form.languages || null, notes: form.notes || null,
+      contact_name: form.contact_name.trim() || null,
+      contact_email: form.contact_email.trim() || null,
+      contact_phone: form.contact_phone.trim() || null,
       updated_at: new Date().toISOString(),
     }
     if (editingId) {
@@ -365,6 +375,26 @@ export default function JobsClient({
                 <Label htmlFor="company_name">Company Name</Label>
                 <Input id="company_name" value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="e.g. Acme Corp" />
                 <p className="text-xs text-muted-foreground">Saved to the employer&apos;s profile and shown throughout the app.</p>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 px-4 py-3.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Requester contact{!form.employer_id && <span> — how to reach them until they create an account</span>}
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_name">Contact name</Label>
+                  <Input id="contact_name" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="e.g. Sara Klein" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact_email">Email</Label>
+                    <Input id="contact_email" type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="you@company.com" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact_phone">Phone</Label>
+                    <Input id="contact_phone" type="tel" value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="631 494 3567" />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1.5">
