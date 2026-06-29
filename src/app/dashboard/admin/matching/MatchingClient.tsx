@@ -418,12 +418,12 @@ export default function MatchingClient({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               {c.source === 'video' ? (
-                                <Link href={`/dashboard/admin/video-candidates/${c.id}`}
+                                <Link href={`/dashboard/admin/video-candidates/${c.id}?from=matching`}
                                   className="text-[15px] font-bold text-gray-950 hover:text-gray-600 transition-colors">
                                   {c.full_name ?? 'Unnamed'}
                                 </Link>
                               ) : (
-                                <Link href={`/dashboard/admin/candidates/${c.id}`}
+                                <Link href={`/dashboard/admin/candidates/${c.id}?from=matching`}
                                   className="text-[15px] font-bold text-gray-950 hover:text-gray-600 transition-colors">
                                   {c.full_name ?? 'Unnamed'}
                                 </Link>
