@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import JobsClient, { type Job, type EmployerOption, employerLabel } from './JobsClient'
+import JobsClient, { type Job } from './JobsClient'
+import { employerLabel, type EmployerOption } from './employerLabel'
 
 export default async function AdminJobsPage() {
   const supabase = await createClient()
