@@ -30,26 +30,39 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // One roundtrip: the assignment lookup verifies job ownership via the join,
-  // and the candidate/video fetches don't depend on it so they run in parallel
-  const [{ data: matches }, { data: candidate }, { data: videos }] = await Promise.all([
+  // A candidate reaches this employer either via one of their jobs
+  // (candidate_job_assignments) or via a direct admin assignment
+  // (employer_candidate_assignments). Accept both; job-based wins when present.
+  const [{ data: matches }, { data: directMatches }, { data: candidate }, { data: videos }] = await Promise.all([
     supabase
       .from('candidate_job_assignments')
       .select('id, action, proposed_times, job_requirements!inner(employer_id)')
       .eq('job_requirements.employer_id', user.id)
       .eq('candidate_id', id)
       .limit(1),
+    supabase
+      .from('employer_candidate_assignments')
+      .select('id, action, proposed_times')
+      .eq('employer_id', user.id)
+      .eq('candidate_id', id)
+      .limit(1),
     supabase.from('candidate_profiles').select('*').eq('id', id).single<CandidateProfile>(),
     supabase.from('videos').select('*').eq('candidate_id', id).order('created_at', { ascending: false }).limit(1),
   ])
 
-  const match = matches?.[0]
+  const jobMatch = matches?.[0]
+  const directMatch = directMatches?.[0]
+  const match = jobMatch ?? directMatch
   if (!match) notFound()
+  const assignmentTable = jobMatch ? 'candidate_job_assignments' : 'employer_candidate_assignments'
 
+  // Look up by candidate+employer (not assignment_id) so scheduled meetings
+  // resolve for both assignment kinds
   const { data: meetingData } = await supabase
     .from('meeting_requests')
     .select('scheduled_at, meeting_link, notes')
-    .eq('assignment_id', match.id)
+    .eq('candidate_id', id)
+    .eq('employer_id', user.id)
     .maybeSingle()
 
   if (!candidate) notFound()
@@ -118,6 +131,7 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
           <CandidateActions
             candidateId={id}
             assignmentId={match.id}
+            assignmentTable={assignmentTable}
             initialAction={(match.action ?? null) as 'request_meeting' | 'pass' | null}
             initialProposedTimes={(match.proposed_times ?? []) as string[]}
             meeting={meeting}

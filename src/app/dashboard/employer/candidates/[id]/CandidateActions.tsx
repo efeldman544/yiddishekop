@@ -18,12 +18,15 @@ type Meeting = {
 export default function CandidateActions({
   candidateId,
   assignmentId,
+  assignmentTable = 'candidate_job_assignments',
   initialAction,
   initialProposedTimes,
   meeting,
 }: {
   candidateId: string
   assignmentId: string
+  // Which table this assignment lives in: job-based or direct admin assignment
+  assignmentTable?: 'candidate_job_assignments' | 'employer_candidate_assignments'
   initialAction: Action
   initialProposedTimes: string[]
   meeting: Meeting
@@ -38,7 +41,7 @@ export default function CandidateActions({
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase.channel('employer-candidate-sync')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'candidate_job_assignments' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: assignmentTable }, (payload) => {
         const row = payload.new as { id: string; action: string | null; proposed_times: string[] | null }
         if (row.id === assignmentId) {
           setAction((row.action ?? null) as Action)
@@ -47,7 +50,7 @@ export default function CandidateActions({
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [assignmentId])
+  }, [assignmentId, assignmentTable])
 
   async function handleRequestMeeting() {
     const filled = slots.filter(s => s.trim())
@@ -55,7 +58,7 @@ export default function CandidateActions({
     setSaving(true)
     setError(null)
     const supabase = createClient()
-    await supabase.from('candidate_job_assignments').update({
+    await supabase.from(assignmentTable).update({
       action: 'request_meeting',
       proposed_times: filled.map(s => new Date(s).toISOString()),
     }).eq('id', assignmentId)
@@ -73,7 +76,7 @@ export default function CandidateActions({
     const next: Action = action === 'pass' ? null : 'pass'
     setSaving(true)
     const supabase = createClient()
-    await supabase.from('candidate_job_assignments').update({ action: next, proposed_times: null }).eq('id', assignmentId)
+    await supabase.from(assignmentTable).update({ action: next, proposed_times: null }).eq('id', assignmentId)
     setAction(next)
     setProposedTimes([])
     setSaving(false)
@@ -82,7 +85,7 @@ export default function CandidateActions({
   async function handleUndo() {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from('candidate_job_assignments').update({ action: null, proposed_times: null }).eq('id', assignmentId)
+    await supabase.from(assignmentTable).update({ action: null, proposed_times: null }).eq('id', assignmentId)
     setAction(null)
     setProposedTimes([])
     setShowForm(false)
