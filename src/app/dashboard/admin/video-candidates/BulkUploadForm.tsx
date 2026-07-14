@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadVideoToMux } from '@/lib/muxUpload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -101,19 +102,12 @@ export default function BulkUploadForm({ onDone }: { onDone: () => void }) {
   }
 
   async function uploadToMux(file: File, onStatus: (s: RowStatus) => void): Promise<{ assetId: string; playbackId: string } | null> {
-    onStatus('uploading')
-    const res = await fetch('/api/mux/upload-url', { method: 'POST' })
-    const { uploadId, url } = await res.json()
-    await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
-    onStatus('processing')
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 4000))
-      const poll = await fetch(`/api/mux/asset/${uploadId}`)
-      const data = await poll.json()
-      if (data.status === 'ready') return { assetId: data.assetId, playbackId: data.playbackId }
-      if (data.status === 'errored') return null
+    try {
+      return await uploadVideoToMux(file, label =>
+        onStatus(label.startsWith('Processing') ? 'processing' : 'uploading'))
+    } catch {
+      return null // caller marks the row failed
     }
-    return null
   }
 
   async function runUpload() {

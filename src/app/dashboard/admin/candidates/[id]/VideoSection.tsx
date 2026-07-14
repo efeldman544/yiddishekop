@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import MuxPlayer from '@mux/mux-player-react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadVideoToMux } from '@/lib/muxUpload'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -24,7 +25,7 @@ export default function VideoSection({
 }) {
   const [video, setVideo] = useState<Video | null>(initialVideo)
   const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [videoStatus, setVideoStatus] = useState<'uploading' | 'processing' | null>(null)
+  const [videoStatus, setVideoStatus] = useState<string | null>(null)
   const [videoUploadError, setVideoUploadError] = useState<string | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [muxToken, setMuxToken] = useState<string | null>(null)
@@ -42,34 +43,25 @@ export default function VideoSection({
   }, [video?.mux_playback_id])
 
   async function handleVideoUpload(file: File) {
-    setUploadingVideo(true); setVideoUploadError(null); setVideoStatus('uploading')
-    const urlRes = await fetch('/api/mux/upload-url', { method: 'POST' })
-    if (!urlRes.ok) { setVideoUploadError('Failed to get upload URL'); setUploadingVideo(false); setVideoStatus(null); return }
-    const { uploadId, url } = await urlRes.json()
-    const putRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
-    if (!putRes.ok) { setVideoUploadError('Upload to Mux failed'); setUploadingVideo(false); setVideoStatus(null); return }
-    setVideoStatus('processing')
-    let playbackId: string | null = null
-    let assetId: string | null = null
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 3000))
-      const poll = await fetch(`/api/mux/asset/${uploadId}`)
-      const data = await poll.json()
-      if (data.status === 'errored') { setVideoUploadError('Mux processing failed'); setUploadingVideo(false); setVideoStatus(null); return }
-      if (data.playbackId) { playbackId = data.playbackId; assetId = data.assetId; break }
+    setUploadingVideo(true); setVideoUploadError(null); setVideoStatus('Starting…')
+    try {
+      const { assetId, playbackId } = await uploadVideoToMux(file, setVideoStatus)
+      setVideoStatus('Saving…')
+      const supabase = createClient()
+      if (video?.id) {
+        const { error } = await supabase.from('videos').update({ mux_playback_id: playbackId, mux_asset_id: assetId }).eq('id', video.id)
+        if (error) throw new Error('DB update failed: ' + error.message)
+        setVideo({ ...video, mux_playback_id: playbackId, mux_asset_id: assetId })
+      } else {
+        const { data, error } = await supabase.from('videos').insert({ candidate_id: candidateId, mux_playback_id: playbackId, mux_asset_id: assetId }).select('id').single()
+        if (error) throw new Error('DB insert failed: ' + error.message)
+        setVideo({ id: data?.id ?? '', mux_playback_id: playbackId, mux_asset_id: assetId, url: null, transcript: null, created_at: new Date().toISOString() })
+      }
+    } catch (e) {
+      setVideoUploadError(e instanceof Error ? e.message : 'Upload failed — please try again')
+    } finally {
+      setUploadingVideo(false); setVideoStatus(null)
     }
-    if (!playbackId) { setVideoUploadError('Video processing timed out — try again'); setUploadingVideo(false); setVideoStatus(null); return }
-    const supabase = createClient()
-    if (video?.id) {
-      const { error } = await supabase.from('videos').update({ mux_playback_id: playbackId, mux_asset_id: assetId }).eq('id', video.id)
-      if (error) { setVideoUploadError('DB update failed: ' + error.message); setUploadingVideo(false); setVideoStatus(null); return }
-      setVideo({ ...video, mux_playback_id: playbackId, mux_asset_id: assetId })
-    } else {
-      const { error } = await supabase.from('videos').insert({ candidate_id: candidateId, mux_playback_id: playbackId, mux_asset_id: assetId })
-      if (error) { setVideoUploadError('DB insert failed: ' + error.message); setUploadingVideo(false); setVideoStatus(null); return }
-      setVideo({ id: '', mux_playback_id: playbackId, mux_asset_id: assetId, url: null, transcript: null, created_at: new Date().toISOString() })
-    }
-    setUploadingVideo(false); setVideoStatus(null)
   }
 
   const hasVideo = video?.mux_playback_id || video?.url
@@ -80,9 +72,7 @@ export default function VideoSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">Screening video</CardTitle>
           <Button variant="ghost" size="sm" onClick={() => videoFileRef.current?.click()} disabled={uploadingVideo}>
-            {videoStatus === 'uploading' ? 'Uploading…'
-              : videoStatus === 'processing' ? 'Processing…'
-              : hasVideo ? 'Replace video' : 'Upload video'}
+            {videoStatus ?? (hasVideo ? 'Replace video' : 'Upload video')}
           </Button>
         </div>
       </CardHeader>

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadVideoToMux } from '@/lib/muxUpload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,23 +58,8 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
     setError(null); setOpen(false)
   }
 
-  async function uploadToMux(file: File): Promise<{ assetId: string; playbackId: string }> {
-    setUploadProgress('Requesting upload URL…')
-    const res = await fetch('/api/mux/upload-url', { method: 'POST' })
-    const { uploadId, url } = await res.json()
-
-    setUploadProgress('Uploading video…')
-    await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-
-    setUploadProgress('Processing video…')
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 3000))
-      const poll = await fetch(`/api/mux/asset/${uploadId}`)
-      const data = await poll.json()
-      if (data.status === 'ready') return { assetId: data.assetId, playbackId: data.playbackId }
-      if (data.status === 'errored') throw new Error('Mux processing failed')
-    }
-    throw new Error('Timed out waiting for video')
+  function uploadToMux(file: File): Promise<{ assetId: string; playbackId: string }> {
+    return uploadVideoToMux(file, setUploadProgress)
   }
 
   async function handleSubmit(e: React.FormEvent) {
