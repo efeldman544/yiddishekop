@@ -9,11 +9,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export type EmployerOption = {
-  id: string
-  company_name: string | null
-  full_name: string | null
-}
+import { employerLabel, type EmployerOption } from './employerLabel'
+
+export type { EmployerOption }
 
 export type Job = {
   id: string
@@ -56,10 +54,6 @@ const STATUS_BADGE: Record<string, string> = {
   'Filled':  'bg-indigo-100 text-indigo-700 border-indigo-200',
   'On Hold': 'bg-yellow-100 text-yellow-700 border-yellow-200',
   'Closed':  'bg-gray-100 text-gray-500 border-gray-200',
-}
-
-export function employerLabel(emp: EmployerOption) {
-  return emp.company_name || emp.full_name || emp.id
 }
 
 export default function JobsClient({
