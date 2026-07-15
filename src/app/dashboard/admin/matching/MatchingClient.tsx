@@ -106,10 +106,14 @@ export default function MatchingClient({
   jobs,
   candidates,
   initialAssignments,
+  directAssignments = [],
 }: {
   jobs: MatchJob[]
   candidates: MatchCandidate[]
   initialAssignments: { candidate_id: string; job_id: string }[]
+  // Direct candidate→employer assignments (made on the admin candidate page),
+  // shown here so both assignment systems are visible in one place
+  directAssignments?: { employer_id: string; candidate_id: string }[]
 }) {
   // Selected job is mirrored in the URL (?job=<id>) so navigating into a
   // candidate and pressing Back returns you to the same job, not jobs[0].
@@ -136,6 +140,18 @@ export default function MatchingClient({
     () => (selectedJobId ? aiScoresByJob[selectedJobId] : null) ?? {},
     [selectedJobId, aiScoresByJob],
   )
+  const [showAssignedOnly, setShowAssignedOnly] = useState(false)
+
+  // Candidates directly assigned to the selected job's employer (via the admin
+  // candidate page) — surfaced here so both assignment paths are visible
+  const directForEmployer = useMemo(() => {
+    if (!selectedJob?.employer_id) return new Set<string>()
+    return new Set(
+      directAssignments
+        .filter(d => d.employer_id === selectedJob.employer_id)
+        .map(d => d.candidate_id)
+    )
+  }, [selectedJob?.employer_id, directAssignments])
 
   function mergeJobScores(jobId: string, scores: Record<string, AiResult>) {
     setAiScoresByJob(prev => ({ ...prev, [jobId]: { ...prev[jobId], ...scores } }))
@@ -407,14 +423,40 @@ export default function MatchingClient({
                 {sortedCandidates.length} active candidate{sortedCandidates.length !== 1 ? 's' : ''}
                 {hasAiForJob ? ' · AI scored' : aiRunning ? ' · AI analyzing…' : ''}
               </p>
-              <p className="text-[11px] text-gray-400">{assignedCount(selectedJob.id)} assigned</p>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => setShowAssignedOnly(false)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${!showAssignedOnly ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                  All
+                </button>
+                <button type="button" onClick={() => setShowAssignedOnly(true)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${showAssignedOnly ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                  Assigned ({sortedCandidates.filter(c => isAssigned(c.id) || directForEmployer.has(c.id)).length})
+                </button>
+              </div>
             </div>
 
-            {sortedCandidates.length === 0 ? (
-              <div className="text-sm text-gray-400 py-12 text-center">No active candidates yet.</div>
+            {(() => {
+              // Until AI scores exist for this job, showing the rule-scored list
+              // just flashes an order that reshuffles seconds later — hold on the
+              // analyzing state and go straight to the AI-ranked list instead
+              if (aiRunning && !hasAiForJob) {
+                return (
+                  <div className="py-16 text-center space-y-2">
+                    <p className="text-sm text-gray-500">AI is ranking {sortedCandidates.length} candidates…</p>
+                    <p className="text-xs text-gray-400">Usually takes under a minute for large pools.</p>
+                  </div>
+                )
+              }
+              const visibleCandidates = showAssignedOnly
+                ? sortedCandidates.filter(c => isAssigned(c.id) || directForEmployer.has(c.id))
+                : sortedCandidates
+              return visibleCandidates.length === 0 ? (
+              <div className="text-sm text-gray-400 py-12 text-center">
+                {showAssignedOnly ? 'No candidates assigned to this job yet.' : 'No active candidates yet.'}
+              </div>
             ) : (
               <div className="space-y-2.5">
-                {sortedCandidates.map(c => {
+                {visibleCandidates.map(c => {
                   const assigned = isAssigned(c.id)
                   const key = `${c.id}-${selectedJobId}`
                   const ai = aiScores[c.id] ?? null
@@ -443,6 +485,9 @@ export default function MatchingClient({
                               )}
                               {assigned && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Assigned</span>
+                              )}
+                              {directForEmployer.has(c.id) && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-cyan-50 text-cyan-700 border-cyan-200">Assigned to employer</span>
                               )}
                               {ai && !ai.triageOnly && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">AI scored</span>
@@ -528,7 +573,7 @@ export default function MatchingClient({
                   )
                 })}
               </div>
-            )}
+            )})()}
           </div>
         )}
       </div>

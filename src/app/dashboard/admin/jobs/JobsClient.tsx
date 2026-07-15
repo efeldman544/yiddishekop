@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,6 +74,9 @@ export default function JobsClient({
   const [employerAccounts, setEmployerAccounts] = useState<{id: string; full_name: string | null; email: string | null; created_at: string}[] | null>(null)
   const [loadingEmployers, setLoadingEmployers] = useState(false)
   const [employerPanelOpen, setEmployerPanelOpen] = useState(false)
+  const [expandedEmployer, setExpandedEmployer] = useState<string | null>(null)
+  const [employerAssigned, setEmployerAssigned] = useState<Record<string, { id: string; name: string; via: string; source: 'profile' | 'video' }[]>>({})
+  const [loadingAssigned, setLoadingAssigned] = useState<string | null>(null)
   const [employerForm, setEmployerForm] = useState({ full_name: '', email: '', company_name: '' })
   const [employerError, setEmployerError] = useState<string | null>(null)
   const [creatingEmployer, setCreatingEmployer] = useState(false)
@@ -108,6 +111,53 @@ export default function JobsClient({
       .order('full_name')
     setEmployerAccounts(data ?? [])
     setLoadingEmployers(false)
+  }
+
+  // Everyone assigned to this employer: directly (employer_candidate_assignments)
+  // and via their jobs (candidate_job_assignments → job_requirements)
+  async function toggleEmployerAssigned(empId: string) {
+    if (expandedEmployer === empId) { setExpandedEmployer(null); return }
+    setExpandedEmployer(empId)
+    if (employerAssigned[empId]) return
+    setLoadingAssigned(empId)
+    const supabase = createClient()
+    const [{ data: direct }, { data: empJobs }] = await Promise.all([
+      supabase.from('employer_candidate_assignments').select('candidate_id').eq('employer_id', empId),
+      supabase.from('job_requirements').select('id, job_title').eq('employer_id', empId),
+    ])
+    const jobIds = (empJobs ?? []).map(j => j.id)
+    const { data: jobAsg } = jobIds.length > 0
+      ? await supabase.from('candidate_job_assignments').select('candidate_id, job_id').in('job_id', jobIds)
+      : { data: [] as { candidate_id: string; job_id: string }[] }
+    const candidateIds = [...new Set([
+      ...(direct ?? []).map(d => d.candidate_id),
+      ...(jobAsg ?? []).map(a => a.candidate_id),
+    ])]
+    const names: Record<string, { name: string; source: 'profile' | 'video' }> = {}
+    if (candidateIds.length > 0) {
+      const [{ data: cps }, { data: vcs }] = await Promise.all([
+        supabase.from('candidate_profiles').select('id, full_name').in('id', candidateIds),
+        supabase.from('video_candidates').select('id, name').in('id', candidateIds),
+      ])
+      for (const c of cps ?? []) names[c.id] = { name: c.full_name ?? 'Unnamed', source: 'profile' }
+      for (const v of vcs ?? []) names[v.id] = { name: v.name, source: 'video' }
+    }
+    const jobTitleMap: Record<string, string> = {}
+    for (const j of empJobs ?? []) jobTitleMap[j.id] = j.job_title
+    const rows: { id: string; name: string; via: string; source: 'profile' | 'video' }[] = []
+    const seen = new Set<string>()
+    for (const a of jobAsg ?? []) {
+      if (seen.has(a.candidate_id)) continue
+      seen.add(a.candidate_id)
+      rows.push({ id: a.candidate_id, name: names[a.candidate_id]?.name ?? 'Unknown', via: jobTitleMap[a.job_id] ?? 'Job', source: names[a.candidate_id]?.source ?? 'profile' })
+    }
+    for (const d of direct ?? []) {
+      if (seen.has(d.candidate_id)) continue
+      seen.add(d.candidate_id)
+      rows.push({ id: d.candidate_id, name: names[d.candidate_id]?.name ?? 'Unknown', via: 'Direct', source: names[d.candidate_id]?.source ?? 'profile' })
+    }
+    setEmployerAssigned(prev => ({ ...prev, [empId]: rows }))
+    setLoadingAssigned(null)
   }
 
   function openNewEmployer() {
@@ -310,17 +360,52 @@ export default function JobsClient({
                       <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Name</th>
                       <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Email</th>
                       <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Joined</th>
+                      <th className="px-5 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {(employerAccounts ?? []).map(emp => (
-                      <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="px-5 py-3.5 font-semibold text-gray-950 text-[13px]">{emp.full_name ?? '—'}</td>
-                        <td className="px-5 py-3.5 text-gray-500 text-[13px]">{emp.email ?? '—'}</td>
-                        <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
-                          {new Date(emp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </td>
-                      </tr>
+                      <React.Fragment key={emp.id}>
+                        <tr className="hover:bg-gray-50/60 transition-colors">
+                          <td className="px-5 py-3.5 font-semibold text-gray-950 text-[13px]">{emp.full_name ?? '—'}</td>
+                          <td className="px-5 py-3.5 text-gray-500 text-[13px]">{emp.email ?? '—'}</td>
+                          <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
+                            {new Date(emp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Button variant="ghost" size="sm" onClick={() => toggleEmployerAssigned(emp.id)}>
+                              {expandedEmployer === emp.id ? 'Hide assigned' : 'View assigned'}
+                            </Button>
+                          </td>
+                        </tr>
+                        {expandedEmployer === emp.id && (
+                          <tr className="bg-gray-50/60">
+                            <td colSpan={4} className="px-5 py-3">
+                              {loadingAssigned === emp.id ? (
+                                <p className="text-xs text-gray-400">Loading…</p>
+                              ) : (employerAssigned[emp.id] ?? []).length === 0 ? (
+                                <p className="text-xs text-gray-400">No candidates assigned to this employer yet.</p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {(employerAssigned[emp.id] ?? []).map(c => (
+                                    <div key={c.id} className="flex items-center gap-2">
+                                      <a
+                                        href={c.source === 'video' ? `/dashboard/admin/video-candidates/${c.id}` : `/dashboard/admin/candidates/${c.id}`}
+                                        className="text-[13px] font-medium text-gray-900 hover:underline underline-offset-2"
+                                      >
+                                        {c.name}
+                                      </a>
+                                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${c.via === 'Direct' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                                        {c.via}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
