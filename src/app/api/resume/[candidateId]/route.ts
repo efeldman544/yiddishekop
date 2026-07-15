@@ -183,20 +183,31 @@ export async function GET(
     .single<{ role: string }>()
 
   if (profile?.role === 'employer') {
+    // Authorized if the candidate reaches this employer either via one of
+    // their jobs (candidate_job_assignments) or via a direct admin assignment
+    // (employer_candidate_assignments) — mirrors what the employer portal shows
     const { data: myJobs } = await supabase
       .from('job_requirements')
       .select('id')
       .eq('employer_id', user.id)
     const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
-    const { data: assignment } = jobIds.length > 0
-      ? await supabase
-          .from('candidate_job_assignments')
-          .select('id')
-          .in('job_id', jobIds)
-          .eq('candidate_id', candidateId)
-          .maybeSingle()
-      : { data: null }
-    if (!assignment) return new NextResponse('Forbidden', { status: 403 })
+    const [{ data: assignment }, { data: directAssignment }] = await Promise.all([
+      jobIds.length > 0
+        ? supabase
+            .from('candidate_job_assignments')
+            .select('id')
+            .in('job_id', jobIds)
+            .eq('candidate_id', candidateId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('employer_candidate_assignments')
+        .select('id')
+        .eq('employer_id', user.id)
+        .eq('candidate_id', candidateId)
+        .maybeSingle(),
+    ])
+    if (!assignment && !directAssignment) return new NextResponse('Forbidden', { status: 403 })
   } else if (profile?.role !== 'admin') {
     return new NextResponse('Forbidden', { status: 403 })
   }
