@@ -16,7 +16,11 @@ export default async function AdminMatchingPage({
   const [{ data: jobData }, { data: candidateData }, { data: assignmentData }, { data: videoData }] = await Promise.all([
     supabase
       .from('job_requirements')
-      .select('id, job_title, employment_type, languages, description, status, company_name, employer_id, employer_profiles(company_name)')
+      // No employer_profiles(...) embed here: that join resolved through the
+      // old employer_id → employer_profiles FK; the FK now points at profiles,
+      // so the embed errors and the whole query returns nothing. Company names
+      // are batch-fetched below instead.
+      .select('id, job_title, employment_type, languages, description, status, company_name, employer_id')
       .in('status', ['New', 'Open', 'On Hold'])
       .order('created_at', { ascending: false }),
     supabase
@@ -34,16 +38,18 @@ export default async function AdminMatchingPage({
   ])
 
   // Resolve company name: job's own field → employer profile's company → employer's full name
-  const missingNameEmployerIds = (jobData ?? [])
-    .filter((j: any) => !j.company_name && !j.employer_profiles?.company_name && j.employer_id)
-    .map((j: any) => j.employer_id)
+  const employerIds = [...new Set((jobData ?? []).map((j: any) => j.employer_id).filter(Boolean))] as string[]
+  const companyMap: Record<string, string> = {}
   const employerNameMap: Record<string, string> = {}
-  if (missingNameEmployerIds.length > 0) {
-    const { data: employerProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', missingNameEmployerIds)
-    for (const p of employerProfiles ?? []) {
+  if (employerIds.length > 0) {
+    const [{ data: employerProfiles }, { data: employerAccounts }] = await Promise.all([
+      supabase.from('employer_profiles').select('id, company_name').in('id', employerIds),
+      supabase.from('profiles').select('id, full_name').in('id', employerIds),
+    ])
+    for (const e of employerProfiles ?? []) {
+      if (e.company_name) companyMap[e.id] = e.company_name
+    }
+    for (const p of employerAccounts ?? []) {
       if (p.full_name) employerNameMap[p.id] = p.full_name
     }
   }
@@ -58,7 +64,7 @@ export default async function AdminMatchingPage({
     employer_id: j.employer_id,
     company_name:
       j.company_name
-      || j.employer_profiles?.company_name
+      || (j.employer_id ? companyMap[j.employer_id] : null)
       || (j.employer_id ? employerNameMap[j.employer_id] : null)
       || null,
   }))
