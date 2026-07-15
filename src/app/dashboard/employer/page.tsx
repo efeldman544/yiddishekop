@@ -45,14 +45,23 @@ export default function EmployerDashboard() {
 
       setEmployerName(profile?.full_name ?? null)
       const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
-      if (jobIds.length === 0) { setLoading(false); return }
 
-      const { data: assignments } = await supabase
-        .from('candidate_job_assignments').select('id, candidate_id, action').in('job_id', jobIds)
+      // Candidates reach an employer two ways: via a job (candidate_job_assignments
+      // → their job) or assigned directly by an admin on the candidate page
+      // (employer_candidate_assignments). Show both.
+      const [{ data: assignments }, { data: directAssignments }] = await Promise.all([
+        jobIds.length > 0
+          ? supabase.from('candidate_job_assignments').select('id, candidate_id, action').in('job_id', jobIds)
+          : Promise.resolve({ data: [] as { id: string; candidate_id: string; action: string | null }[] }),
+        supabase.from('employer_candidate_assignments').select('id, candidate_id, action').eq('employer_id', user.id),
+      ])
 
       const actionMap: Record<string, { action: string | null; assignmentId: string }> = {}
       for (const a of assignments ?? []) {
         if (!(a.candidate_id in actionMap)) actionMap[a.candidate_id] = { action: a.action, assignmentId: a.id }
+      }
+      for (const a of directAssignments ?? []) {
+        if (!(a.candidate_id in actionMap)) actionMap[a.candidate_id] = { action: a.action ?? null, assignmentId: a.id }
       }
 
       const candidateIds = Object.keys(actionMap)
@@ -83,6 +92,10 @@ export default function EmployerDashboard() {
     const supabase = createClient()
     const channel = supabase.channel('employer-assignment-sync')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'candidate_job_assignments' }, (payload) => {
+        const row = payload.new as { id: string; candidate_id: string; action: string | null }
+        setCandidates(prev => prev.map(c => c.id === row.candidate_id ? { ...c, action: row.action } : c))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'employer_candidate_assignments' }, (payload) => {
         const row = payload.new as { id: string; candidate_id: string; action: string | null }
         setCandidates(prev => prev.map(c => c.id === row.candidate_id ? { ...c, action: row.action } : c))
       })

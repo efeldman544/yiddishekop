@@ -62,6 +62,14 @@ export default function MeetingsClient() {
       .eq('action', 'request_meeting')
       .order('created_at', { ascending: false })
 
+    // Meeting requests can also come from direct candidate→employer
+    // assignments (made on the admin candidate page)
+    const { data: directRequests } = await supabase
+      .from('employer_candidate_assignments')
+      .select('id, candidate_id, employer_id, action, created_at, proposed_times')
+      .eq('action', 'request_meeting')
+      .order('created_at', { ascending: false })
+
     const { data: meetings } = await supabase
       .from('meeting_requests')
       .select('id, assignment_id, candidate_id, employer_id, scheduled_at, meeting_link')
@@ -75,21 +83,26 @@ export default function MeetingsClient() {
     const scheduledAssignmentIds = new Set((meetings ?? []).map((m: any) => m.assignment_id))
 
     const pendingAssignments = (assignments ?? []).filter((a: any) => !scheduledAssignmentIds.has(a.id))
+    const pendingDirect = (directRequests ?? []).filter((a: any) => !scheduledAssignmentIds.has(a.id))
 
-    if (pendingAssignments.length === 0 && (meetings ?? []).length === 0 && (screeningData ?? []).length === 0) {
+    if (pendingAssignments.length === 0 && pendingDirect.length === 0 && (meetings ?? []).length === 0 && (screeningData ?? []).length === 0) {
       setLoading(false)
       return
     }
 
     const candidateIds = [...new Set([
       ...pendingAssignments.map((a: any) => a.candidate_id),
+      ...pendingDirect.map((a: any) => a.candidate_id),
       ...(meetings ?? []).map((m: any) => m.candidate_id),
       ...(screeningData ?? []).map((s: any) => s.candidate_id),
     ])]
 
     const jobIds = [...new Set(pendingAssignments.map((a: any) => a.job_id))]
 
-    const employerIds = [...new Set((meetings ?? []).map((m: any) => m.employer_id))]
+    const employerIds = [...new Set([
+      ...(meetings ?? []).map((m: any) => m.employer_id),
+      ...pendingDirect.map((a: any) => a.employer_id),
+    ])]
 
     const [{ data: candidateProfiles }, { data: jobs }] = await Promise.all([
       candidateIds.length > 0
@@ -118,16 +131,28 @@ export default function MeetingsClient() {
     const jobMap: Record<string, { title: string; employerId: string }> = {}
     for (const j of jobs ?? []) jobMap[j.id] = { title: j.job_title, employerId: j.employer_id }
 
-    setPending(pendingAssignments.map((a: any) => ({
-      assignmentId: a.id,
-      candidateId: a.candidate_id,
-      employerId: jobMap[a.job_id]?.employerId ?? '',
-      candidateName: candidateMap[a.candidate_id] ?? 'Unknown',
-      employerName: employerMap[jobMap[a.job_id]?.employerId ?? ''] ?? 'Unknown',
-      jobTitle: jobMap[a.job_id]?.title ?? 'Unknown role',
-      requestedAt: a.created_at,
-      proposedTimes: a.proposed_times ?? [],
-    })))
+    setPending([
+      ...pendingAssignments.map((a: any) => ({
+        assignmentId: a.id,
+        candidateId: a.candidate_id,
+        employerId: jobMap[a.job_id]?.employerId ?? '',
+        candidateName: candidateMap[a.candidate_id] ?? 'Unknown',
+        employerName: employerMap[jobMap[a.job_id]?.employerId ?? ''] ?? 'Unknown',
+        jobTitle: jobMap[a.job_id]?.title ?? 'Unknown role',
+        requestedAt: a.created_at,
+        proposedTimes: a.proposed_times ?? [],
+      })),
+      ...pendingDirect.map((a: any) => ({
+        assignmentId: a.id,
+        candidateId: a.candidate_id,
+        employerId: a.employer_id,
+        candidateName: candidateMap[a.candidate_id] ?? 'Unknown',
+        employerName: employerMap[a.employer_id] ?? 'Unknown',
+        jobTitle: 'Direct match',
+        requestedAt: a.created_at,
+        proposedTimes: a.proposed_times ?? [],
+      })),
+    ])
 
     setScheduled((meetings ?? []).map((m: any) => ({
       id: m.id,
