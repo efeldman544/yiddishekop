@@ -171,17 +171,21 @@ export default function AdminDashboard() {
       const supabase = createClient()
       const { data } = await supabase
         .from('job_requirements')
-        .select('id, job_title, status, employer_profiles(company_name), employer_id')
+        // No employer_profiles(...) embed: it resolved through the old
+        // employer_id → employer_profiles FK, which now points at profiles
+        .select('id, job_title, status, employer_id')
         .in('status', ['Open', 'On Hold'])
         .order('created_at', { ascending: false })
 
       const profileIds = (data ?? []).map((j: any) => j.employer_id).filter(Boolean)
-      let profileMap: Record<string, string> = {}
+      const companyMap: Record<string, string> = {}
+      const profileMap: Record<string, string> = {}
       if (profileIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', profileIds)
+        const [{ data: eps }, { data: profiles }] = await Promise.all([
+          supabase.from('employer_profiles').select('id, company_name').in('id', profileIds),
+          supabase.from('profiles').select('id, full_name').in('id', profileIds),
+        ])
+        for (const e of eps ?? []) { if (e.company_name) companyMap[e.id] = e.company_name }
         for (const p of profiles ?? []) profileMap[p.id] = p.full_name ?? ''
       }
 
@@ -189,7 +193,7 @@ export default function AdminDashboard() {
         id: j.id,
         job_title: j.job_title,
         status: j.status,
-        employer_label: j.employer_profiles?.company_name || profileMap[j.employer_id] || 'Unknown',
+        employer_label: companyMap[j.employer_id] || profileMap[j.employer_id] || 'Unknown',
       })))
     }
     loadJobs()
