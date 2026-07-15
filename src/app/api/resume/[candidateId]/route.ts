@@ -191,23 +191,28 @@ export async function GET(
       .select('id')
       .eq('employer_id', user.id)
     const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
-    const [{ data: assignment }, { data: directAssignment }] = await Promise.all([
+    // limit(1) + length check, NOT maybeSingle(): maybeSingle() errors out
+    // (data = null) when the candidate is assigned more than once — e.g. on
+    // two of the employer's jobs — which read as Forbidden for legitimate access
+    const [{ data: jobAssignments }, { data: directAssignments }] = await Promise.all([
       jobIds.length > 0
         ? supabase
             .from('candidate_job_assignments')
             .select('id')
             .in('job_id', jobIds)
             .eq('candidate_id', candidateId)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
+            .limit(1)
+        : Promise.resolve({ data: [] as { id: string }[] }),
       supabase
         .from('employer_candidate_assignments')
         .select('id')
         .eq('employer_id', user.id)
         .eq('candidate_id', candidateId)
-        .maybeSingle(),
+        .limit(1),
     ])
-    if (!assignment && !directAssignment) return new NextResponse('Forbidden', { status: 403 })
+    if (!jobAssignments?.length && !directAssignments?.length) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
   } else if (profile?.role !== 'admin') {
     return new NextResponse('Forbidden', { status: 403 })
   }
