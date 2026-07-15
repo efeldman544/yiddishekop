@@ -332,11 +332,16 @@ export default function AdminDashboard() {
     const isAssigned = (jobAssignments[candidateId] ?? []).includes(jobId)
 
     if (isAssigned) {
-      await supabase
+      const { error: deleteErr } = await supabase
         .from('candidate_job_assignments')
         .delete()
         .eq('candidate_id', candidateId)
         .eq('job_id', jobId)
+      if (deleteErr) {
+        alert(`Couldn't remove assignment: ${deleteErr.message}`)
+        setTogglingAssign(null)
+        return
+      }
       setJobAssignments(prev => ({
         ...prev,
         [candidateId]: (prev[candidateId] ?? []).filter(id => id !== jobId),
@@ -345,7 +350,11 @@ export default function AdminDashboard() {
       const { error: insertErr } = await supabase
         .from('candidate_job_assignments')
         .insert({ candidate_id: candidateId, job_id: jobId })
-      if (insertErr) { setTogglingAssign(null); return }
+      if (insertErr) {
+        alert(`Couldn't save assignment: ${insertErr.message}`)
+        setTogglingAssign(null)
+        return
+      }
       setJobAssignments(prev => ({
         ...prev,
         [candidateId]: [...(prev[candidateId] ?? []), jobId],

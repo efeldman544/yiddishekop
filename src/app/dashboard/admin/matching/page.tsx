@@ -13,7 +13,7 @@ export default async function AdminMatchingPage({
 
   const supabase = await createClient()
 
-  const [{ data: jobData }, { data: candidateData }, { data: assignmentData }, { data: videoData }] = await Promise.all([
+  const [{ data: jobData }, { data: candidateData }, { data: assignmentData }, { data: videoData }, { data: directAssignmentData }] = await Promise.all([
     supabase
       .from('job_requirements')
       // No employer_profiles(...) embed here: that join resolved through the
@@ -35,6 +35,9 @@ export default async function AdminMatchingPage({
       .from('video_candidates')
       .select('id, name, location, current_job_title, fields_worked_in, employment_type')
       .order('created_at', { ascending: false }),
+    supabase
+      .from('employer_candidate_assignments')
+      .select('employer_id, candidate_id'),
   ])
 
   // Resolve company name: job's own field → employer profile's company → employer's full name
@@ -102,6 +105,7 @@ export default async function AdminMatchingPage({
           jobs={jobs}
           candidates={[...regularCandidates, ...videoCandidates]}
           initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
+          directAssignments={(directAssignmentData ?? []) as { employer_id: string; candidate_id: string }[]}
         />
       )}
     </div>
