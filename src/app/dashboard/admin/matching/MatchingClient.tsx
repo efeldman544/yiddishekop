@@ -307,13 +307,23 @@ export default function MatchingClient({
     const key = `${candidateId}-${selectedJobId}`
     setToggling(key)
     const supabase = createClient()
+    // Only update UI state after the DB write succeeds — an optimistic flip
+    // that swallows the error shows "Assigned ✓" that silently vanishes on reload
     if (isAssigned(candidateId)) {
-      await supabase.from('candidate_job_assignments').delete()
+      const { error } = await supabase.from('candidate_job_assignments').delete()
         .eq('candidate_id', candidateId).eq('job_id', selectedJobId)
-      setAssignments(prev => prev.filter(a => !(a.candidate_id === candidateId && a.job_id === selectedJobId)))
+      if (error) {
+        setAiError(`Couldn't remove assignment: ${error.message}`)
+      } else {
+        setAssignments(prev => prev.filter(a => !(a.candidate_id === candidateId && a.job_id === selectedJobId)))
+      }
     } else {
-      await supabase.from('candidate_job_assignments').insert({ candidate_id: candidateId, job_id: selectedJobId })
-      setAssignments(prev => [...prev, { candidate_id: candidateId, job_id: selectedJobId }])
+      const { error } = await supabase.from('candidate_job_assignments').insert({ candidate_id: candidateId, job_id: selectedJobId })
+      if (error) {
+        setAiError(`Couldn't save assignment: ${error.message}`)
+      } else {
+        setAssignments(prev => [...prev, { candidate_id: candidateId, job_id: selectedJobId }])
+      }
     }
     setToggling(null)
   }
