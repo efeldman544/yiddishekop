@@ -305,20 +305,25 @@ export default function VideosPage() {
     const total = videoCandidates.length
 
     try {
-      const res = await fetch('/api/admin/ai-name-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoCandidates: videoCandidates.map(vc => ({ id: vc.id, name: cleanFolderName(vc.name) || vc.name })),
-        }),
-      })
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        setRematchResult(`AI matching failed (${res.status})${text ? ': ' + text : ''}`)
-        return
-      }
-      const { results } = await res.json() as {
-        results: { videoId: string; candidateId: string | null; confidence: 'high' | 'medium' | 'low' | 'none'; reason: string }[]
+      // Chunked: one big request for all entries exceeds the serverless time
+      // limit and 500s — batches keep each request well under it
+      const entries = videoCandidates.map(vc => ({ id: vc.id, name: cleanFolderName(vc.name) || vc.name }))
+      const CHUNK = 15
+      const results: { videoId: string; candidateId: string | null; confidence: 'high' | 'medium' | 'low' | 'none'; reason: string }[] = []
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        setRematchResult(`AI matching ${Math.min(i + CHUNK, entries.length)} of ${entries.length}…`)
+        const res = await fetch('/api/admin/ai-name-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoCandidates: entries.slice(i, i + CHUNK) }),
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          setRematchResult(`AI matching failed (${res.status})${text ? ': ' + text : ''}`)
+          return
+        }
+        const json = await res.json() as { results: typeof results }
+        results.push(...json.results)
       }
 
       const profileById: Record<string, CandidateOption> = {}
