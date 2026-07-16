@@ -72,6 +72,20 @@ export async function POST(req: Request) {
     return new Response('No MP4 recording found in payload', { status: 400 })
   }
 
+  const supabase = adminClient()
+
+  // Zoom retries webhooks that don't answer within a few seconds, and this
+  // handler does slow work (Mux ingest, AI matching) — dedupe by meeting id so
+  // a retry never ingests the same recording twice
+  const { data: alreadySaved } = await supabase
+    .from('videos')
+    .select('id')
+    .eq('zoom_meeting_id', meetingId)
+    .limit(1)
+  if (alreadySaved?.length) {
+    return new Response('Already processed', { status: 200 })
+  }
+
   // 5. Fetch transcript text if available (VTT file, small enough to download here)
   const transcriptFile = recordingFiles.find((f) => f.file_type === 'TRANSCRIPT')
   let transcriptText: string | null = null
@@ -82,51 +96,75 @@ export async function POST(req: Request) {
     } catch {}
   }
 
-  // 6. Get Zoom OAuth token
-  const tokenRes = await fetch(
-    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${process.env.ZOOM_ACCOUNT_ID}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + Buffer.from(`${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`).toString('base64'),
-      },
-    }
-  )
-  const { access_token } = await tokenRes.json()
-
-  // 7. Fetch past meeting participants to find the candidate
-  const participantsRes = await fetch(
-    `https://api.zoom.us/v2/past_meetings/${meetingId}/participants`,
-    { headers: { Authorization: `Bearer ${access_token}` } }
-  )
-  const participantsData = await participantsRes.json()
-  const participants: { email?: string; user_email?: string; name?: string }[] = participantsData.participants ?? []
-
-  const hostEmail: string = object.host_email ?? ''
-  const nonHostParticipants = participants.filter(p => {
-    const email = p.email || p.user_email || ''
-    return email.toLowerCase() !== hostEmail.toLowerCase()
-  })
-
-  const supabase = adminClient()
   let candidateId: string | null = null
 
-  // 8a. Fallback 1 — match by participant email
-  const candidateEmail = nonHostParticipants
-    .map(p => p.email || p.user_email || '')
-    .find(email => email)
+  // 6. Match tier 1 — the deterministic link. When the screening call was
+  // booked through Calendly, the calendly webhook already stored
+  // zoom_meeting_id → candidate_id in screening_bookings. If that row exists,
+  // we KNOW who this recording belongs to — no guessing.
+  const { data: bookings } = await supabase
+    .from('screening_bookings')
+    .select('candidate_id')
+    .eq('zoom_meeting_id', meetingId)
+    .limit(1)
+  if (bookings?.[0]?.candidate_id) candidateId = bookings[0].candidate_id
 
-  if (candidateEmail) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', candidateEmail.toLowerCase())
-      .eq('role', 'candidate')
-      .single()
-    if (data?.id) candidateId = data.id
+  // 7. Fetch past meeting participants (used by tiers 2–4). Tolerate failure —
+  // matching falls through to the meeting topic.
+  let nonHostParticipants: { email?: string; user_email?: string; name?: string }[] = []
+  if (!candidateId) {
+    try {
+      const tokenRes = await fetch(
+        `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${process.env.ZOOM_ACCOUNT_ID}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Basic ' + Buffer.from(`${process.env.ZOOM_CLIENT_ID}:${process.env.ZOOM_CLIENT_SECRET}`).toString('base64'),
+          },
+        }
+      )
+      const { access_token } = await tokenRes.json()
+      const participantsRes = await fetch(
+        `https://api.zoom.us/v2/past_meetings/${meetingId}/participants`,
+        { headers: { Authorization: `Bearer ${access_token}` } }
+      )
+      const participantsData = await participantsRes.json()
+      const participants: { email?: string; user_email?: string; name?: string }[] = participantsData.participants ?? []
+      const hostEmail: string = object.host_email ?? ''
+      nonHostParticipants = participants.filter(p => {
+        const email = p.email || p.user_email || ''
+        return email.toLowerCase() !== hostEmail.toLowerCase()
+      })
+    } catch {
+      // participants unavailable — tiers below use what they have
+    }
   }
 
-  // 8b. Fallback 2 — match by participant display name
+  // 8a. Match tier 2 — participant emails (all of them, case-insensitive,
+  // against both profiles and candidate_profiles)
+  if (!candidateId) {
+    const emails = nonHostParticipants
+      .map(p => (p.email || p.user_email || '').trim())
+      .filter(Boolean)
+    for (const email of emails) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', email)
+        .eq('role', 'candidate')
+        .limit(1)
+      if (prof?.[0]?.id) { candidateId = prof[0].id; break }
+      const { data: cp } = await supabase
+        .from('candidate_profiles')
+        .select('id')
+        .ilike('email', email)
+        .limit(1)
+      if (cp?.[0]?.id) { candidateId = cp[0].id; break }
+    }
+  }
+
+  // 8b. Match tier 3 — exact display-name match (all participants;
+  // limit(1) instead of single() so multiple same-named rows don't error out)
   if (!candidateId) {
     for (const p of nonHostParticipants) {
       if (!p.name) continue
@@ -134,13 +172,40 @@ export async function POST(req: Request) {
         .from('candidate_profiles')
         .select('id')
         .ilike('full_name', p.name.trim())
-        .single()
-      if (data?.id) { candidateId = data.id; break }
+        .limit(1)
+      if (data?.[0]?.id) { candidateId = data[0].id; break }
     }
   }
 
-  // 8c. Fallback 3 — save as unassigned so admin can manually link it
-  // candidateId stays null, recording still gets saved
+  // 8c. Match tier 4 — AI name match on participant display names + meeting
+  // topic (handles nicknames/transliterations). Only a high-confidence match
+  // auto-attaches; anything less stays unassigned for admin review.
+  if (!candidateId) {
+    const nameHints = [
+      ...nonHostParticipants.map(p => p.name?.trim()).filter(Boolean),
+      object.topic ? `meeting topic: ${object.topic}` : null,
+    ].filter(Boolean).join(' | ')
+    if (nameHints) {
+      try {
+        const { data: allProfiles } = await supabase
+          .from('candidate_profiles')
+          .select('id, full_name')
+          .order('full_name')
+        const { aiMatchNamesToCandidates } = await import('@/lib/aiNameMatch')
+        const results = await aiMatchNamesToCandidates(
+          [{ id: 'recording', name: nameHints }],
+          (allProfiles ?? []) as { id: string; full_name: string | null }[],
+        )
+        if (results[0]?.confidence === 'high' && results[0].candidateId) {
+          candidateId = results[0].candidateId
+        }
+      } catch {
+        // AI unavailable — recording stays unassigned for manual review
+      }
+    }
+  }
+
+  // 8d. No match — save as unassigned so admin can link it on the Videos page
 
   // 9. Send to Mux for permanent storage (Zoom download tokens expire ~60 min)
   const mp4Url = `${mp4File.download_url}?access_token=${download_token}`
