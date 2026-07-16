@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import AddCandidatesPanel from './AddCandidatesPanel'
 
 type Candidate = {
   id: string
@@ -389,7 +390,10 @@ export default function AdminDashboard() {
 
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Candidates</h1>
-          <span className="text-sm text-gray-400">{candidates.length} total</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-400">{candidates.length} total</span>
+            <AddCandidatesPanel onAdded={fetchCandidates} />
+          </div>
         </div>
 
         {/* Search */}
