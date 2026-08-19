@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { INDUSTRIES, EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
 
 const CSV_COLUMNS = [
   'full_name', 'email', 'phone', 'whatsapp', 'location', 'current_job_title',
@@ -51,7 +52,7 @@ function parseCsv(text: string): string[][] {
 type FormState = {
   full_name: string; email: string; phone: string; whatsapp: string; location: string
   current_job_title: string; education_level: string; years_experience: string
-  fields_worked_in: string; tools_software: string; languages: string; roles_seeking: string
+  fields_worked_in: string[]; tools_software: string; languages: string; roles_seeking: string
   employment_type: string[]; desired_salary: string; currency: string
   us_hours_comfortable: boolean; remote_experience: boolean; resume_url: string
 }
@@ -59,7 +60,7 @@ type FormState = {
 const EMPTY: FormState = {
   full_name: '', email: '', phone: '', whatsapp: '', location: '',
   current_job_title: '', education_level: '', years_experience: '',
-  fields_worked_in: '', tools_software: '', languages: '', roles_seeking: '',
+  fields_worked_in: [], tools_software: '', languages: '', roles_seeking: '',
   employment_type: [], desired_salary: '', currency: 'USD',
   us_hours_comfortable: false, remote_experience: false, resume_url: '',
 }
@@ -229,8 +230,20 @@ export default function AddCandidatesPanel({ onAdded }: { onAdded: () => void })
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Industries <span className="text-xs font-normal text-muted-foreground">— separate with ;</span></Label>
-                    <Input value={form.fields_worked_in} onChange={e => set('fields_worked_in', e.target.value)} placeholder="Accounting & Finance; Customer Service" />
+                    <Label>Industries</Label>
+                    <p className="text-xs text-muted-foreground">Used by matching and the industry filter.</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-1 max-h-56 overflow-y-auto rounded-lg border border-border p-3">
+                      {INDUSTRIES.map(ind => (
+                        <label key={ind} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={form.fields_worked_in.includes(ind)}
+                            onCheckedChange={checked => set('fields_worked_in',
+                              checked ? [...form.fields_worked_in, ind] : form.fields_worked_in.filter(x => x !== ind))}
+                          />
+                          <span className="leading-tight">{ind}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Tools &amp; software</Label>
@@ -249,7 +262,7 @@ export default function AddCandidatesPanel({ onAdded }: { onAdded: () => void })
                   <div className="space-y-1.5">
                     <Label>Employment type</Label>
                     <div className="flex gap-4">
-                      {['Full Time', 'Part Time', 'Contract'].map(t => (
+                      {EMPLOYMENT_TYPES.map(t => (
                         <label key={t} className="flex items-center gap-2 text-sm">
                           <Checkbox
                             checked={form.employment_type.includes(t)}

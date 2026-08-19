@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import AddCandidatesPanel from './AddCandidatesPanel'
+import { INDUSTRIES as SHARED_INDUSTRIES } from '@/lib/candidateOptions'
 
 type Candidate = {
   id: string
@@ -31,16 +32,7 @@ type JobOption = {
   employer_label: string
 }
 
-const INDUSTRIES = [
-  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
-  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
-  'Education & Training', 'Engineering', 'Healthcare & Medical',
-  'Hospitality & Travel', 'Human Resources', 'Information Technology',
-  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
-  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
-  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
-  'Sales & Business Development', 'Technology & Software', 'Other',
-]
+const INDUSTRIES: readonly string[] = SHARED_INDUSTRIES
 
 // Candidates filled out `fields_worked_in` under earlier, differently-worded category
 // lists before the current set was adopted. `legacyAliases` maps each current category
