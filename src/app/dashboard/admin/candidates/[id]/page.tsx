@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoSection, { type Video } from './VideoSection'
 import AdminControls, { type Employer } from './AdminControls'
 import BackButton from './BackButton'
+import EditCandidatePanel from './EditCandidatePanel'
+import ResumeSection from './ResumeSection'
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
@@ -55,7 +57,10 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
                 ))}
               </div>
             </div>
-            <Badge variant="outline" className="capitalize">{cp.status ?? 'active'}</Badge>
+            <div className="flex items-center gap-3 shrink-0">
+              <Badge variant="outline" className="capitalize">{cp.status ?? 'active'}</Badge>
+              <EditCandidatePanel candidate={cp} />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -92,17 +97,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
             </CardContent>
           </Card>
 
-          {cp.resume_url && (
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Resume</CardTitle></CardHeader>
-              <CardContent>
-                <a href={cp.resume_url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4 font-medium">
-                  View resume →
-                </a>
-              </CardContent>
-            </Card>
-          )}
+          <ResumeSection candidateId={id} resumeUrl={cp.resume_url} />
 
           <Card>
             <CardHeader><CardTitle className="text-sm">Screening call</CardTitle></CardHeader>
