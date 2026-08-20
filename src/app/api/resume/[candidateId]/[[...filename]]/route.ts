@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { resumeFileName } from '@/lib/resumeUrl'
 
 export const maxDuration = 60
 
@@ -168,7 +169,9 @@ function contactRanges(line: string): [number, number][] {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ candidateId: string }> }
+  // `filename` is a decorative trailing segment so browsers name the saved
+  // file after the candidate (see src/lib/resumeUrl.ts); it is never read.
+  { params }: { params: Promise<{ candidateId: string; filename?: string[] }> }
 ) {
   const { candidateId } = await params
   const supabase = await createClient()
@@ -292,11 +295,11 @@ export async function GET(
       // No text layer means nothing to redact, so we skip the pdfjs pipeline.
       try {
         const imgPdf = await imageToRedactedPdf(buffer)
-        const name = String(cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
+        const name = resumeFileName(cp.full_name)
         return new NextResponse(Buffer.from(imgPdf), {
           headers: {
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="${name} - Resume (redacted).pdf"`,
+            'Content-Disposition': `inline; filename="${name}"`,
             'Cache-Control': 'private, max-age=300',
           },
         })
@@ -490,12 +493,12 @@ export async function GET(
     }
 
     const pdfBytes = await out.save()
-    const name = String(cp.full_name ?? 'Resume').replace(/[^\w\s.\-]/g, '')
+    const name = resumeFileName(cp.full_name)
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${name} - Resume (redacted).pdf"`,
+        'Content-Disposition': `inline; filename="${name}"`,
         'Cache-Control': 'private, max-age=300',
       },
     })

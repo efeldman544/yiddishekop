@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoPlayer from './VideoPlayer'
 import CandidateActions from './CandidateActions'
+import { resumeHref } from '@/lib/resumeUrl'
 
 type Video = {
   id: string
@@ -108,7 +109,7 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
             <Card>
               <CardHeader><CardTitle className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Resume</CardTitle></CardHeader>
               <CardContent>
-                <a href={`/api/resume/${candidate.id}`} target="_blank" rel="noopener noreferrer"
+                <a href={resumeHref(candidate.id, candidate.full_name)} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm text-indigo-600 underline underline-offset-4 font-medium">
                   View resume →
                 </a>

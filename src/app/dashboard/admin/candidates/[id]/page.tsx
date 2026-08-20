@@ -97,7 +97,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
             </CardContent>
           </Card>
 
-          <ResumeSection candidateId={id} resumeUrl={cp.resume_url} />
+          <ResumeSection candidateId={id} candidateName={cp.full_name} resumeUrl={cp.resume_url} />
 
           <Card>
             <CardHeader><CardTitle className="text-sm">Screening call</CardTitle></CardHeader>
