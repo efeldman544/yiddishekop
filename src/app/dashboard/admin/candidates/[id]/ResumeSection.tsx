@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { resumeHref } from '@/lib/resumeUrl'
 
 export default function ResumeSection({
   candidateId,
+  candidateName,
   resumeUrl,
 }: {
   candidateId: string
+  candidateName: string | null
   resumeUrl: string | null
 }) {
   const router = useRouter()
@@ -78,7 +81,7 @@ export default function ResumeSection({
 
         {resumeUrl ? (
           <div className="flex items-center gap-4">
-            <a href={`/api/resume/${candidateId}`} target="_blank" rel="noopener noreferrer"
+            <a href={resumeHref(candidateId, candidateName)} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4 font-medium">
               View resume →
             </a>
