@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { displayTitle, displayName } from './candidateDisplay'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -19,7 +20,7 @@ export type BrowseCard = {
   /** Real id — only populated when names are revealed. */
   id: string | null
   name: string | null
-  title: string | null
+  title: string
   location: string | null
   industries: string[]
   employmentType: string[]
@@ -35,7 +36,7 @@ export type BrowseFilters = {
   q?: string
 }
 
-const LIMIT = 60
+const LIMIT = 200
 
 function refFrom(id: string) {
   return id.replace(/-/g, '').slice(0, 4).toUpperCase()
@@ -67,7 +68,7 @@ export async function browseCandidates(
 
   let profileQuery = client
     .from('candidate_profiles')
-    .select('id, full_name, current_job_title, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
+    .select('id, full_name, current_job_title, roles_seeking, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
     .eq('status', 'active')
     .limit(LIMIT)
 
@@ -100,7 +101,7 @@ export async function browseCandidates(
   }
 
   type ProfileRow = {
-    id: string; full_name: string | null; current_job_title: string | null; location: string | null
+    id: string; full_name: string | null; current_job_title: string | null; roles_seeking: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null; years_experience: string | null
     languages: string | null; us_hours_comfortable: boolean | null; interviewed: boolean | null
   }
@@ -114,8 +115,8 @@ export async function browseCandidates(
       key: `p-${p.id}`,
       ref: refFrom(p.id),
       id: revealNames ? p.id : null,
-      name: revealNames ? p.full_name : null,
-      title: p.current_job_title,
+      name: revealNames ? displayName(p.full_name) : null,
+      title: displayTitle(p.current_job_title, p.roles_seeking, p.fields_worked_in),
       location: p.location,
       industries: p.fields_worked_in ?? [],
       employmentType: p.employment_type ?? [],
@@ -128,8 +129,8 @@ export async function browseCandidates(
       key: `v-${v.id}`,
       ref: refFrom(v.id),
       id: revealNames ? v.id : null,
-      name: revealNames ? v.name : null,
-      title: v.current_job_title,
+      name: revealNames ? displayName(v.name) : null,
+      title: displayTitle(v.current_job_title, null, v.fields_worked_in),
       location: v.location,
       industries: v.fields_worked_in ?? [],
       employmentType: v.employment_type ?? [],
@@ -140,7 +141,9 @@ export async function browseCandidates(
     })),
   ]
 
-  // Video-interviewed first — those are the ones an employer can act on today
-  cards.sort((a, b) => Number(b.interviewed) - Number(a.interviewed))
+  // Order by title so the grid reads consistently. Deliberately NOT
+  // interviewed-first: with the row cap that hid every candidate who hasn't
+  // been filmed yet.
+  cards.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''))
   return cards.slice(0, LIMIT)
 }

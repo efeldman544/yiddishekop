@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as adminSupabase } from '@supabase/supabase-js'
+import { displayName } from '@/lib/candidateDisplay'
 
 function adminClient() {
   return adminSupabase(
@@ -10,8 +11,8 @@ function adminClient() {
 }
 
 // An employer asking to be introduced to someone they found on /browse.
-// Notifies every admin so it lands in the existing bell — no new table, and
-// the admin still controls whether the candidate is actually shared.
+// Recorded in introduction_requests (the admin queue) AND sent to the
+// notification bell — the record is the durable part, the bell is the nudge.
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -37,14 +38,30 @@ export async function POST(req: Request) {
     db.from('candidate_profiles').select('full_name').eq('id', candidateId).maybeSingle<{ full_name: string | null }>(),
     db.from('video_candidates').select('name').eq('id', candidateId).maybeSingle<{ name: string | null }>(),
   ])
-  const candidateName = cp?.full_name ?? vc?.name ?? `Candidate #${candidateRef}`
   if (!cp && !vc) return new Response('Candidate not found', { status: 404 })
 
+  const candidateName =
+    displayName(cp?.full_name ?? vc?.name) ?? `Candidate #${candidateRef}`
   const who = me.full_name ?? me.email ?? 'An employer'
+
+  // Durable queue entry. Tolerated if the migration hasn't been run yet —
+  // the notification below still gets through, so the request is never lost.
+  let recorded = true
+  const { error: insertError } = await db.from('introduction_requests').insert({
+    employer_id: user.id,
+    candidate_id: cp ? candidateId : null,
+    candidate_name: candidateName,
+    candidate_ref: candidateRef || null,
+    status: 'new',
+  })
+  if (insertError) {
+    recorded = false
+    console.error('introduction_requests insert failed:', insertError.message)
+  }
 
   const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin')
   if (admins?.length) {
-    await db.from('notifications').insert(
+    const { error: notifyError } = await db.from('notifications').insert(
       admins.map((a: { id: string }) => ({
         user_id: a.id,
         type: 'intro_request',
@@ -53,7 +70,15 @@ export async function POST(req: Request) {
         read: false,
       }))
     )
+    if (notifyError) {
+      console.error('intro notification failed:', notifyError.message)
+      // If neither the queue nor the bell captured it, tell the employer
+      // rather than showing a false success.
+      if (!recorded) {
+        return new Response('Could not record that request — please call us instead.', { status: 500 })
+      }
+    }
   }
 
-  return Response.json({ ok: true })
+  return Response.json({ ok: true, recorded })
 }
