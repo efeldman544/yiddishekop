@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { displayTitle, displayName } from './candidateDisplay'
+import { displayTitle, displayName, cleanText } from './candidateDisplay'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -37,6 +37,20 @@ export type BrowseFilters = {
 }
 
 const LIMIT = 200
+// Fetch wider than we display: industry and availability are matched in JS
+// (below) so stored variants still match, and that filtering has to happen
+// against the full set rather than a pre-trimmed page.
+const FETCH_LIMIT = 600
+
+// Stored values drift — "Full-time" vs "Full Time", "Other:: Doing accounting
+// for clients" vs "Other". An exact array match silently drops those
+// candidates from results, so compare loosely.
+function looseMatch(value: string, filter: string): boolean {
+  const a = value.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  const b = filter.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  if (!a || !b) return false
+  return a === b || a.startsWith(b) || b.startsWith(a)
+}
 
 function refFrom(id: string) {
   return id.replace(/-/g, '').slice(0, 4).toUpperCase()
@@ -70,21 +84,13 @@ export async function browseCandidates(
     .from('candidate_profiles')
     .select('id, full_name, current_job_title, roles_seeking, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
     .eq('status', 'active')
-    .limit(LIMIT)
+    .limit(FETCH_LIMIT)
 
   let videoQuery = client
     .from('video_candidates')
     .select('id, name, current_job_title, location, fields_worked_in, employment_type')
-    .limit(LIMIT)
+    .limit(FETCH_LIMIT)
 
-  if (industry) {
-    profileQuery = profileQuery.overlaps('fields_worked_in', [industry])
-    videoQuery = videoQuery.overlaps('fields_worked_in', [industry])
-  }
-  if (employmentType) {
-    profileQuery = profileQuery.overlaps('employment_type', [employmentType])
-    videoQuery = videoQuery.overlaps('employment_type', [employmentType])
-  }
   if (q?.trim()) {
     const term = q.trim()
     profileQuery = profileQuery.or(`current_job_title.ilike.%${term}%,roles_seeking.ilike.%${term}%,tools_software.ilike.%${term}%`)
@@ -117,11 +123,11 @@ export async function browseCandidates(
       id: revealNames ? p.id : null,
       name: revealNames ? displayName(p.full_name) : null,
       title: displayTitle(p.current_job_title, p.roles_seeking, p.fields_worked_in),
-      location: p.location,
-      industries: p.fields_worked_in ?? [],
+      location: cleanText(p.location),
+      industries: (p.fields_worked_in ?? []).map(i => cleanText(i) ?? i),
       employmentType: p.employment_type ?? [],
-      yearsExperience: p.years_experience,
-      languages: p.languages,
+      yearsExperience: cleanText(p.years_experience),
+      languages: cleanText(p.languages),
       usHours: p.us_hours_comfortable,
       interviewed: !!p.interviewed,
     })),
@@ -131,8 +137,8 @@ export async function browseCandidates(
       id: revealNames ? v.id : null,
       name: revealNames ? displayName(v.name) : null,
       title: displayTitle(v.current_job_title, null, v.fields_worked_in),
-      location: v.location,
-      industries: v.fields_worked_in ?? [],
+      location: cleanText(v.location),
+      industries: (v.fields_worked_in ?? []).map(i => cleanText(i) ?? i),
       employmentType: v.employment_type ?? [],
       yearsExperience: null,
       languages: null,
@@ -141,9 +147,15 @@ export async function browseCandidates(
     })),
   ]
 
+  const filtered = cards.filter(c => {
+    if (industry && !c.industries.some(i => looseMatch(i, industry))) return false
+    if (employmentType && !c.employmentType.some(t => looseMatch(t, employmentType))) return false
+    return true
+  })
+
   // Order by title so the grid reads consistently. Deliberately NOT
   // interviewed-first: with the row cap that hid every candidate who hasn't
   // been filmed yet.
-  cards.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''))
-  return cards.slice(0, LIMIT)
+  filtered.sort((a, b) => a.title.localeCompare(b.title))
+  return filtered.slice(0, LIMIT)
 }
