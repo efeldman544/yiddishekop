@@ -63,11 +63,11 @@ export default async function BrowsePage({
           <h1 style={{
             fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600,
             fontSize: 'clamp(32px,4.2vw,52px)', letterSpacing: '-0.02em', lineHeight: 1.05,
-            color: 'var(--lp-cream)', marginTop: 14, marginBottom: 16,
+            color: 'var(--lp-text)', marginTop: 14, marginBottom: 16,
           }}>
             Browse people who are ready to work.
           </h1>
-          <p style={{ fontSize: 17.5, color: 'var(--lp-cream-dim)', lineHeight: 1.6, maxWidth: 620 }}>
+          <p style={{ fontSize: 17.5, color: 'var(--lp-text-dim)', lineHeight: 1.6, maxWidth: 620 }}>
             {stats.total > 0
               ? <>Every one of these {stats.total} candidates has already been screened by us, and {stats.interviewed} have sat for a recorded interview. Filter to what you need, then tell us who you want to meet.</>
               : <>Every candidate here has already been screened and interviewed by us. Filter to what you need, then tell us who you want to meet.</>}
@@ -90,7 +90,7 @@ export default async function BrowsePage({
                   introduction. We keep candidate details private until then.
                 </p>
               </div>
-              <Link href="/signup?role=employer" className="lp-btn lp-btn-gold">Create free account</Link>
+              <Link href="/signup?role=employer" className="lp-btn lp-btn-primary">Create free account</Link>
             </div>
           )}
 

@@ -21,12 +21,12 @@ export default function PrivacyPolicyPage() {
       <section style={{ padding: '72px 0 100px' }}>
         <div className="wrap" style={{ maxWidth: 720 }}>
           <div className="lp-sec-eyebrow" style={{ marginBottom: 16 }}>Legal</div>
-          <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600, fontSize: 'clamp(30px,4vw,46px)', letterSpacing: '-0.02em', lineHeight: 1.05, color: 'var(--lp-cream)', marginBottom: 12 }}>
+          <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600, fontSize: 'clamp(30px,4vw,46px)', letterSpacing: '-0.02em', lineHeight: 1.05, color: 'var(--lp-text)', marginBottom: 12 }}>
             Privacy Policy
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--lp-cream-dim)', marginBottom: 48 }}>Last updated: June 2026</p>
+          <p style={{ fontSize: 14, color: 'var(--lp-text-dim)', marginBottom: 48 }}>Last updated: June 2026</p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 36, fontSize: 16, lineHeight: 1.75, color: 'var(--lp-cream-dim)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36, fontSize: 16, lineHeight: 1.75, color: 'var(--lp-text-dim)' }}>
             {[
               {
                 title: '1. Information we collect',
@@ -66,14 +66,14 @@ export default function PrivacyPolicyPage() {
               },
             ].map(({ title, body }) => (
               <div key={title}>
-                <h2 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontSize: 21, fontWeight: 600, color: 'var(--lp-cream)', marginBottom: 10, lineHeight: 1.2 }}>{title}</h2>
+                <h2 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontSize: 21, fontWeight: 600, color: 'var(--lp-text)', marginBottom: 10, lineHeight: 1.2 }}>{title}</h2>
                 <p>{body}</p>
               </div>
             ))}
           </div>
 
           <div style={{ marginTop: 56, paddingTop: 32, borderTop: '1px solid var(--lp-line)' }}>
-            <Link href="/" style={{ fontSize: 14, color: 'var(--lp-cream-dim)' }}>← Back to home</Link>
+            <Link href="/" style={{ fontSize: 14, color: 'var(--lp-text-dim)' }}>← Back to home</Link>
           </div>
         </div>
       </section>

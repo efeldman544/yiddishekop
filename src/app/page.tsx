@@ -46,7 +46,7 @@ export default async function LandingPage() {
             no waiting, no pile of résumés.
           </p>
           <div className="lp-hero-cta">
-            <Link href="/browse" className="lp-btn lp-btn-gold lp-btn-lg">Browse candidates</Link>
+            <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           </div>
           <div className="lp-hero-note">
             <span><span className="lp-dot" />Screened before you see them</span>
@@ -209,7 +209,7 @@ export default async function LandingPage() {
             No job post, no forms to start. Browse the people we&apos;ve already screened and
             interviewed, and tell us who you&apos;d like to meet.
           </p>
-          <Link href="/browse" className="lp-btn lp-btn-gold lp-btn-lg">Browse candidates</Link>
+          <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
             Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}
             <a href="tel:6314943567">631 494 3567</a>

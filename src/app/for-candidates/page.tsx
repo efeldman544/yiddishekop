@@ -31,7 +31,7 @@ export default function ForCandidatesPage() {
             hiring remote staff — again and again, at no cost to you.
           </p>
           <div className="lp-hero-cta">
-            <Link href="/signup?role=candidate" className="lp-btn lp-btn-gold lp-btn-lg">Create your profile</Link>
+            <Link href="/signup?role=candidate" className="lp-btn lp-btn-primary lp-btn-lg">Create your profile</Link>
           </div>
           <div className="lp-hero-note">
             <span><span className="lp-dot" />Always free for candidates</span>
@@ -117,7 +117,7 @@ export default function ForCandidatesPage() {
             It takes a few minutes, it&apos;s free, and it puts you in front of businesses that are
             hiring right now.
           </p>
-          <Link href="/signup?role=candidate" className="lp-btn lp-btn-gold lp-btn-lg">Create your profile</Link>
+          <Link href="/signup?role=candidate" className="lp-btn lp-btn-primary lp-btn-lg">Create your profile</Link>
           <div className="lp-cta-contact">
             Already have an account? <Link href="/login">Log in</Link> · Questions?{' '}
             <a href="tel:6314943567">631 494 3567</a>

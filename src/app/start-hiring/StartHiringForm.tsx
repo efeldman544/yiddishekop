@@ -64,33 +64,33 @@ export default function StartHiringForm() {
     return (
       <div className="lp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '48px 24px' }}>
         <div style={{ maxWidth: 520, textAlign: 'center' }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--lp-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', fontSize: 28 }}>✓</div>
-          <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontSize: 'clamp(28px,4vw,42px)', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--lp-cream)', marginBottom: 16 }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--lp-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', fontSize: 28 }}>✓</div>
+          <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontSize: 'clamp(28px,4vw,42px)', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--lp-text)', marginBottom: 16 }}>
             We&apos;ve got your role.
           </h1>
-          <p style={{ fontSize: 17, color: 'var(--lp-cream-dim)', lineHeight: 1.65, marginBottom: 36 }}>
+          <p style={{ fontSize: 17, color: 'var(--lp-text-dim)', lineHeight: 1.65, marginBottom: 36 }}>
             Thanks, {form.contact_name.split(' ')[0]}. We&apos;ll review your requirements and be in touch shortly with next steps.
           </p>
 
           <div style={{ background: 'rgba(201,162,75,0.08)', border: '1px solid rgba(201,162,75,0.2)', borderRadius: 12, padding: '24px 28px', marginBottom: 36, textAlign: 'left' }}>
-            <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--lp-cream)', marginBottom: 8 }}>Create your employer account</p>
-            <p style={{ fontSize: 14, color: 'var(--lp-cream-dim)', lineHeight: 1.6, marginBottom: 20 }}>
+            <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--lp-text)', marginBottom: 8 }}>Create your employer account</p>
+            <p style={{ fontSize: 14, color: 'var(--lp-text-dim)', lineHeight: 1.6, marginBottom: 20 }}>
               Track your candidates, review shortlists, and manage your open roles — all in one place.
             </p>
             <Link
               href={`/signup?${signupParams.toString()}`}
-              className="lp-btn lp-btn-gold"
+              className="lp-btn lp-btn-primary"
               style={{ display: 'inline-block', padding: '11px 24px', fontSize: 14 }}
             >
               Create account →
             </Link>
           </div>
 
-          <p style={{ fontSize: 14.5, color: 'var(--lp-cream-dim)' }}>
-            Questions? Call us at <a href="tel:6314943567" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>631 494 3567</a>
+          <p style={{ fontSize: 14.5, color: 'var(--lp-text-dim)' }}>
+            Questions? Call us at <a href="tel:6314943567" style={{ color: 'var(--lp-accent-soft)', fontWeight: 600 }}>631 494 3567</a>
           </p>
           <div style={{ marginTop: 28 }}>
-            <Link href="/browse" style={{ color: 'var(--lp-cream-dim)', fontSize: 14 }}>← Browse available candidates</Link>
+            <Link href="/browse" style={{ color: 'var(--lp-text-dim)', fontSize: 14 }}>← Browse available candidates</Link>
           </div>
         </div>
       </div>
@@ -112,16 +112,16 @@ export default function StartHiringForm() {
         <div className="wrap" style={{ maxWidth: 680 }}>
           <div style={{ marginBottom: 48 }}>
             <div className="lp-sec-eyebrow">Request a role</div>
-            <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600, fontSize: 'clamp(32px,4vw,48px)', letterSpacing: '-0.02em', lineHeight: 1.05, color: 'var(--lp-cream)', marginTop: 16, marginBottom: 16 }}>
+            <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600, fontSize: 'clamp(32px,4vw,48px)', letterSpacing: '-0.02em', lineHeight: 1.05, color: 'var(--lp-text)', marginTop: 16, marginBottom: 16 }}>
               Tell us what you&apos;re looking for.
             </h1>
-            <p style={{ fontSize: 17, color: 'var(--lp-cream-dim)', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 17, color: 'var(--lp-text-dim)', lineHeight: 1.6 }}>
               Didn&apos;t find the right person in the pool? Describe the role and we&apos;ll go source,
               screen and video-interview candidates specifically for it.
             </p>
-            <p style={{ fontSize: 15, color: 'var(--lp-cream-dim)', lineHeight: 1.6, marginTop: 14 }}>
+            <p style={{ fontSize: 15, color: 'var(--lp-text-dim)', lineHeight: 1.6, marginTop: 14 }}>
               Haven&apos;t looked yet?{' '}
-              <Link href="/browse" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>
+              <Link href="/browse" style={{ color: 'var(--lp-accent-soft)', fontWeight: 600 }}>
                 Browse candidates who are already available →
               </Link>
             </p>
@@ -136,7 +136,7 @@ export default function StartHiringForm() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
               <div>
-                <label className="auth-label">Your name <span style={{ color: 'var(--lp-gold)' }}>*</span></label>
+                <label className="auth-label">Your name <span style={{ color: 'var(--lp-accent)' }}>*</span></label>
                 <input type="text" required value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Sara Klein" className="auth-input" />
               </div>
               <div>
@@ -147,7 +147,7 @@ export default function StartHiringForm() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
               <div>
-                <label className="auth-label">Email <span style={{ color: 'var(--lp-gold)' }}>*</span></label>
+                <label className="auth-label">Email <span style={{ color: 'var(--lp-accent)' }}>*</span></label>
                 <input type="email" required value={form.email} onChange={e => set('email', e.target.value)} placeholder="you@company.com" className="auth-input" />
               </div>
               <div>
@@ -157,7 +157,7 @@ export default function StartHiringForm() {
             </div>
 
             <div style={{ borderTop: '1px solid var(--lp-line)', paddingTop: 22 }}>
-              <label className="auth-label">Role title <span style={{ color: 'var(--lp-gold)' }}>*</span></label>
+              <label className="auth-label">Role title <span style={{ color: 'var(--lp-accent)' }}>*</span></label>
               <input type="text" required value={form.role_title} onChange={e => set('role_title', e.target.value)} placeholder="e.g. Bookkeeper, Admin Assistant, Sales Rep…" className="auth-input" />
             </div>
 
@@ -186,13 +186,13 @@ export default function StartHiringForm() {
               <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={5} placeholder="Describe the day-to-day responsibilities, required skills, and what a great fit looks like for your business…" className="auth-input" style={{ resize: 'vertical', lineHeight: 1.6 }} />
             </div>
 
-            <button type="submit" disabled={loading} className="lp-btn lp-btn-gold" style={{ width: '100%', textAlign: 'center', padding: '16px', fontSize: 16, marginTop: 4 }}>
+            <button type="submit" disabled={loading} className="lp-btn lp-btn-primary" style={{ width: '100%', textAlign: 'center', padding: '16px', fontSize: 16, marginTop: 4 }}>
               {loading ? 'Submitting…' : 'Submit role →'}
             </button>
 
-            <p style={{ fontSize: 13.5, color: 'var(--lp-cream-dim)', textAlign: 'center', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13.5, color: 'var(--lp-text-dim)', textAlign: 'center', lineHeight: 1.6 }}>
               We&apos;ll review your submission and be in touch shortly.
-              Prefer to call? <a href="tel:6314943567" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>631 494 3567</a>
+              Prefer to call? <a href="tel:6314943567" style={{ color: 'var(--lp-accent-soft)', fontWeight: 600 }}>631 494 3567</a>
             </p>
           </form>
         </div>
