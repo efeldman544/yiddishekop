@@ -22,7 +22,7 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "YiddisheKop",
-  description: "Your next hire is already here. Browse vetted, video-interviewed remote professionals from the frum community — screened before you ever see them, and ready to meet this week.",
+  description: "Your next hire is already here. Browse pre-screened, video-interviewed remote professionals from the frum community — see them on video and pick who you want to meet.",
 };
 
 export default function RootLayout({

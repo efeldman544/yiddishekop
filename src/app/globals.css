@@ -9,41 +9,47 @@
    Remapping those palettes to the landing page's blue tones
    rebrands every portal screen in one place. */
 @theme {
-  --color-indigo-50: #EFF6FF;
-  --color-indigo-100: #DBEAFE;
-  --color-indigo-200: #BFDBFE;
-  --color-indigo-300: #93C5FD;
-  --color-indigo-400: #60A5FA;
-  --color-indigo-500: #3B82F6;
-  --color-indigo-600: #2563EB;
-  --color-indigo-700: #1D4ED8;
-  --color-indigo-800: #1E40AF;
-  --color-indigo-900: #1E3A8A;
-  --color-indigo-950: #172554;
+  /* Brand blue. 600 is the accent, 900 the navy used for chrome — the same
+     values as --lp-accent / --lp-navy, so utility classes in the dashboards
+     and the landing-page variables can never drift apart. */
+  --color-indigo-50: #F1F6FC;
+  --color-indigo-100: #DFEAF8;
+  --color-indigo-200: #C1D7F0;
+  --color-indigo-300: #9ABBE3;
+  --color-indigo-400: #6E97D2;
+  --color-indigo-500: #4577BE;
+  --color-indigo-600: #2A62AE;
+  --color-indigo-700: #22508F;
+  --color-indigo-800: #1C4275;
+  --color-indigo-900: #16355F;
+  --color-indigo-950: #102541;
 
-  --color-violet-50: #F0F9FF;
-  --color-violet-100: #E0F2FE;
-  --color-violet-200: #BAE6FD;
-  --color-violet-300: #7DD3FC;
-  --color-violet-400: #38BDF8;
-  --color-violet-500: #0EA5E9;
-  --color-violet-600: #0284C7;
-  --color-violet-700: #0369A1;
-  --color-violet-800: #075985;
-  --color-violet-900: #0C4A6E;
-  --color-violet-950: #082F49;
+  /* Complement for secondary badges (AI scores), muted so it sits beside
+     the blue rather than competing with it. */
+  --color-violet-50: #EEF8F7;
+  --color-violet-100: #D6EFED;
+  --color-violet-200: #AFDFDB;
+  --color-violet-300: #7FC9C3;
+  --color-violet-400: #4FADA6;
+  --color-violet-500: #2F9089;
+  --color-violet-600: #217670;
+  --color-violet-700: #1B5F5A;
+  --color-violet-800: #184D49;
+  --color-violet-900: #16403D;
+  --color-violet-950: #0B2523;
 
+  /* Cool slate neutrals — 950 lands on the brand navy so headings match. */
   --color-gray-50: #F8FAFC;
-  --color-gray-100: #F1F5F9;
-  --color-gray-200: #E2E8F0;
-  --color-gray-300: #CBD5E1;
-  --color-gray-400: #94A3B8;
-  --color-gray-500: #64748B;
-  --color-gray-600: #475569;
-  --color-gray-700: #334155;
-  --color-gray-800: #1E293B;
-  --color-gray-900: #0F172A;
-  --color-gray-950: #020617;
+  --color-gray-100: #F0F4F9;
+  --color-gray-200: #E2E9F2;
+  --color-gray-300: #CBD6E4;
+  --color-gray-400: #97A8BF;
+  --color-gray-500: #6E819B;
+  --color-gray-600: #56718F;
+  --color-gray-700: #3F5675;
+  --color-gray-800: #2A3E58;
+  --color-gray-900: #1E3350;
+  --color-gray-950: #16355F;
 }
 
 @theme inline {
@@ -211,24 +217,24 @@ input, textarea, select {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.22 0.05 258);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.05 258);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.05 258);
-  --primary: oklch(0.51 0.19 259);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.972 0.008 250);
-  --secondary-foreground: oklch(0.22 0.05 258);
-  --muted: oklch(0.972 0.008 250);
-  --muted-foreground: oklch(0.52 0.04 252);
-  --accent: oklch(0.96 0.015 252);
-  --accent-foreground: oklch(0.22 0.05 258);
+  --background: #FFFFFF;
+  --foreground: #16355F;
+  --card: #FFFFFF;
+  --card-foreground: #16355F;
+  --popover: #FFFFFF;
+  --popover-foreground: #16355F;
+  --primary: #2A62AE;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F4F9;
+  --secondary-foreground: #16355F;
+  --muted: #F0F4F9;
+  --muted-foreground: #56718F;
+  --accent: #E9F0F9;
+  --accent-foreground: #16355F;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.014 252);
-  --input: oklch(0.91 0.014 252);
-  --ring: oklch(0.62 0.15 259);
+  --border: #DEE7F1;
+  --input: #DEE7F1;
+  --ring: #2A62AE;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -296,23 +302,20 @@ input, textarea, select {
 
 :root {
   --lp-bg: #FFFFFF;
-  --lp-surface: #EDF3FB;
-  --lp-text: #0D2545;
-  --lp-text-dim: #52698A;
-  --lp-accent: #1D4F91;        /* buttons and links on light — calm, not neon */
-  --lp-accent-soft: #163D71;   /* hover / pressed */
-  --lp-accent-mid: #4A7FD0;    /* display accents on light */
-  --lp-accent-bright: #7BAAEE; /* accents on navy */
-  --lp-line: rgba(29,79,145,0.16);
+  --lp-surface: #F1F6FC;       /* indigo-50 */
+  --lp-text: #16355F;          /* indigo-900 */
+  --lp-text-dim: #56718F;      /* gray-600 */
+  --lp-accent: #2A62AE;        /* indigo-600 */
+  --lp-accent-soft: #22508F;   /* indigo-700 */
+  --lp-accent-mid: #4577BE;    /* indigo-500 — display accents on light */
+  --lp-accent-bright: #9ABBE3; /* indigo-300 — accents on navy */
+  --lp-line: rgba(42,98,174,0.16);
 
-  /* Navy brand chrome — header, closing band, footer, dashboard sidebar and
-     auth panel. Alternating navy and soft blue is what gives the palette
-     depth instead of reading as flat white. */
-  --lp-navy: #0D2545;
-  --lp-navy-2: #16365F;
-  --lp-on-navy: #F2F7FD;
-  --lp-on-navy-dim: #A9C2E0;
-  --lp-navy-line: rgba(242,247,253,0.14);
+  --lp-navy: #16355F;          /* indigo-900 */
+  --lp-navy-2: #1C4275;
+  --lp-on-navy: #F1F6FC;
+  --lp-on-navy-dim: #A9C1E2;
+  --lp-navy-line: rgba(241,246,252,0.15);
   --lp-maxw: 1180px;
 }
 
@@ -358,7 +361,7 @@ input, textarea, select {
 .lp .lp-hero { padding: 110px 0 96px; position: relative; text-align: center; }
 .lp .lp-hero::before {
   content: ""; position: absolute; inset: 0; z-index: -1;
-  background: radial-gradient(55% 45% at 50% 0%, rgba(29,79,145,0.07), transparent 70%);
+  background: radial-gradient(55% 45% at 50% 0%, rgba(42,98,174,0.07), transparent 70%);
 }
 .lp .lp-eyebrow {
   font-size: 14px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase;
@@ -401,7 +404,7 @@ input, textarea, select {
 .lp .lp-steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 26px; }
 .lp .lp-step {
   border: 1px solid var(--lp-line); border-radius: 9px; padding: 32px 30px;
-  background: linear-gradient(160deg,rgba(29,79,145,0.05),transparent);
+  background: linear-gradient(160deg,rgba(42,98,174,0.05),transparent);
   transition: border-color .2s;
 }
 .lp .lp-step:hover { border-color: var(--lp-accent); }
@@ -422,7 +425,7 @@ input, textarea, select {
 
 /* vals */
 .lp .lp-vals { display: grid; grid-template-columns: repeat(2,1fr); gap: 28px; }
-.lp .lp-val { border: 1px solid var(--lp-line); border-radius: 9px; padding: 34px; background: linear-gradient(160deg,rgba(29,79,145,0.05),transparent); }
+.lp .lp-val { border: 1px solid var(--lp-line); border-radius: 9px; padding: 34px; background: linear-gradient(160deg,rgba(42,98,174,0.05),transparent); }
 .lp .lp-val .lp-tag { font-family: var(--font-fraunces), 'Fraunces', serif; font-size: 14px; font-weight: 600; letter-spacing: 0.04em; color: var(--lp-accent); text-transform: uppercase; }
 .lp .lp-val h3 { font-family: var(--font-fraunces), 'Fraunces', serif; font-size: 25px; font-weight: 600; margin: 12px 0 10px; }
 .lp .lp-val p { font-size: 16px; color: var(--lp-text-dim); }
@@ -446,7 +449,7 @@ input, textarea, select {
 .lp .lp-portals { display: grid; grid-template-columns: repeat(2,1fr); gap: 26px; max-width: 860px; }
 .lp .lp-portal {
   border: 1px solid var(--lp-line); border-radius: 9px; padding: 34px 32px;
-  background: linear-gradient(160deg,rgba(29,79,145,0.05),transparent);
+  background: linear-gradient(160deg,rgba(42,98,174,0.05),transparent);
   display: flex; flex-direction: column; gap: 10px;
 }
 .lp .lp-portal h3 { font-family: var(--font-fraunces), 'Fraunces', serif; font-size: 23px; font-weight: 600; }
@@ -625,7 +628,7 @@ input, textarea, select {
 .lp .browse-gate {
   display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
   border: 1px solid var(--lp-line); border-radius: 10px; padding: 20px 24px;
-  background: linear-gradient(160deg, rgba(29,79,145,0.07), transparent); margin-bottom: 26px;
+  background: linear-gradient(160deg, rgba(42,98,174,0.07), transparent); margin-bottom: 26px;
 }
 .lp .browse-gate strong { color: var(--lp-text); font-size: 15px; }
 .lp .browse-gate p { color: var(--lp-text-dim); font-size: 14px; margin-top: 5px; max-width: 560px; line-height: 1.55; }
@@ -654,14 +657,14 @@ input, textarea, select {
 }
 .lp .browse-card-tags { display: flex; flex-wrap: wrap; gap: 7px; }
 .lp .browse-tag {
-  font-size: 11.5px; color: var(--lp-accent-soft); background: rgba(29,79,145,0.08);
+  font-size: 11.5px; color: var(--lp-accent-soft); background: rgba(42,98,174,0.08);
   border-radius: 100px; padding: 4px 10px;
 }
 .lp .browse-tag-muted { color: var(--lp-text-dim); background: rgba(11,37,69,0.06); }
 .lp .browse-card-meta { display: flex; flex-wrap: wrap; gap: 6px 22px; }
 .lp .browse-card-meta dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(11,37,69,0.55); }
 .lp .browse-card-meta dd { font-size: 13.5px; color: var(--lp-text); margin-top: 2px; }
-.lp .browse-card-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(29,79,145,0.14); }
+.lp .browse-card-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(42,98,174,0.14); }
 .lp .browse-card-cta {
   display: inline-block; background: none; border: 1px solid var(--lp-line); border-radius: 7px;
   padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: var(--lp-text);
@@ -709,7 +712,7 @@ input, textarea, select {
 /* Hero gets a soft blue wash rather than flat white */
 .lp .lp-hero { background: linear-gradient(180deg, #F7FAFE 0%, var(--lp-bg) 100%); }
 .lp .lp-hero::before {
-  background: radial-gradient(52% 42% at 50% 0%, rgba(29,79,145,0.09), transparent 70%);
+  background: radial-gradient(52% 42% at 50% 0%, rgba(42,98,174,0.09), transparent 70%);
 }
 
 /* Cards lift off the tinted bands */
@@ -717,11 +720,11 @@ input, textarea, select {
 .lp .lp-pain-grid { background: var(--lp-line); border-color: var(--lp-line); }
 .lp .lp-step {
   background: var(--lp-bg);
-  box-shadow: 0 1px 2px rgba(13,37,69,0.05), 0 8px 24px -12px rgba(13,37,69,0.12);
+  box-shadow: 0 1px 2px rgba(22,53,95,0.05), 0 8px 24px -12px rgba(22,53,95,0.12);
 }
 .lp .lp-val {
   background: linear-gradient(160deg, #F7FAFE, var(--lp-bg));
-  box-shadow: 0 1px 2px rgba(13,37,69,0.05), 0 8px 24px -12px rgba(13,37,69,0.12);
+  box-shadow: 0 1px 2px rgba(22,53,95,0.05), 0 8px 24px -12px rgba(22,53,95,0.12);
 }
 .lp .lp-role-chip { background: var(--lp-bg); }
 .lp .lp-role-chip:hover {
@@ -760,6 +763,9 @@ input, textarea, select {
 /* Browse cards on the tinted page */
 .lp .browse-card {
   background: var(--lp-bg);
-  box-shadow: 0 1px 2px rgba(13,37,69,0.05), 0 8px 24px -12px rgba(13,37,69,0.12);
+  box-shadow: 0 1px 2px rgba(22,53,95,0.05), 0 8px 24px -12px rgba(22,53,95,0.12);
 }
 .lp .browse-search input, .lp .browse-selects select { background: var(--lp-bg); }
+
+/* Left-aligned page headers (browse): h1 is centred by default for the hero */
+.lp .lp-page-head h1 { margin-left: 0; max-width: 860px; }

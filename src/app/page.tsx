@@ -7,7 +7,7 @@ import { INDUSTRIES } from '@/lib/candidateOptions'
 
 export const metadata: Metadata = {
   title: 'YiddisheKop',
-  description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates from the frum community — you see the strongest people on video, and the final call is always yours.',
+  description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates from the frum community — see the strongest people on video and pick who you want to meet.',
   openGraph: {
     title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
     description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates — the strongest people, on video.',
@@ -33,7 +33,7 @@ export default function LandingPage() {
           <h1>Your next hire is <span className="it">already</span> here.</h1>
           <p className="lp-lead">
             We&apos;ve already screened and interviewed them. Browse short video clips of the{' '}
-            <strong>strongest candidates</strong> — and the final call is always yours.
+            <strong>strongest candidates</strong> and pick who you want to meet.
           </p>
           <div className="lp-hero-cta">
             <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>

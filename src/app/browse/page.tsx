@@ -56,8 +56,8 @@ export default async function BrowsePage({
     <div className="lp">
       <LpHeader />
 
-      <section style={{ padding: '72px 0 32px' }}>
-        <div className="wrap">
+      <section style={{ padding: '72px 0 28px' }}>
+        <div className="wrap lp-page-head">
           <div className="lp-sec-eyebrow">Available now</div>
           <h1 style={{
             fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600,
@@ -73,7 +73,7 @@ export default async function BrowsePage({
         </div>
       </section>
 
-      <section style={{ paddingBottom: 80 }}>
+      <section style={{ padding: '0 0 80px' }}>
         <div className="wrap">
           <Suspense fallback={null}>
             <BrowseFilters />
@@ -118,7 +118,7 @@ export default async function BrowsePage({
                 <article key={c.key} className="browse-card">
                   <div className="browse-card-top">
                     <div>
-                      <h3>{c.title || 'Remote professional'}</h3>
+                      <h3>{c.title}</h3>
                       <p className="browse-card-id">
                         {c.name ? c.name : `Candidate #${c.ref}`}
                         {c.location && <> · {c.location}</>}
