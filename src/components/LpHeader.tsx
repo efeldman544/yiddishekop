@@ -13,13 +13,14 @@ export default function LpHeader() {
       <div className="wrap lp-nav">
         <Link href="/" className="lp-logo">Yiddishe<span>Kop</span></Link>
         <nav className={`lp-nav-links${menuOpen ? ' open' : ''}`}>
-          <Link href="/why-us" onClick={closeMenu}>Why us</Link>
+          <Link href="/browse" onClick={closeMenu}>Browse</Link>
           <Link href="/how-it-works" onClick={closeMenu}>How it works</Link>
-          <Link href="/#roles" onClick={closeMenu}>Roles</Link>
+          <Link href="/why-us" onClick={closeMenu}>Why us</Link>
+          <Link href="/for-candidates" onClick={closeMenu}>For candidates</Link>
         </nav>
         <div className="lp-nav-right">
           <LpAuthButton />
-          <Link href="/start-hiring" className="lp-btn lp-btn-gold">Start hiring</Link>
+          <Link href="/browse" className="lp-btn lp-btn-gold">Browse candidates</Link>
           <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
         </div>
       </div>

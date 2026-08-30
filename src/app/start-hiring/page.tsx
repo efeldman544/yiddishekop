@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import StartHiringForm from './StartHiringForm'
 
 export const metadata: Metadata = {
-  title: 'Start Hiring | YiddisheKop',
-  description: 'Tell us your open role. We\'ll screen, vet, and video-interview candidates from the frum community and send you a shortlist of the strongest people — ready to hire.',
+  title: 'Request a Role | YiddisheKop',
+  description: 'Can\'t find the right person in the pool? Tell us the role and we\'ll source, screen and video-interview candidates specifically for your opening.',
   openGraph: {
-    title: 'Start Hiring | YiddisheKop',
-    description: 'Tell us your open role and we\'ll send you a shortlist of pre-screened, video-interviewed candidates worth your time.',
+    title: 'Request a Role | YiddisheKop',
+    description: 'Tell us the role and we\'ll source, screen and video-interview candidates specifically for your opening.',
     url: 'https://yiddishekop.app/start-hiring',
     siteName: 'YiddisheKop',
     type: 'website',

@@ -90,7 +90,7 @@ export default function StartHiringForm() {
             Questions? Call us at <a href="tel:6314943567" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>631 494 3567</a>
           </p>
           <div style={{ marginTop: 28 }}>
-            <Link href="/" style={{ color: 'var(--lp-cream-dim)', fontSize: 14 }}>← Back to home</Link>
+            <Link href="/browse" style={{ color: 'var(--lp-cream-dim)', fontSize: 14 }}>← Browse available candidates</Link>
           </div>
         </div>
       </div>
@@ -111,12 +111,19 @@ export default function StartHiringForm() {
       <section style={{ padding: '80px 0 100px' }}>
         <div className="wrap" style={{ maxWidth: 680 }}>
           <div style={{ marginBottom: 48 }}>
-            <div className="lp-sec-eyebrow">Start hiring</div>
+            <div className="lp-sec-eyebrow">Request a role</div>
             <h1 style={{ fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600, fontSize: 'clamp(32px,4vw,48px)', letterSpacing: '-0.02em', lineHeight: 1.05, color: 'var(--lp-cream)', marginTop: 16, marginBottom: 16 }}>
-              Tell us your open role.
+              Tell us what you&apos;re looking for.
             </h1>
             <p style={{ fontSize: 17, color: 'var(--lp-cream-dim)', lineHeight: 1.6 }}>
-              Fill out the form below. We&apos;ll match you with pre-screened, video-interviewed candidates worth your time.
+              Didn&apos;t find the right person in the pool? Describe the role and we&apos;ll go source,
+              screen and video-interview candidates specifically for it.
+            </p>
+            <p style={{ fontSize: 15, color: 'var(--lp-cream-dim)', lineHeight: 1.6, marginTop: 14 }}>
+              Haven&apos;t looked yet?{' '}
+              <Link href="/browse" style={{ color: 'var(--lp-gold-soft)', fontWeight: 600 }}>
+                Browse candidates who are already available →
+              </Link>
             </p>
           </div>
 
