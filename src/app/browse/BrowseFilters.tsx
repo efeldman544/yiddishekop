@@ -37,7 +37,7 @@ export default function BrowseFilters() {
           placeholder="Search a role or skill — bookkeeper, QuickBooks, sales…"
           aria-label="Search candidates"
         />
-        <button type="submit" className="lp-btn lp-btn-gold">Search</button>
+        <button type="submit" className="lp-btn lp-btn-primary">Search</button>
       </form>
 
       <div className="browse-selects">

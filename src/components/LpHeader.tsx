@@ -20,7 +20,7 @@ export default function LpHeader() {
         </nav>
         <div className="lp-nav-right">
           <LpAuthButton />
-          <Link href="/browse" className="lp-btn lp-btn-gold">Browse candidates</Link>
+          <Link href="/browse" className="lp-btn lp-btn-primary">Browse candidates</Link>
           <button className="lp-nav-toggle" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">☰</button>
         </div>
       </div>

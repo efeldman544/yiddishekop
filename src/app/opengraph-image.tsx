@@ -9,7 +9,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: '#0E0E0C',
+          background: '#FFFFFF',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -21,21 +21,21 @@ export default function Image() {
         }}
       >
         {/* Gold accent bar */}
-        <div style={{ width: 60, height: 4, background: '#C9A24B', borderRadius: 2, marginBottom: 48 }} />
+        <div style={{ width: 60, height: 4, background: '#1B5FCC', borderRadius: 2, marginBottom: 48 }} />
 
         {/* Brand name */}
         <div style={{ display: 'flex', fontSize: 100, fontWeight: 700, letterSpacing: '-2px', lineHeight: 1 }}>
-          <span style={{ color: '#F3ECDD' }}>Yiddishe</span>
-          <span style={{ color: '#C9A24B' }}>Kop</span>
+          <span style={{ color: '#0B2545' }}>Yiddishe</span>
+          <span style={{ color: '#1B5FCC' }}>Kop</span>
         </div>
 
         {/* Subline */}
-        <div style={{ fontSize: 22, color: '#6B6459', marginTop: 32, textAlign: 'center' }}>
+        <div style={{ fontSize: 22, color: '#55708C', marginTop: 32, textAlign: 'center' }}>
           Vetted · Video-interviewed · Worth your time
         </div>
 
         {/* Bottom URL */}
-        <div style={{ position: 'absolute', bottom: 48, fontSize: 18, color: '#C9A24B', letterSpacing: '0.05em' }}>
+        <div style={{ position: 'absolute', bottom: 48, fontSize: 18, color: '#1B5FCC', letterSpacing: '0.05em' }}>
           yiddishekop.app
         </div>
       </div>
