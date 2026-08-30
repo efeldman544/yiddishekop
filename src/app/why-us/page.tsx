@@ -5,7 +5,7 @@ import LpFooter from '@/components/LpFooter'
 
 export const metadata: Metadata = {
   title: 'Why Us | YiddisheKop',
-  description: 'Stop guessing on résumés. YiddisheKop keeps a pool of vetted, video-interviewed remote candidates ready to meet — so you start at the shortlist instead of the job post.',
+  description: 'Stop guessing on résumés. YiddisheKop vets, interviews, and delivers remote candidates who are actually worth your time — and actually last.',
 }
 
 export default function WhyUsPage() {
@@ -18,7 +18,7 @@ export default function WhyUsPage() {
           <div className="lp-sec-head">
             <div className="lp-sec-eyebrow">The real problem</div>
             <h2>Hiring isn&apos;t hard because there aren&apos;t enough applicants.</h2>
-            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit — and because finding out takes weeks you don&apos;t have.</p>
+            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. So you sift, interview strangers, and hope you guessed right.</p>
           </div>
           <div className="lp-pain-grid">
             <div className="lp-pain">
@@ -30,40 +30,8 @@ export default function WhyUsPage() {
               <p>A résumé tells you what someone typed. It doesn&apos;t tell you whether they&apos;ll show up, communicate, or last.</p>
             </div>
             <div className="lp-pain">
-              <h3>How long will it take?</h3>
-              <p>Posting, sifting, and first-round interviews eat weeks — while the work sits there waiting for someone to do it.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section style={{ padding: '70px 0' }}>
-        <div className="wrap">
-          <div className="lp-sec-head">
-            <div className="lp-sec-eyebrow">What we do differently</div>
-            <h2>We do the work <span className="it">before</span> you need it.</h2>
-            <p>Most agencies start looking the day you call. We already looked.</p>
-          </div>
-          <div className="lp-vals">
-            <div className="lp-val">
-              <div className="lp-tag">Ready now</div>
-              <h3>A pool, not a search</h3>
-              <p>Candidates are sourced, screened and interviewed in advance. When you arrive, there are already people to look at.</p>
-            </div>
-            <div className="lp-val">
-              <div className="lp-tag">On video</div>
-              <h3>See them before you commit</h3>
-              <p>Every candidate answers real questions on camera. You judge the person, not the paperwork.</p>
-            </div>
-            <div className="lp-val">
-              <div className="lp-tag">You choose</div>
-              <h3>No one is assigned to you</h3>
-              <p>You browse and pick who you want to meet. We handle the introduction and stay out of your decision.</p>
-            </div>
-            <div className="lp-val">
-              <div className="lp-tag">Understands your world</div>
-              <h3>People who fit</h3>
-              <p>Remote professionals who understand how a frum business runs — the calendar, the culture, the things you&apos;d otherwise have to explain.</p>
+              <h3>How do you avoid a bad hire?</h3>
+              <p>A wrong hire costs months and real money. Most owners would rather be confident before they commit.</p>
             </div>
           </div>
         </div>
@@ -95,8 +63,8 @@ export default function WhyUsPage() {
       <section className="lp-cta-final">
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Ready?</div>
-          <h2>See who&apos;s available right now.</h2>
-          <p>Browse the people we&apos;ve already screened and interviewed, and tell us who you&apos;d like to meet.</p>
+          <h2>See who&apos;s available.</h2>
+          <p>Browse the candidates we&apos;ve already screened and video-interviewed, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">Prefer to talk? <a href="tel:6314943567">631 494 3567</a></div>
         </div>

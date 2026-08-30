@@ -3,15 +3,14 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 import LpFooter from '@/components/LpFooter'
 import RevealObserver from '@/components/RevealObserver'
-import { poolStats } from '@/lib/browse'
 import { INDUSTRIES } from '@/lib/candidateOptions'
 
 export const metadata: Metadata = {
   title: 'YiddisheKop',
-  description: 'Your next hire is already here. Browse vetted, video-interviewed remote professionals from the frum community — screened before you ever see them, available to meet this week.',
+  description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates from the frum community — you see the strongest people on video, and the final call is always yours.',
   openGraph: {
-    title: 'YiddisheKop | Browse Pre-Screened Remote Staff',
-    description: 'Your next hire is already here. Browse vetted, video-interviewed remote professionals from the frum community — available to meet this week.',
+    title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
+    description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates — the strongest people, on video.',
     url: 'https://yiddishekop.app',
     siteName: 'YiddisheKop',
     locale: 'en_US',
@@ -19,13 +18,7 @@ export const metadata: Metadata = {
   },
 }
 
-// The pool size is the pitch, so keep it fresh without hitting the DB on
-// every visit.
-export const revalidate = 3600
-
-export default async function LandingPage() {
-  const stats = await poolStats()
-
+export default function LandingPage() {
   return (
     <div className="lp">
       <RevealObserver />
@@ -36,22 +29,19 @@ export default async function LandingPage() {
       {/* ── HERO ── */}
       <section className="lp-hero">
         <div className="wrap reveal">
-          <div className="lp-eyebrow">
-            {stats.total > 0 ? `${stats.total} vetted candidates, available now` : 'Vetted remote staff, available now'}
-          </div>
+          <div className="lp-eyebrow">Pre-screened remote staff</div>
           <h1>Your next hire is <span className="it">already</span> here.</h1>
           <p className="lp-lead">
-            We&apos;ve already sourced, screened and video-interviewed remote professionals who
-            understand how a frum business runs. <strong>Browse them today</strong> — no job post,
-            no waiting, no pile of résumés.
+            We&apos;ve already screened and interviewed them. Browse short video clips of the{' '}
+            <strong>strongest candidates</strong> — and the final call is always yours.
           </p>
           <div className="lp-hero-cta">
             <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           </div>
           <div className="lp-hero-note">
-            <span><span className="lp-dot" />Screened before you see them</span>
+            <span><span className="lp-dot" />Screened &amp; vetted first</span>
             <span><span className="lp-dot" />Every candidate on video</span>
-            <span><span className="lp-dot" />Ready to start now</span>
+            <span><span className="lp-dot" />People who understand your world</span>
           </div>
         </div>
       </section>
@@ -61,21 +51,21 @@ export default async function LandingPage() {
         <div className="wrap">
           <div className="lp-sec-head reveal">
             <div className="lp-sec-eyebrow">The real problem</div>
-            <h2>Most hiring starts from zero. Yours doesn&apos;t have to.</h2>
-            <p>Post a job, wait, sift a hundred résumés, interview strangers, hope you guessed right. Weeks gone before you meet anyone worth meeting.</p>
+            <h2>Hiring isn&apos;t hard because there aren&apos;t enough applicants.</h2>
+            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. So you sift, interview strangers, and hope you guessed right.</p>
           </div>
           <div className="lp-pain-grid reveal">
             <div className="lp-pain">
-              <h3>Waiting is the expensive part</h3>
-              <p>The work doesn&apos;t pause while you recruit. Every week a seat sits empty is a week someone else covers it badly.</p>
+              <h3>Who&apos;s actually qualified?</h3>
+              <p>The hardest part of hiring isn&apos;t finding applicants. It&apos;s knowing which of them is genuinely right for your work.</p>
             </div>
             <div className="lp-pain">
-              <h3>A résumé tells you almost nothing</h3>
-              <p>It tells you what someone typed. Not whether they&apos;ll show up, communicate clearly, or still be there in a year.</p>
+              <h3>Who can you trust?</h3>
+              <p>A résumé tells you what someone typed. It doesn&apos;t tell you whether they&apos;ll show up, communicate, or last.</p>
             </div>
             <div className="lp-pain">
-              <h3>You shouldn&apos;t gamble on strangers</h3>
-              <p>A wrong hire costs months and real money. You should be able to see and hear someone before you commit.</p>
+              <h3>How do you avoid a bad hire?</h3>
+              <p>A wrong hire costs months and real money. Most owners would rather be confident before they commit.</p>
             </div>
           </div>
         </div>
@@ -86,7 +76,7 @@ export default async function LandingPage() {
         <div className="wrap">
           <div className="lp-sec-head reveal">
             <div className="lp-sec-eyebrow">How it works</div>
-            <h2>Skip the search. Go <span className="it">straight to choosing.</span></h2>
+            <h2>Skip the pile. Go <span className="it">straight to the decision.</span></h2>
           </div>
           <div className="lp-steps">
             <div className="lp-step reveal">
@@ -98,8 +88,8 @@ export default async function LandingPage() {
               <p>Pick the people worth your time. We share their full profile and interview clip, and set up the introduction.</p>
             </div>
             <div className="lp-step reveal">
-              <div className="lp-step-head"><div className="lp-step-n">3</div><h3>Meet and hire</h3></div>
-              <p>You meet the ones you chose, live. The decision is always yours — we just make sure it&apos;s an easy one.</p>
+              <div className="lp-step-head"><div className="lp-step-n">3</div><h3>You watch &amp; choose</h3></div>
+              <p>You meet the ones you chose, live. Pick who you hire — the decision is yours.</p>
             </div>
           </div>
         </div>
@@ -110,14 +100,14 @@ export default async function LandingPage() {
         <div className="wrap">
           <div className="lp-sec-head reveal">
             <div className="lp-sec-eyebrow">Inside the screening</div>
-            <h2>Why the pool is worth browsing.</h2>
-            <p>No black box. Nobody appears on this site until they&apos;ve been through all of it:</p>
+            <h2>What happens before a candidate reaches you.</h2>
+            <p>No black box. Every person in the pool has already been through all of this:</p>
           </div>
           <div className="lp-screen-list reveal">
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Sourced and screened by us</b> — we go and find them; they don&apos;t arrive from a generic job board.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Résumé &amp; background review</b> — experience checked against what the work actually needs.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, recorded, so you can see and hear how they answer.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Only the ones worth showing</b> — if we wouldn&apos;t put them in front of you, they&apos;re not in the pool.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Resume &amp; background review</b> — experience verified against what the work actually needs.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>First-round interview, recorded</b> — we ask the questions you&apos;d ask, on video, so you can see and hear how they answer.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Selected with a reason</b> — every candidate we show you comes with why we chose them.</span></div>
           </div>
         </div>
       </section>
@@ -127,13 +117,13 @@ export default async function LandingPage() {
         <div className="wrap">
           <div className="lp-sec-head reveal">
             <div className="lp-sec-eyebrow">Why YiddisheKop</div>
-            <h2>Better candidates. <span className="it">Ready today.</span></h2>
+            <h2>Better candidates. <span className="it">Less guesswork.</span></h2>
           </div>
           <div className="lp-vals">
             <div className="lp-val reveal">
-              <div className="lp-tag">No waiting</div>
-              <h3>The work is already done</h3>
-              <p>The sourcing, screening and first-round interviews happened before you arrived. You start at the shortlist instead of the job post.</p>
+              <div className="lp-tag">Vetted first</div>
+              <h3>We do the sifting</h3>
+              <p>Every candidate is screened and interviewed before they ever reach you. You spend your time on the few worth meeting — not the pile that isn&apos;t.</p>
             </div>
             <div className="lp-val reveal">
               <div className="lp-tag">On video</div>
@@ -141,14 +131,14 @@ export default async function LandingPage() {
               <p>You see and hear each candidate answer real questions — so you&apos;re deciding on a person, not a piece of paper.</p>
             </div>
             <div className="lp-val reveal">
-              <div className="lp-tag">You choose</div>
-              <h3>Nobody is assigned to you</h3>
-              <p>You pick who you want to meet from the people in front of you. We make the introduction; the decision stays yours.</p>
+              <div className="lp-tag">Confidence</div>
+              <h3>Know who you&apos;re hiring</h3>
+              <p>You review candidates with the reasoning behind each pick. No guessing, no gambling on strangers.</p>
             </div>
             <div className="lp-val reveal">
               <div className="lp-tag">Understands your world</div>
               <h3>People who fit</h3>
-              <p>Qualified remote professionals who understand how a frum business runs — the calendar, the culture, the unspoken things you&apos;d otherwise have to explain.</p>
+              <p>Qualified, pre-screened remote professionals who understand how a frum business runs — the calendar, the culture, the unspoken things you&apos;d otherwise have to explain.</p>
             </div>
           </div>
         </div>
@@ -182,9 +172,9 @@ export default async function LandingPage() {
       <section id="roles">
         <div className="wrap">
           <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">Who&apos;s in the pool</div>
-            <h2>Remote professionals, across the roles you actually hire for.</h2>
-            <p>Full-time or part-time, working in your hours. Pick an area to see who&apos;s available.</p>
+            <div className="lp-sec-eyebrow">What we place</div>
+            <h2>Remote roles, filled with people you&apos;d actually hire.</h2>
+            <p>Full-time or part-time, working in your hours.</p>
           </div>
           <div className="lp-roles reveal">
             {INDUSTRIES.filter(r => r !== 'Other').map(role => (
@@ -204,11 +194,8 @@ export default async function LandingPage() {
       <section className="lp-cta-final" id="start">
         <div className="wrap reveal">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Start here</div>
-          <h2>See who&apos;s available right now.</h2>
-          <p>
-            No job post, no forms to start. Browse the people we&apos;ve already screened and
-            interviewed, and tell us who you&apos;d like to meet.
-          </p>
+          <h2>See who&apos;s available.</h2>
+          <p>Browse the candidates we&apos;ve already screened and video-interviewed, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
             Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}

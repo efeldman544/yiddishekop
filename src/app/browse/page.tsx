@@ -4,7 +4,7 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 import LpFooter from '@/components/LpFooter'
 import { createClient } from '@/lib/supabase/server'
-import { browseCandidates, poolStats } from '@/lib/browse'
+import { browseCandidates } from '@/lib/browse'
 import BrowseFilters from './BrowseFilters'
 import RequestIntroButton from './RequestIntroButton'
 
@@ -51,7 +51,6 @@ export default async function BrowsePage({
     console.error('browse load failed:', e instanceof Error ? e.message : e)
     loadFailed = true
   }
-  const stats = await poolStats()
 
   return (
     <div className="lp">
@@ -68,9 +67,8 @@ export default async function BrowsePage({
             Browse people who are ready to work.
           </h1>
           <p style={{ fontSize: 17.5, color: 'var(--lp-text-dim)', lineHeight: 1.6, maxWidth: 620 }}>
-            {stats.total > 0
-              ? <>Every one of these {stats.total} candidates has already been screened by us, and {stats.interviewed} have sat for a recorded interview. Filter to what you need, then tell us who you want to meet.</>
-              : <>Every candidate here has already been screened and interviewed by us. Filter to what you need, then tell us who you want to meet.</>}
+            Every candidate here has already been screened and video-interviewed by us. Filter to
+            what you need, then tell us who you want to meet.
           </p>
         </div>
       </section>
@@ -99,18 +97,12 @@ export default async function BrowsePage({
               <p><strong>We couldn&apos;t load the candidate list just now.</strong></p>
               <p>
                 Please refresh in a moment, or{' '}
-                <Link href="/start-hiring">tell us what you&apos;re looking for</Link> and we&apos;ll
-                come back to you directly.
+                <Link href="/start-hiring">tell us what you&apos;re looking for</Link>{' '}
+                and we&apos;ll come back to you directly.
               </p>
             </div>
           ) : (
           <>
-          <p className="browse-count">
-            {cards.length === 0
-              ? 'No candidates match those filters yet.'
-              : `Showing ${cards.length} candidate${cards.length === 1 ? '' : 's'}`}
-          </p>
-
           {cards.length === 0 ? (
             <div className="browse-empty">
               <p>Nothing matches that combination right now.</p>
