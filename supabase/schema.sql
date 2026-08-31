@@ -1,7 +1,7 @@
 -- Run this in your Supabase SQL Editor
 
 -- 1. Profiles table (extends auth.users)
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   email text not null,
   full_name text,
@@ -24,6 +24,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -32,17 +33,20 @@ create trigger on_auth_user_created
 alter table public.profiles enable row level security;
 
 -- Users can read their own profile
+drop policy if exists "Users can view own profile" on public.profiles;
 create policy "Users can view own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
 -- Users can update their own profile (but not role)
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
 -- Admins can read all profiles
+drop policy if exists "Admins can view all profiles" on public.profiles;
 create policy "Admins can view all profiles"
   on public.profiles for select
   using (
@@ -55,7 +59,7 @@ create policy "Admins can view all profiles"
 -- ── job_leads: inbound "start hiring" requests from the public landing page ──
 -- Run this in your Supabase SQL Editor to enable the /start-hiring form.
 
-create table public.job_leads (
+create table if not exists public.job_leads (
   id            uuid default gen_random_uuid() primary key,
   contact_name  text not null,
   email         text not null,
@@ -72,11 +76,13 @@ create table public.job_leads (
 alter table public.job_leads enable row level security;
 
 -- Anyone (including unauthenticated visitors) can submit a lead
+drop policy if exists "Public can insert job leads" on public.job_leads;
 create policy "Public can insert job leads"
   on public.job_leads for insert
   with check (true);
 
 -- Only admins can view submissions
+drop policy if exists "Admins can view job leads" on public.job_leads;
 create policy "Admins can view job leads"
   on public.job_leads for select
   using (

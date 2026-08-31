@@ -1,7 +1,7 @@
 -- Run this in your Supabase SQL Editor
 -- Caches AI match scores per (job, candidate) so revisiting a job doesn't re-pay for analysis.
 
-create table public.candidate_ai_scores (
+create table if not exists public.candidate_ai_scores (
   id           uuid default gen_random_uuid() primary key,
   job_id       uuid not null references public.job_requirements(id) on delete cascade,
   candidate_id uuid not null,  -- candidate_profiles.id OR video_candidates.id, see "source"
@@ -15,11 +15,12 @@ create table public.candidate_ai_scores (
   unique (job_id, candidate_id)
 );
 
-create index candidate_ai_scores_job_idx on public.candidate_ai_scores (job_id);
+create index if not exists candidate_ai_scores_job_idx on public.candidate_ai_scores (job_id);
 
 alter table public.candidate_ai_scores enable row level security;
 
 -- Writes happen server-side via the service role (bypasses RLS); admins read from the dashboard.
+drop policy if exists "Admins can view ai scores" on public.candidate_ai_scores;
 create policy "Admins can view ai scores"
   on public.candidate_ai_scores for select
   using (

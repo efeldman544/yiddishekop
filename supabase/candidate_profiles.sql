@@ -2,7 +2,7 @@
 -- If you ran the previous version, drop it first:
 -- drop table if exists public.candidate_profiles;
 
-create table public.candidate_profiles (
+create table if not exists public.candidate_profiles (
   id               uuid references public.profiles(id) on delete cascade primary key,
   full_name        text,
   email            text,
@@ -29,11 +29,13 @@ create table public.candidate_profiles (
 -- Row Level Security
 alter table public.candidate_profiles enable row level security;
 
+drop policy if exists "Candidates can manage own profile" on public.candidate_profiles;
 create policy "Candidates can manage own profile"
   on public.candidate_profiles
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+drop policy if exists "Employers and admins can view candidate profiles" on public.candidate_profiles;
 create policy "Employers and admins can view candidate profiles"
   on public.candidate_profiles for select
   using (
@@ -48,18 +50,21 @@ create policy "Employers and admins can view candidate profiles"
 -- 2. Create a bucket named "resumes", set to private
 -- 3. Then run the policies below:
 
+drop policy if exists "Candidates can upload own resume" on storage.objects;
 create policy "Candidates can upload own resume"
   on storage.objects for insert
   with check (
     bucket_id = 'resumes' and auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Candidates can read own resume" on storage.objects;
 create policy "Candidates can read own resume"
   on storage.objects for select
   using (
     bucket_id = 'resumes' and auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Candidates can update own resume" on storage.objects;
 create policy "Candidates can update own resume"
   on storage.objects for update
   using (
