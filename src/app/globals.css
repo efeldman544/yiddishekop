@@ -675,6 +675,12 @@ input, textarea, select {
 .lp .browse-card-sent { font-size: 13.5px; color: var(--lp-accent-soft); font-weight: 600; }
 .lp .browse-card-error { display: block; font-size: 12.5px; color: #fca5a5; margin-top: 6px; }
 
+.lp .browse-more { display: flex; justify-content: center; margin-top: 28px; }
+.lp .browse-truncated {
+  margin-top: 20px; text-align: center; font-size: 14.5px; color: var(--lp-text-dim); line-height: 1.6;
+}
+.lp .browse-truncated a { color: var(--lp-accent-soft); text-decoration: underline; }
+
 .lp .browse-fallback {
   margin-top: 56px; border-top: 1px solid var(--lp-line); padding-top: 40px; text-align: center;
 }
