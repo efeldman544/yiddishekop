@@ -8,6 +8,7 @@ const NAV = [
     label: 'Candidates',
     href: '/dashboard/admin',
     exact: true,
+    also: ['/dashboard/admin/candidates'],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -48,6 +49,9 @@ const NAV = [
     label: 'Videos',
     href: '/dashboard/admin/videos',
     exact: false,
+    // Opening a video profile lands on /video-candidates/[id]; without this
+    // the sidebar went blank and it looked like you'd left the section.
+    also: ['/dashboard/admin/video-candidates'],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10l4.553-2.069A1 1 0 0121 8.867v6.266a1 1 0 01-1.447.902L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -59,7 +63,8 @@ const NAV = [
 export default function AdminSidebar() {
   const pathname = usePathname()
 
-  function isActive(href: string, exact: boolean) {
+  function isActive(href: string, exact: boolean, also: string[] = []) {
+    if (also.some(p => pathname.startsWith(p))) return true
     if (exact) return pathname === href
     return pathname.startsWith(href)
   }
@@ -74,7 +79,7 @@ export default function AdminSidebar() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {NAV.map(item => {
-          const active = isActive(item.href, item.exact)
+          const active = isActive(item.href, item.exact, item.also)
           return (
             <Link
               key={item.href}

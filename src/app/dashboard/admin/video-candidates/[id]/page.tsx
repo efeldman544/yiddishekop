@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoPlayer from '@/app/dashboard/employer/candidates/[id]/VideoPlayer'
-import Link from 'next/link'
+import BackButton from '@/components/BackButton'
 
 export default async function AdminVideoCandidatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,7 +25,7 @@ export default async function AdminVideoCandidatePage({ params }: { params: Prom
   return (
     <div className="px-8 py-8 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/dashboard/admin/video-candidates" className="text-sm text-gray-400 hover:text-gray-700">← Video Interviews</Link>
+        <BackButton fallback="/dashboard/admin/videos" label="Back to videos" />
       </div>
 
       <div>
