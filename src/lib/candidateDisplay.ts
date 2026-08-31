@@ -1,8 +1,17 @@
 // Imported and self-entered candidate data has messy titles: blanks,
-// "unemployed", "not working right now", and — for bulk-uploaded video
-// candidates — file-derived strings like "2026 03 29 Reuvane Rhodes
-// transcript". None of that should be shown to an employer, so fall back to
-// the best signal we do have.
+// "unemployed", "not working right now", sentences ("I am currently doing
+// accounting for a few clients"), shouting ("BOOKKEEPER"), and — for
+// bulk-uploaded video candidates — file-derived strings like "2026 03 29
+// Reuvane Rhodes transcript". None of that should be shown to an employer, so
+// map it onto the canonical role vocabulary and only fall back to the raw text
+// when it already reads like a title.
+
+import { cleanText } from './textClean'
+import {
+  matchRole, tidyCase, stripLeadIn, canonicalIndustry, industryLabel,
+} from './candidateTaxonomy'
+
+export { cleanText }
 
 // Whole-value junk
 const JUNK_EXACT = /^(n\/?a|na|none|nothing|null|nil|unknown|untitled|test|tbd|other|misc|[-–—.?]+)$/i
@@ -12,28 +21,6 @@ const JUNK_PREFIX = /^(un-?employed|not\s*(currently\s*)?(working|employed)|no\s
 
 // File-derived noise: dates, transcript/interview/zoom, extensions, "(2)"
 const NOISE = /(transcript|interview|zoom|recording|meeting|\.(mp4|mov|m4a|pdf|docx?)\b|\d{4}[-_ /]\d{1,2}[-_ /]\d{1,2}|\(\d+\))/i
-
-// Imported text sometimes arrives mis-decoded: an en-dash written as
-// Windows-1252 0x96 isn't valid UTF-8, so it reaches us as U+FFFD ("5<62>7
-// years"). Repair the common cases rather than showing a replacement glyph.
-export function cleanText(v: string | null | undefined): string | null {
-  let t = (v ?? '')
-  if (!t) return null
-  t = t
-    // Classic UTF-8-read-as-Latin-1 sequences
-    .replace(/\u00e2\u0080\u0093/g, '\u2013')
-    .replace(/\u00e2\u0080\u0094/g, '\u2014')
-    .replace(/\u00e2\u0080\u0099/g, '\u2019')
-    .replace(/\u00e2\u0080\u009c|\u00e2\u0080\u009d/g, '"')
-    .replace(/\u00c2/g, '')
-    // A replacement char between digits was a dash: "5<>7 years"
-    .replace(/(\d)\s*\uFFFD\s*(\d)/g, '$1\u2013$2')
-    // Anything left is unrecoverable noise
-    .replace(/\uFFFD/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return t || null
-}
 
 function usable(v: string | null | undefined): string | null {
   const t = cleanText(v) ?? ''
@@ -46,22 +33,52 @@ function usable(v: string | null | undefined): string | null {
   return t
 }
 
+/**
+ * Turn one free-text answer into a presentable title, or null if it can't be
+ * one. A recognised role wins over the candidate's own phrasing so the grid
+ * reads consistently; unrecognised text is only kept when it's short enough to
+ * plausibly be a title rather than a description of their situation.
+ */
+function normalizeTitle(raw: string | null | undefined): string | null {
+  const cleaned = cleanText(raw)
+  if (!cleaned) return null
+
+  // "I am a bookkeeper" -> "bookkeeper". Do this before the junk checks so
+  // "Currently unemployed" is still caught by JUNK_PREFIX.
+  const stripped = stripLeadIn(cleaned)
+
+  // A recognised role is worth extracting even out of a sentence, and even out
+  // of a "not working right now" answer — someone between jobs is still a
+  // bookkeeper, and that's what an employer needs to see on the card.
+  const role = matchRole(stripped)
+  if (role) return role
+
+  if (!usable(stripped)) return null
+
+  // Unrecognised. Keep it only if it reads like a title.
+  if (stripped.split(/\s+/).length > 5) return null
+  return tidyCase(stripped).replace(/[.,;:]+$/, '')
+}
+
 /** A presentable role title, derived from whatever the record actually has. */
 export function displayTitle(
   title: string | null | undefined,
   rolesSeeking?: string | null,
   industries?: string[] | null,
 ): string {
-  const direct = usable(title)
+  const direct = normalizeTitle(title)
   if (direct) return direct
 
   // What they say they're looking for is the next best description
-  const seeking = usable((rolesSeeking ?? '').split(/[,;/|]/)[0])
+  const seeking = normalizeTitle((rolesSeeking ?? '').split(/[,;/|]/)[0])
   if (seeking) return seeking
 
-  // Otherwise describe them by the field they've worked in
-  const field = (industries ?? []).map(usable).find(Boolean)
-  if (field) return `${field} professional`
+  // Otherwise describe them by the field they've worked in. "Other" tells an
+  // employer nothing, so it doesn't count as a field.
+  for (const raw of industries ?? []) {
+    const canon = canonicalIndustry(raw)
+    if (canon && canon !== 'Other') return `${industryLabel(canon)} professional`
+  }
 
   return 'Remote professional'
 }

@@ -2,7 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { INDUSTRIES, EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
+import { EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
+import { BROWSE_INDUSTRIES } from '@/lib/candidateTaxonomy'
 
 export default function BrowseFilters() {
   const router = useRouter()
@@ -45,7 +46,7 @@ export default function BrowseFilters() {
           <span>Industry</span>
           <select value={industry} onChange={e => apply({ industry: e.target.value })}>
             <option value="">All industries</option>
-            {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+            {BROWSE_INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
           </select>
         </label>
 
