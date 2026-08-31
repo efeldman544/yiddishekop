@@ -37,11 +37,16 @@ export type BrowseFilters = {
   q?: string
 }
 
-const LIMIT = 200
+// The pool is in the dozens-to-low-hundreds, so everyone who matches is
+// returned and the page reveals them in batches rather than paging. These caps
+// exist only to stop a runaway response if the pool grows by an order of
+// magnitude; `truncated` says when one actually bit, so it can't silently hide
+// people the way a quiet slice would.
+const LIMIT = 500
 // Fetch wider than we display: industry and availability are matched in JS
 // (below) so stored variants still match, and that filtering has to happen
 // against the full set rather than a pre-trimmed page.
-const FETCH_LIMIT = 600
+const FETCH_LIMIT = 1500
 
 // Stored availability values drift — "Full-time" vs "Full Time" — and an exact
 // array match silently drops those candidates from results, so compare
@@ -75,10 +80,16 @@ export async function poolStats(): Promise<{ total: number; interviewed: number 
   }
 }
 
+export type BrowseResult = {
+  cards: BrowseCard[]
+  /** True when the display cap cut the list — the page says so rather than pretending that's everyone. */
+  truncated: boolean
+}
+
 export async function browseCandidates(
   filters: BrowseFilters,
   revealNames: boolean,
-): Promise<BrowseCard[]> {
+): Promise<BrowseResult> {
   const client = db()
   const { industry, employmentType, q } = filters
 
@@ -161,5 +172,5 @@ export async function browseCandidates(
   // interviewed-first: with the row cap that hid every candidate who hasn't
   // been filmed yet.
   filtered.sort((a, b) => a.title.localeCompare(b.title))
-  return filtered.slice(0, LIMIT)
+  return { cards: filtered.slice(0, LIMIT), truncated: filtered.length > LIMIT }
 }

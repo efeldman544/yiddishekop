@@ -4,9 +4,9 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 import LpFooter from '@/components/LpFooter'
 import { createClient } from '@/lib/supabase/server'
-import { browseCandidates } from '@/lib/browse'
+import { browseCandidates, type BrowseCard } from '@/lib/browse'
 import BrowseFilters from './BrowseFilters'
-import RequestIntroButton from './RequestIntroButton'
+import BrowseGrid from './BrowseGrid'
 
 export const metadata: Metadata = {
   title: 'Browse Candidates | YiddisheKop',
@@ -40,13 +40,14 @@ export default async function BrowsePage({
 
   // A failed lookup must not read as "nobody matched" — that would quietly
   // misrepresent an empty pool to an employer.
-  let cards: Awaited<ReturnType<typeof browseCandidates>> = []
+  let cards: BrowseCard[] = []
+  let truncated = false
   let loadFailed = false
   try {
-    cards = await browseCandidates(
+    ;({ cards, truncated } = await browseCandidates(
       { industry: params.industry, employmentType: params.type, q: params.q },
       revealNames,
-    )
+    ))
   } catch (e) {
     console.error('browse load failed:', e instanceof Error ? e.message : e)
     loadFailed = true
@@ -113,53 +114,16 @@ export default async function BrowsePage({
               </p>
             </div>
           ) : (
-            <div className="browse-grid">
-              {cards.map(c => (
-                <article key={c.key} className="browse-card">
-                  <div className="browse-card-top">
-                    <div>
-                      <h3>{c.title}</h3>
-                      <p className="browse-card-id">
-                        {c.name ? c.name : `Candidate #${c.ref}`}
-                        {c.location && <> · {c.location}</>}
-                      </p>
-                    </div>
-                    {c.interviewed && <span className="browse-badge">Video interviewed</span>}
-                  </div>
-
-                  <div className="browse-card-tags">
-                    {c.industries.slice(0, 3).map(i => (
-                      <span key={i} className="browse-tag">{i}</span>
-                    ))}
-                    {c.employmentType.map(t => (
-                      <span key={t} className="browse-tag browse-tag-muted">{t}</span>
-                    ))}
-                  </div>
-
-                  <dl className="browse-card-meta">
-                    {c.yearsExperience && (
-                      <div><dt>Experience</dt><dd>{c.yearsExperience}</dd></div>
-                    )}
-                    {c.languages && (
-                      <div><dt>Languages</dt><dd>{c.languages}</dd></div>
-                    )}
-                    {c.usHours && (
-                      <div><dt>Hours</dt><dd>Works U.S. hours</dd></div>
-                    )}
-                  </dl>
-
-                  <div className="browse-card-foot">
-                    {c.id ? (
-                      <RequestIntroButton candidateId={c.id} candidateRef={c.ref} />
-                    ) : (
-                      <Link href="/signup?role=employer" className="browse-card-cta">
-                        Unlock this profile
-                      </Link>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
+            <>
+              <BrowseGrid cards={cards} />
+              {truncated && (
+                <p className="browse-truncated">
+                  That&apos;s as far as this list goes. Narrow it with the filters above, or{' '}
+                  <Link href="/start-hiring">tell us what you&apos;re looking for</Link> and
+                  we&apos;ll shortlist for you.
+                </p>
+              )}
+            </>
           )}
           </>
           )}
