@@ -60,7 +60,7 @@ export default function BrowseGrid({ cards }: { cards: BrowseCard[] }) {
                     {c.location && <> · {c.location}</>}
                   </p>
                 </div>
-                {c.interviewed && <span className="browse-badge">Video interviewed</span>}
+                {c.interviewed && <span className="browse-badge">Interviewed</span>}
               </div>
 
               <div className="browse-card-tags">

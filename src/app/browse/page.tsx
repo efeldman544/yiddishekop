@@ -70,7 +70,7 @@ export default async function BrowsePage({
             Browse people who are ready to work.
           </h1>
           <p style={{ fontSize: 17.5, color: 'var(--lp-text-dim)', lineHeight: 1.6, maxWidth: 620 }}>
-            Everyone here has been screened by us; the ones we&apos;ve already put on video are
+            Everyone here has been screened by us; the ones we&apos;ve already interviewed are
             marked. Filter to what you need, then tell us who you want to meet.
           </p>
         </div>
