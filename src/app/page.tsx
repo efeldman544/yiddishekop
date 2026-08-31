@@ -7,10 +7,10 @@ import { INDUSTRIES } from '@/lib/candidateOptions'
 
 export const metadata: Metadata = {
   title: 'YiddisheKop',
-  description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates from the frum community — see the strongest people on video and pick who you want to meet.',
+  description: 'Your next hire is already here. Browse pre-screened remote candidates from the frum community — see the strongest people on video and pick who you want to meet.',
   openGraph: {
     title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
-    description: 'Your next hire is already here. Browse pre-screened, video-interviewed remote candidates — the strongest people, on video.',
+    description: 'Your next hire is already here. Browse pre-screened remote candidates — the strongest people, on video.',
     url: 'https://yiddishekop.app',
     siteName: 'YiddisheKop',
     locale: 'en_US',
@@ -195,7 +195,7 @@ export default function LandingPage() {
         <div className="wrap reveal">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Start here</div>
           <h2>See who&apos;s available.</h2>
-          <p>Browse the candidates we&apos;ve already screened and video-interviewed, and tell us who you&apos;d like to meet.</p>
+          <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
             Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}

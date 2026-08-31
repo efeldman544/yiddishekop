@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { displayTitle, displayName, cleanText } from './candidateDisplay'
+import { displayTitle, cleanText } from './candidateDisplay'
 import { canonicalIndustries, inferIndustry } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
@@ -16,11 +16,15 @@ function db() {
 
 export type BrowseCard = {
   key: string
-  /** Short opaque reference shown instead of a name to logged-out visitors. */
+  /** Short opaque reference — browse never shows a candidate's real name. */
   ref: string
-  /** Real id — only populated when names are revealed. */
+  /**
+   * Real id, only for accounts allowed to request an introduction. There is
+   * deliberately no name field: the introduction is how an employer learns who
+   * someone is, so the name is resolved server-side when the request is made
+   * and never travels with the card.
+   */
   id: string | null
-  name: string | null
   title: string
   location: string | null
   industries: string[]
@@ -114,11 +118,17 @@ export type BrowseResult = {
   cards: BrowseCard[]
   /** True when the display cap cut the list — the page says so rather than pretending that's everyone. */
   truncated: boolean
+  /**
+   * The industries actually present in the pool, given the other filters.
+   * The page offers only these, so every choice returns someone — a fixed list
+   * of all 23 categories was mostly dead ends.
+   */
+  industries: string[]
 }
 
 export async function browseCandidates(
   filters: BrowseFilters,
-  revealNames: boolean,
+  allowIntroRequests: boolean,
 ): Promise<BrowseResult> {
   const client = db()
   const { industry, employmentType, q } = filters
@@ -130,13 +140,13 @@ export async function browseCandidates(
   // mismatch the taxonomy exists to remove.
   const profileQuery = client
     .from('candidate_profiles')
-    .select('id, full_name, current_job_title, roles_seeking, tools_software, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
+    .select('id, current_job_title, roles_seeking, tools_software, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
     .eq('status', 'active')
     .limit(FETCH_LIMIT)
 
   const videoQuery = client
     .from('video_candidates')
-    .select('id, name, current_job_title, location, fields_worked_in, employment_type')
+    .select('id, current_job_title, location, fields_worked_in, employment_type')
     .limit(FETCH_LIMIT)
 
   const [{ data: profiles, error: profileError }, { data: videos, error: videoError }] =
@@ -149,13 +159,13 @@ export async function browseCandidates(
   }
 
   type ProfileRow = {
-    id: string; full_name: string | null; current_job_title: string | null; roles_seeking: string | null
+    id: string; current_job_title: string | null; roles_seeking: string | null
     tools_software: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null; years_experience: string | null
     languages: string | null; us_hours_comfortable: boolean | null; interviewed: boolean | null
   }
   type VideoRow = {
-    id: string; name: string | null; current_job_title: string | null; location: string | null
+    id: string; current_job_title: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null
   }
 
@@ -171,8 +181,7 @@ export async function browseCandidates(
         card: {
           key: `p-${p.id}`,
           ref: refFrom(p.id),
-          id: revealNames ? p.id : null,
-          name: revealNames ? displayName(p.full_name) : null,
+          id: allowIntroRequests ? p.id : null,
           title,
           location: cleanText(p.location),
           industries,
@@ -195,8 +204,7 @@ export async function browseCandidates(
         card: {
           key: `v-${v.id}`,
           ref: refFrom(v.id),
-          id: revealNames ? v.id : null,
-          name: revealNames ? displayName(v.name) : null,
+          id: allowIntroRequests ? v.id : null,
           title,
           location: cleanText(v.location),
           industries,
@@ -215,23 +223,42 @@ export async function browseCandidates(
   // return every remote worker.
   const terms = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
 
-  const filtered = entries.filter(({ card, haystack }) => {
-    // Both sides are canonical by construction: cardIndustries emits only
-    // values the dropdown offers, and "Other" means no category was found.
-    if (industry) {
-      const inIndustry = industry === 'Other'
-        ? card.industries.length === 0
-        : card.industries.includes(industry)
-      if (!inIndustry) return false
-    }
+  // Narrow by everything except industry first, so the industry choices can be
+  // built from what's genuinely left.
+  const pool = entries.filter(({ card, haystack }) => {
     if (employmentType && !card.employmentType.some(t => looseMatch(t, employmentType))) return false
     if (terms.length && !terms.every(t => haystack.includes(t))) return false
     return true
+  })
+
+  // Offer only industries somebody is actually in. Listing all 23 categories
+  // meant most of them returned nothing, which reads as a broken filter rather
+  // than an empty category — and there's no way for a visitor to tell which is
+  // which. "Other" appears only if someone really couldn't be categorized.
+  const present = new Set<string>()
+  let anyUncategorized = false
+  for (const { card } of pool) {
+    if (card.industries.length === 0) anyUncategorized = true
+    for (const i of card.industries) present.add(i)
+  }
+  const industries = [...present].sort((a, b) => a.localeCompare(b))
+  if (anyUncategorized) industries.push('Other')
+
+  const filtered = pool.filter(({ card }) => {
+    if (!industry) return true
+    // "Other" is the absence of a category, not a category.
+    return industry === 'Other'
+      ? card.industries.length === 0
+      : card.industries.includes(industry)
   }).map(e => e.card)
 
   // Order by title so the grid reads consistently. Deliberately NOT
   // interviewed-first: with the row cap that hid every candidate who hasn't
   // been filmed yet.
   filtered.sort((a, b) => a.title.localeCompare(b.title))
-  return { cards: filtered.slice(0, LIMIT), truncated: filtered.length > LIMIT }
+  return {
+    cards: filtered.slice(0, LIMIT),
+    truncated: filtered.length > LIMIT,
+    industries,
+  }
 }

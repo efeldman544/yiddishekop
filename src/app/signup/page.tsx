@@ -2,7 +2,7 @@ import type { Role } from '@/types'
 import SignupForm from './SignupForm'
 
 type Props = {
-  searchParams: Promise<{ email?: string; name?: string; role?: string }>
+  searchParams: Promise<{ email?: string; name?: string; role?: string; next?: string }>
 }
 
 export default async function SignupPage({ searchParams }: Props) {
@@ -14,6 +14,7 @@ export default async function SignupPage({ searchParams }: Props) {
       defaultEmail={params.email ?? ''}
       defaultName={params.name ?? ''}
       defaultRole={defaultRole}
+      next={params.next ?? ''}
     />
   )
 }
