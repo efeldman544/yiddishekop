@@ -48,14 +48,30 @@ const INDUSTRY_RULES: [string, RegExp][] = [
   ['Engineering', /(engineer)/i],
 ]
 
-/** Map a stored industry value onto one of the canonical categories. */
-export function canonicalIndustry(raw: string | null | undefined): string | null {
+/**
+ * The category a piece of free text belongs to, or null when nothing in it
+ * says. Unlike `canonicalIndustry` this does NOT fall back to "Other", so it
+ * is safe to run over a job title: a title we can't place adds no category
+ * rather than mislabelling someone.
+ */
+export function inferIndustry(raw: string | null | undefined): string | null {
   const t = cleanText(raw)
   if (!t) return null
   const exact = CANON_BY_NORM.get(norm(t))
   if (exact) return exact
   for (const [canon, re] of INDUSTRY_RULES) if (re.test(t)) return canon
-  return 'Other'
+  return null
+}
+
+/**
+ * Map a stored industry value onto one of the canonical categories. A value
+ * that was stored as an industry always lands somewhere, so unrecognised ones
+ * become "Other".
+ */
+export function canonicalIndustry(raw: string | null | undefined): string | null {
+  const t = cleanText(raw)
+  if (!t) return null
+  return inferIndustry(t) ?? 'Other'
 }
 
 export function canonicalIndustries(raw: string[] | null | undefined): string[] {

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { displayTitle, displayName, cleanText } from './candidateDisplay'
-import { canonicalIndustries } from './candidateTaxonomy'
+import { canonicalIndustries, inferIndustry } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -63,6 +63,36 @@ function refFrom(id: string) {
   return id.replace(/-/g, '').slice(0, 4).toUpperCase()
 }
 
+/**
+ * The categories a candidate belongs to, judged the way an employer would
+ * judge the card: by the title as well as the fields they ticked.
+ *
+ * Plenty of candidates left `fields_worked_in` empty or answered "Other" while
+ * their title says exactly what they do. Filtering on the stored list alone
+ * dropped those people from the very category the card visibly belongs to —
+ * a bookkeeper missing from Accounting & Finance.
+ *
+ * "Other" is deliberately not in the result: it's not worth a chip on the
+ * card, and an empty list is what the "Other" filter looks for.
+ */
+function cardIndustries(
+  stored: string[] | null | undefined,
+  title: string,
+  rolesSeeking?: string | null,
+): string[] {
+  const out: string[] = []
+  const add = (c: string | null) => { if (c && c !== 'Other' && !out.includes(c)) out.push(c) }
+  for (const c of canonicalIndustries(stored)) add(c)
+  add(inferIndustry(title))
+  add(inferIndustry(rolesSeeking))
+  return out
+}
+
+/** Everything a text search should be able to find this candidate by. */
+function haystackFor(parts: (string | null | undefined)[], industries: string[]): string {
+  return [...parts, ...industries].filter(Boolean).join(' ').toLowerCase()
+}
+
 export async function poolStats(): Promise<{ total: number; interviewed: number }> {
   try {
     const client = db()
@@ -93,22 +123,21 @@ export async function browseCandidates(
   const client = db()
   const { industry, employmentType, q } = filters
 
-  let profileQuery = client
+  // Every filter runs in JS below, against the finished card. Doing the text
+  // search in SQL instead would match the raw stored text — so a search for
+  // "bookkeeper" would miss the candidate whose card says Bookkeeper because
+  // they'd typed "doing the books for a few clients", which is precisely the
+  // mismatch the taxonomy exists to remove.
+  const profileQuery = client
     .from('candidate_profiles')
-    .select('id, full_name, current_job_title, roles_seeking, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
+    .select('id, full_name, current_job_title, roles_seeking, tools_software, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
     .eq('status', 'active')
     .limit(FETCH_LIMIT)
 
-  let videoQuery = client
+  const videoQuery = client
     .from('video_candidates')
     .select('id, name, current_job_title, location, fields_worked_in, employment_type')
     .limit(FETCH_LIMIT)
-
-  if (q?.trim()) {
-    const term = q.trim()
-    profileQuery = profileQuery.or(`current_job_title.ilike.%${term}%,roles_seeking.ilike.%${term}%,tools_software.ilike.%${term}%`)
-    videoQuery = videoQuery.ilike('current_job_title', `%${term}%`)
-  }
 
   const [{ data: profiles, error: profileError }, { data: videos, error: videoError }] =
     await Promise.all([profileQuery, videoQuery])
@@ -120,7 +149,8 @@ export async function browseCandidates(
   }
 
   type ProfileRow = {
-    id: string; full_name: string | null; current_job_title: string | null; roles_seeking: string | null; location: string | null
+    id: string; full_name: string | null; current_job_title: string | null; roles_seeking: string | null
+    tools_software: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null; years_experience: string | null
     languages: string | null; us_hours_comfortable: boolean | null; interviewed: boolean | null
   }
@@ -129,44 +159,75 @@ export async function browseCandidates(
     fields_worked_in: string[] | null; employment_type: string[] | null
   }
 
-  const cards: BrowseCard[] = [
-    ...((profiles ?? []) as ProfileRow[]).map(p => ({
-      key: `p-${p.id}`,
-      ref: refFrom(p.id),
-      id: revealNames ? p.id : null,
-      name: revealNames ? displayName(p.full_name) : null,
-      title: displayTitle(p.current_job_title, p.roles_seeking, p.fields_worked_in),
-      location: cleanText(p.location),
-      industries: canonicalIndustries(p.fields_worked_in),
-      employmentType: p.employment_type ?? [],
-      yearsExperience: cleanText(p.years_experience),
-      languages: cleanText(p.languages),
-      usHours: p.us_hours_comfortable,
-      interviewed: !!p.interviewed,
-    })),
-    ...((videos ?? []) as VideoRow[]).map(v => ({
-      key: `v-${v.id}`,
-      ref: refFrom(v.id),
-      id: revealNames ? v.id : null,
-      name: revealNames ? displayName(v.name) : null,
-      title: displayTitle(v.current_job_title, null, v.fields_worked_in),
-      location: cleanText(v.location),
-      industries: canonicalIndustries(v.fields_worked_in),
-      employmentType: v.employment_type ?? [],
-      yearsExperience: null,
-      languages: null,
-      usHours: null,
-      interviewed: true,
-    })),
+  // The haystack stays server-side — it holds the candidate's own raw wording,
+  // which an anonymized visitor has no business receiving.
+  type Entry = { card: BrowseCard; haystack: string }
+
+  const entries: Entry[] = [
+    ...((profiles ?? []) as ProfileRow[]).map((p): Entry => {
+      const title = displayTitle(p.current_job_title, p.roles_seeking, p.fields_worked_in)
+      const industries = cardIndustries(p.fields_worked_in, title, p.roles_seeking)
+      return {
+        card: {
+          key: `p-${p.id}`,
+          ref: refFrom(p.id),
+          id: revealNames ? p.id : null,
+          name: revealNames ? displayName(p.full_name) : null,
+          title,
+          location: cleanText(p.location),
+          industries,
+          employmentType: p.employment_type ?? [],
+          yearsExperience: cleanText(p.years_experience),
+          languages: cleanText(p.languages),
+          usHours: p.us_hours_comfortable,
+          interviewed: !!p.interviewed,
+        },
+        haystack: haystackFor(
+          [title, p.current_job_title, p.roles_seeking, p.tools_software, p.location],
+          industries,
+        ),
+      }
+    }),
+    ...((videos ?? []) as VideoRow[]).map((v): Entry => {
+      const title = displayTitle(v.current_job_title, null, v.fields_worked_in)
+      const industries = cardIndustries(v.fields_worked_in, title)
+      return {
+        card: {
+          key: `v-${v.id}`,
+          ref: refFrom(v.id),
+          id: revealNames ? v.id : null,
+          name: revealNames ? displayName(v.name) : null,
+          title,
+          location: cleanText(v.location),
+          industries,
+          employmentType: v.employment_type ?? [],
+          yearsExperience: null,
+          languages: null,
+          usHours: null,
+          interviewed: true,
+        },
+        haystack: haystackFor([title, v.current_job_title, v.location], industries),
+      }
+    }),
   ]
 
-  const filtered = cards.filter(c => {
-    // c.industries is already canonical, and the dropdown only offers canonical
-    // values, so this is an exact comparison by construction.
-    if (industry && !c.industries.includes(industry)) return false
-    if (employmentType && !c.employmentType.some(t => looseMatch(t, employmentType))) return false
+  // Multi-word searches read as "all of these", so "remote bookkeeper" doesn't
+  // return every remote worker.
+  const terms = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+
+  const filtered = entries.filter(({ card, haystack }) => {
+    // Both sides are canonical by construction: cardIndustries emits only
+    // values the dropdown offers, and "Other" means no category was found.
+    if (industry) {
+      const inIndustry = industry === 'Other'
+        ? card.industries.length === 0
+        : card.industries.includes(industry)
+      if (!inIndustry) return false
+    }
+    if (employmentType && !card.employmentType.some(t => looseMatch(t, employmentType))) return false
+    if (terms.length && !terms.every(t => haystack.includes(t))) return false
     return true
-  })
+  }).map(e => e.card)
 
   // Order by title so the grid reads consistently. Deliberately NOT
   // interviewed-first: with the row cap that hid every candidate who hasn't
