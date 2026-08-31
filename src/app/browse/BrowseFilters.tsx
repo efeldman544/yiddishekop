@@ -1,13 +1,20 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
-import { BROWSE_INDUSTRIES } from '@/lib/candidateTaxonomy'
 
-export default function BrowseFilters() {
+/**
+ * Industries are clickable rather than a dropdown, and the list comes from the
+ * pool rather than the full category list. Offering all 23 categories meant
+ * most of them returned nobody, and an empty result is indistinguishable from
+ * a broken filter — so only categories somebody is actually in are shown.
+ */
+export default function BrowseFilters({ industries }: { industries: string[] }) {
   const router = useRouter()
   const params = useSearchParams()
+  // Filter the page we're actually on rather than a hardcoded route.
+  const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [q, setQ] = useState(params.get('q') ?? '')
 
@@ -20,10 +27,18 @@ export default function BrowseFilters() {
       if (v) sp.set(k, v)
       else sp.delete(k)
     }
-    startTransition(() => router.push(`/browse?${sp.toString()}`, { scroll: false }))
+    const query = sp.toString()
+    startTransition(() => router.push(query ? `${pathname}?${query}` : pathname, { scroll: false }))
   }
 
   const hasFilters = !!(industry || type || params.get('q'))
+
+  // A selected industry that's no longer in the pool (a stale link, or the
+  // search narrowed it away) still needs a chip, or there'd be no way to see
+  // what's filtering the empty page you're looking at.
+  const chips = industry && !industries.includes(industry)
+    ? [industry, ...industries]
+    : industries
 
   return (
     <div className="browse-filters">
@@ -41,15 +56,31 @@ export default function BrowseFilters() {
         <button type="submit" className="lp-btn lp-btn-primary">Search</button>
       </form>
 
-      <div className="browse-selects">
-        <label>
-          <span>Industry</span>
-          <select value={industry} onChange={e => apply({ industry: e.target.value })}>
-            <option value="">All industries</option>
-            {BROWSE_INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
-          </select>
-        </label>
+      {chips.length > 0 && (
+        <div className="browse-chips" role="group" aria-label="Filter by industry">
+          <button
+            type="button"
+            className={`browse-chip${industry ? '' : ' is-on'}`}
+            aria-pressed={!industry}
+            onClick={() => apply({ industry: '' })}
+          >
+            All industries
+          </button>
+          {chips.map(i => (
+            <button
+              key={i}
+              type="button"
+              className={`browse-chip${industry === i ? ' is-on' : ''}`}
+              aria-pressed={industry === i}
+              onClick={() => apply({ industry: industry === i ? '' : i })}
+            >
+              {i}
+            </button>
+          ))}
+        </div>
+      )}
 
+      <div className="browse-selects">
         <label>
           <span>Availability</span>
           <select value={type} onChange={e => apply({ type: e.target.value })}>
@@ -62,7 +93,7 @@ export default function BrowseFilters() {
           <button
             type="button"
             className="browse-clear"
-            onClick={() => { setQ(''); startTransition(() => router.push('/browse', { scroll: false })) }}
+            onClick={() => { setQ(''); startTransition(() => router.push(pathname, { scroll: false })) }}
           >
             Clear filters
           </button>

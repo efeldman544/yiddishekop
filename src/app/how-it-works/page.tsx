@@ -5,7 +5,7 @@ import LpFooter from '@/components/LpFooter'
 
 export const metadata: Metadata = {
   title: 'How It Works | YiddisheKop',
-  description: 'Browse candidates we have already screened and video-interviewed, tell us who you want to meet, and hire. Three steps to a confident hire — no sifting, no wasted interviews.',
+  description: 'Browse candidates we have already screened, tell us who you want to meet, and hire. Three steps to a confident hire — no sifting, no wasted interviews.',
 }
 
 export default function HowItWorksPage() {
@@ -40,7 +40,7 @@ export default function HowItWorksPage() {
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Ready to start?</div>
           <h2>See who&apos;s available.</h2>
-          <p>Browse the candidates we&apos;ve already screened and video-interviewed, and tell us who you&apos;d like to meet.</p>
+          <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
             Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}

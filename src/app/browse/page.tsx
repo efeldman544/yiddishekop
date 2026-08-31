@@ -10,10 +10,10 @@ import BrowseGrid from './BrowseGrid'
 
 export const metadata: Metadata = {
   title: 'Browse Candidates | YiddisheKop',
-  description: 'Browse vetted, video-interviewed remote professionals from the frum community — bookkeepers, admins, sales, developers and more. Available now, no job post required.',
+  description: 'Browse vetted remote professionals from the frum community — bookkeepers, admins, sales, developers and more. Available now, no job post required.',
   openGraph: {
     title: 'Browse Candidates | YiddisheKop',
-    description: 'Vetted, video-interviewed remote professionals — available now. Browse the pool and pick who you want to meet.',
+    description: 'Vetted remote professionals — available now. Browse the pool and pick who you want to meet.',
     url: 'https://yiddishekop.app/browse',
     siteName: 'YiddisheKop',
     type: 'website',
@@ -35,18 +35,20 @@ export default async function BrowsePage({
       .from('profiles').select('role').eq('id', user.id).single<{ role: string }>()
     role = profile?.role ?? null
   }
-  // Names, and the ability to ask for an introduction, are for hiring accounts
-  const revealNames = role === 'employer' || role === 'admin'
+  // Browse never shows names — an introduction is how an employer learns who
+  // someone is. Hiring accounts get the ability to ask for one.
+  const canRequestIntro = role === 'employer' || role === 'admin'
 
   // A failed lookup must not read as "nobody matched" — that would quietly
   // misrepresent an empty pool to an employer.
   let cards: BrowseCard[] = []
+  let industries: string[] = []
   let truncated = false
   let loadFailed = false
   try {
-    ;({ cards, truncated } = await browseCandidates(
+    ;({ cards, truncated, industries } = await browseCandidates(
       { industry: params.industry, employmentType: params.type, q: params.q },
-      revealNames,
+      canRequestIntro,
     ))
   } catch (e) {
     console.error('browse load failed:', e instanceof Error ? e.message : e)
@@ -68,8 +70,8 @@ export default async function BrowsePage({
             Browse people who are ready to work.
           </h1>
           <p style={{ fontSize: 17.5, color: 'var(--lp-text-dim)', lineHeight: 1.6, maxWidth: 620 }}>
-            Every candidate here has already been screened and video-interviewed by us. Filter to
-            what you need, then tell us who you want to meet.
+            Everyone here has been screened by us; the ones we&apos;ve already put on video are
+            marked. Filter to what you need, then tell us who you want to meet.
           </p>
         </div>
       </section>
@@ -77,15 +79,15 @@ export default async function BrowsePage({
       <section style={{ padding: '0 0 80px' }}>
         <div className="wrap">
           <Suspense fallback={null}>
-            <BrowseFilters />
+            <BrowseFilters industries={industries} />
           </Suspense>
 
-          {!revealNames && (
+          {!canRequestIntro && (
             <div className="browse-gate">
               <div>
                 <strong>You&apos;re seeing anonymized profiles.</strong>
                 <p>
-                  Create a free hiring account to see names, watch interview clips, and request an
+                  Create a free hiring account to watch interview clips and request an
                   introduction. We keep candidate details private until then.
                 </p>
               </div>

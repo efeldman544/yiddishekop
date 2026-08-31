@@ -26,7 +26,7 @@ export default function BrowseGrid({ cards }: { cards: BrowseCard[] }) {
               <div>
                 <h3>{c.title}</h3>
                 <p className="browse-card-id">
-                  {c.name ? c.name : `Candidate #${c.ref}`}
+                  Candidate #{c.ref}
                   {c.location && <> · {c.location}</>}
                 </p>
               </div>

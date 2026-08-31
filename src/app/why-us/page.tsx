@@ -64,7 +64,7 @@ export default function WhyUsPage() {
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Ready?</div>
           <h2>See who&apos;s available.</h2>
-          <p>Browse the candidates we&apos;ve already screened and video-interviewed, and tell us who you&apos;d like to meet.</p>
+          <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">Prefer to talk? <a href="tel:6314943567">631 494 3567</a></div>
         </div>
