@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { displayTitle, displayName, cleanText } from './candidateDisplay'
+import { canonicalIndustries } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -42,9 +43,10 @@ const LIMIT = 200
 // against the full set rather than a pre-trimmed page.
 const FETCH_LIMIT = 600
 
-// Stored values drift — "Full-time" vs "Full Time", "Other:: Doing accounting
-// for clients" vs "Other". An exact array match silently drops those
-// candidates from results, so compare loosely.
+// Stored availability values drift — "Full-time" vs "Full Time" — and an exact
+// array match silently drops those candidates from results, so compare
+// loosely. Industries go through the taxonomy instead, which maps the far
+// wider spread of stored values onto the same list the filter offers.
 function looseMatch(value: string, filter: string): boolean {
   const a = value.toLowerCase().replace(/[^a-z0-9]+/g, '')
   const b = filter.toLowerCase().replace(/[^a-z0-9]+/g, '')
@@ -124,7 +126,7 @@ export async function browseCandidates(
       name: revealNames ? displayName(p.full_name) : null,
       title: displayTitle(p.current_job_title, p.roles_seeking, p.fields_worked_in),
       location: cleanText(p.location),
-      industries: (p.fields_worked_in ?? []).map(i => cleanText(i) ?? i),
+      industries: canonicalIndustries(p.fields_worked_in),
       employmentType: p.employment_type ?? [],
       yearsExperience: cleanText(p.years_experience),
       languages: cleanText(p.languages),
@@ -138,7 +140,7 @@ export async function browseCandidates(
       name: revealNames ? displayName(v.name) : null,
       title: displayTitle(v.current_job_title, null, v.fields_worked_in),
       location: cleanText(v.location),
-      industries: (v.fields_worked_in ?? []).map(i => cleanText(i) ?? i),
+      industries: canonicalIndustries(v.fields_worked_in),
       employmentType: v.employment_type ?? [],
       yearsExperience: null,
       languages: null,
@@ -148,7 +150,9 @@ export async function browseCandidates(
   ]
 
   const filtered = cards.filter(c => {
-    if (industry && !c.industries.some(i => looseMatch(i, industry))) return false
+    // c.industries is already canonical, and the dropdown only offers canonical
+    // values, so this is an exact comparison by construction.
+    if (industry && !c.industries.includes(industry)) return false
     if (employmentType && !c.employmentType.some(t => looseMatch(t, employmentType))) return false
     return true
   })
