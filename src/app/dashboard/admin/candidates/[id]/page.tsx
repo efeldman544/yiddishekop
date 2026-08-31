@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoSection, { type Video } from './VideoSection'
 import AdminControls, { type Employer } from './AdminControls'
-import BackButton from './BackButton'
+import BackButton from '@/components/BackButton'
 import EditCandidatePanel from './EditCandidatePanel'
 import ResumeSection from './ResumeSection'
 
@@ -41,7 +41,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
   return (
     <main className="px-8 py-8 space-y-6">
 
-      <BackButton />
+      <BackButton fallback="/dashboard/admin" label="Back to candidates" />
 
       <Card>
         <CardContent className="pt-6">

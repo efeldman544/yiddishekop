@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import AdminSidebar from '@/components/AdminSidebar'
+import ScrollMemory from '@/components/ScrollMemory'
 import NotificationBell from '@/components/NotificationBell'
 import SignOutButton from '@/components/SignOutButton'
 
@@ -11,7 +13,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <NotificationBell />
           <SignOutButton />
         </header>
-        <main className="flex-1 overflow-y-auto">
+        {/* The scrolling element is this <main>, not the document, so it needs
+            its own scroll restoration — see ScrollMemory. */}
+        <main id="admin-scroll" className="flex-1 overflow-y-auto">
+          <Suspense fallback={null}>
+            <ScrollMemory targetId="admin-scroll" />
+          </Suspense>
           {children}
         </main>
       </div>
