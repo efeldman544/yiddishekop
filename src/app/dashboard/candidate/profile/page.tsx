@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { CandidateProfile } from '@/types'
+import { INDUSTRIES, EMPLOYMENT_TYPES, EXPERIENCE_LEVELS, EDUCATION_LEVELS } from '@/lib/candidateOptions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,25 +15,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-const EDUCATION_OPTIONS = [
-  'High School / GED', 'Some College', "Associate's Degree", "Bachelor's Degree",
-  "Master's Degree", 'Doctorate / PhD', 'Professional Degree (JD, MD, etc.)', 'Other',
-]
-
-const EXPERIENCE_OPTIONS = ['Less than 1 year', '1–2 years', '3–5 years', '6–10 years', '10+ years']
-
-const FIELDS_WORKED_IN = [
-  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
-  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
-  'Education & Training', 'Engineering', 'Healthcare & Medical',
-  'Hospitality & Travel', 'Human Resources', 'Information Technology',
-  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
-  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
-  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
-  'Sales & Business Development', 'Technology & Software', 'Other',
-]
-
-const EMPLOYMENT_TYPES = ['Full Time', 'Part Time']
+// Industries, availability and experience come from the shared list. They were
+// copied here once, and the copy had already drifted: it still offered
+// "Information Technology" (which browse files under Technology & Software) and
+// omitted Contract, so nobody could ever be found by the Contract filter.
 
 type FormState = {
   full_name: string; email: string; phone: string; whatsapp: string; location: string
@@ -204,14 +190,14 @@ export default function CandidateProfilePage() {
                 <Label>Education <span className="text-destructive">*</span></Label>
                 <Select value={form.education_level} onValueChange={v => set('education_level', v)}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>{EDUCATION_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EDUCATION_LEVELS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Years of Experience <span className="text-destructive">*</span></Label>
                 <Select value={form.years_experience} onValueChange={v => set('years_experience', v)}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>{EXPERIENCE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EXPERIENCE_LEVELS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
@@ -236,7 +222,7 @@ export default function CandidateProfilePage() {
             <div className="space-y-2">
               <Label>Fields You&apos;ve Worked In <span className="text-destructive">*</span></Label>
               <div className="grid grid-cols-2 gap-2">
-                {FIELDS_WORKED_IN.map(field => (
+                {INDUSTRIES.map(field => (
                   <div key={field} className="flex items-center gap-2">
                     <Checkbox
                       id={`field-${field}`}

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import LpHeader from '@/components/LpHeader'
 import LpFooter from '@/components/LpFooter'
 import RevealObserver from '@/components/RevealObserver'
-import { INDUSTRIES } from '@/lib/candidateOptions'
+import { poolIndustries } from '@/lib/browse'
 
 export const metadata: Metadata = {
   title: 'YiddisheKop',
@@ -18,7 +18,15 @@ export const metadata: Metadata = {
   },
 }
 
-export default function LandingPage() {
+// Cached, refreshed hourly: the roles below come from the live pool, but that
+// is not worth a database round trip on every visit to the home page.
+export const revalidate = 3600
+
+export default async function LandingPage() {
+  // Link only to industries somebody is actually in, so a chip here can never
+  // land on an empty browse page.
+  const roles = await poolIndustries()
+
   return (
     <div className="lp">
       <RevealObserver />
@@ -177,7 +185,7 @@ export default function LandingPage() {
             <p>Full-time or part-time, working in your hours.</p>
           </div>
           <div className="lp-roles reveal">
-            {INDUSTRIES.filter(r => r !== 'Other').map(role => (
+            {roles.map(role => (
               <Link
                 key={role}
                 href={`/browse?industry=${encodeURIComponent(role)}`}

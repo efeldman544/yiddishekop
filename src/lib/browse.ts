@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { displayTitle, cleanText } from './candidateDisplay'
-import { canonicalIndustries, inferIndustry } from './candidateTaxonomy'
+import { canonicalIndustries, inferIndustry, BROWSE_INDUSTRIES } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -95,6 +95,37 @@ function cardIndustries(
 /** Everything a text search should be able to find this candidate by. */
 function haystackFor(parts: (string | null | undefined)[], industries: string[]): string {
   return [...parts, ...industries].filter(Boolean).join(' ').toLowerCase()
+}
+
+/**
+ * The industries somebody in the pool is actually in — the same set browse
+ * offers as chips. The home page links into browse with these, so a link there
+ * can't land on an empty list.
+ *
+ * Falls back to the full category list if the lookup fails, so a database
+ * hiccup thins the section rather than deleting it.
+ */
+export async function poolIndustries(): Promise<string[]> {
+  try {
+    const client = db()
+    const [{ data: profiles, error: pErr }, { data: videos, error: vErr }] = await Promise.all([
+      client.from('candidate_profiles').select('current_job_title, roles_seeking, fields_worked_in').eq('status', 'active').limit(FETCH_LIMIT),
+      client.from('video_candidates').select('current_job_title, fields_worked_in').limit(FETCH_LIMIT),
+    ])
+    if (pErr || vErr) throw new Error(pErr?.message ?? vErr?.message)
+
+    type Row = { current_job_title: string | null; roles_seeking?: string | null; fields_worked_in: string[] | null }
+    const present = new Set<string>()
+    for (const r of [...(profiles ?? []), ...(videos ?? [])] as Row[]) {
+      const title = displayTitle(r.current_job_title, r.roles_seeking ?? null, r.fields_worked_in)
+      for (const i of cardIndustries(r.fields_worked_in, title, r.roles_seeking)) present.add(i)
+    }
+    if (present.size === 0) throw new Error('no industries in pool')
+    return [...present].sort((a, b) => a.localeCompare(b))
+  } catch (e) {
+    console.error('poolIndustries failed:', e instanceof Error ? e.message : e)
+    return BROWSE_INDUSTRIES.filter(i => i !== 'Other')
+  }
 }
 
 export async function poolStats(): Promise<{ total: number; interviewed: number }> {

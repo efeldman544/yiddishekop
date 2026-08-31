@@ -9,18 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent } from '@/components/ui/card'
+import { INDUSTRIES, EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
 
-const FIELDS = [
-  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
-  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
-  'Education & Training', 'Engineering', 'Healthcare & Medical',
-  'Hospitality & Travel', 'Human Resources', 'Information Technology',
-  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
-  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
-  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
-  'Sales & Business Development', 'Technology & Software', 'Other',
-]
-const EMP_TYPES = ['Full Time', 'Part Time']
+
 
 type VideoCandidate = {
   id: string
@@ -138,7 +129,7 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
           <div className="space-y-1.5">
             <Label>Fields worked in</Label>
             <div className="grid grid-cols-3 gap-2">
-              {FIELDS.map(f => (
+              {INDUSTRIES.map(f => (
                 <div key={f} className="flex items-center gap-2">
                   <Checkbox id={`f-${f}`} checked={fields.includes(f)} onCheckedChange={() => toggleArr(fields, setFields, f)} />
                   <Label htmlFor={`f-${f}`} className="font-normal cursor-pointer text-xs">{f}</Label>
@@ -150,7 +141,7 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
           <div className="space-y-1.5">
             <Label>Employment type</Label>
             <div className="flex gap-6">
-              {EMP_TYPES.map(t => (
+              {EMPLOYMENT_TYPES.map(t => (
                 <div key={t} className="flex items-center gap-2">
                   <Checkbox id={`e-${t}`} checked={empType.includes(t)} onCheckedChange={() => toggleArr(empType, setEmpType, t)} />
                   <Label htmlFor={`e-${t}`} className="font-normal cursor-pointer text-sm">{t}</Label>
