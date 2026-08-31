@@ -200,9 +200,10 @@ export async function browseCandidates(
     fields_worked_in: string[] | null; employment_type: string[] | null
   }
 
-  // The haystack stays server-side — it holds the candidate's own raw wording,
-  // which an anonymized visitor has no business receiving.
-  type Entry = { card: BrowseCard; haystack: string }
+  // Both extras stay server-side. The haystack holds the candidate's own raw
+  // wording, which an anonymized visitor has no business receiving; the title
+  // industry only exists to order results.
+  type Entry = { card: BrowseCard; haystack: string; titleIndustry: string | null }
 
   const entries: Entry[] = [
     ...((profiles ?? []) as ProfileRow[]).map((p): Entry => {
@@ -226,6 +227,7 @@ export async function browseCandidates(
           [title, p.current_job_title, p.roles_seeking, p.tools_software, p.location],
           industries,
         ),
+        titleIndustry: inferIndustry(title),
       }
     }),
     ...((videos ?? []) as VideoRow[]).map((v): Entry => {
@@ -246,6 +248,7 @@ export async function browseCandidates(
           interviewed: true,
         },
         haystack: haystackFor([title, v.current_job_title, v.location], industries),
+        titleIndustry: inferIndustry(title),
       }
     }),
   ]
@@ -281,15 +284,26 @@ export async function browseCandidates(
     return industry === 'Other'
       ? card.industries.length === 0
       : card.industries.includes(industry)
-  }).map(e => e.card)
+  })
 
-  // Order by title so the grid reads consistently. Deliberately NOT
-  // interviewed-first: with the row cap that hid every candidate who hasn't
-  // been filmed yet.
-  filtered.sort((a, b) => a.title.localeCompare(b.title))
+  // Someone whose job title IS the thing you filtered for is a better answer
+  // than someone who merely ticked that field once, so title matches lead.
+  // Within each group, order by title so the grid reads consistently.
+  // Deliberately NOT interviewed-first: with the row cap that hid every
+  // candidate who hasn't been filmed yet.
+  filtered.sort((a, b) => {
+    if (industry) {
+      const aTitle = a.titleIndustry === industry ? 0 : 1
+      const bTitle = b.titleIndustry === industry ? 0 : 1
+      if (aTitle !== bTitle) return aTitle - bTitle
+    }
+    return a.card.title.localeCompare(b.card.title)
+  })
+
+  const cards = filtered.map(e => e.card)
   return {
-    cards: filtered.slice(0, LIMIT),
-    truncated: filtered.length > LIMIT,
+    cards: cards.slice(0, LIMIT),
+    truncated: cards.length > LIMIT,
     industries,
   }
 }
