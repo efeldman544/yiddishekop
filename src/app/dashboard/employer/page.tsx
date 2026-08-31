@@ -16,6 +16,13 @@ type CandidateSummary = {
   action?: string | null
 }
 
+type IntroRequest = {
+  id: string
+  candidate_ref: string | null
+  status: string
+  created_at: string
+}
+
 type VideoCandidate = {
   id: string
   name: string
@@ -29,6 +36,7 @@ export default function EmployerDashboard() {
   const router = useRouter()
   const [candidates, setCandidates] = useState<CandidateSummary[]>([])
   const [videoCandidates, setVideoCandidates] = useState<VideoCandidate[]>([])
+  const [introRequests, setIntroRequests] = useState<IntroRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [employerName, setEmployerName] = useState<string | null>(null)
 
@@ -45,6 +53,16 @@ export default function EmployerDashboard() {
 
       setEmployerName(profile?.full_name ?? null)
       const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
+
+      // Introductions this employer asked for on /browse. Tolerated if the
+      // migration hasn't been run yet — the rest of the dashboard still loads.
+      const { data: intros, error: introError } = await supabase
+        .from('introduction_requests')
+        .select('id, candidate_ref, status, created_at')
+        .eq('employer_id', user.id)
+        .order('created_at', { ascending: false })
+      if (introError) console.error('intro requests load failed:', introError.message)
+      setIntroRequests((intros ?? []) as IntroRequest[])
 
       // Candidates reach an employer two ways: via a job (candidate_job_assignments
       // → their job) or assigned directly by an admin on the candidate page
@@ -66,6 +84,7 @@ export default function EmployerDashboard() {
 
       const candidateIds = Object.keys(actionMap)
       if (candidateIds.length === 0) { setLoading(false); return }
+
 
       const { data: profiles } = await supabase
         .from('candidate_profiles')
@@ -117,13 +136,52 @@ export default function EmployerDashboard() {
           <p className="text-sm text-gray-400 mt-1">
             {(() => {
               const pending = candidates.filter(c => !c.action).length
-              if (candidates.length === 0) return 'No candidates matched to your roles yet.'
+              if (candidates.length === 0) {
+                return introRequests.length > 0
+                  ? `${introRequests.length} introduction${introRequests.length !== 1 ? 's' : ''} requested.`
+                  : 'No candidates matched to your roles yet.'
+              }
               if (pending === 0) return 'All candidates reviewed.'
               return `${pending} candidate${pending !== 1 ? 's' : ''} awaiting review.`
             })()}
           </p>
         </div>
       </div>
+
+
+      {introRequests.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Introductions you requested</p>
+          {introRequests.map(r => {
+            const label = r.status === 'actioned' ? 'Introduced'
+              : r.status === 'dismissed' ? 'Closed'
+              : 'With our team'
+            const tone = r.status === 'actioned'
+              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              : r.status === 'dismissed'
+                ? 'bg-gray-100 text-gray-500 border-gray-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            return (
+              <div key={r.id} className="bg-white border border-gray-100 rounded-xl shadow-sm px-6 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-950">
+                    Candidate #{r.candidate_ref ?? '—'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Requested {new Date(r.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${tone}`}>
+                  {label}
+                </span>
+              </div>
+            )
+          })}
+          <p className="text-xs text-gray-400">
+            We reach out to the candidate and come back to you with the introduction.
+          </p>
+        </div>
+      )}
 
       {candidates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">

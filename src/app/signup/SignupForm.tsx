@@ -4,15 +4,18 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { safeNextPath } from '@/lib/nextPath'
 import type { Role } from '@/types'
 
 type Props = {
   defaultEmail?: string
   defaultName?: string
   defaultRole?: Role | ''
+  /** Where to land after signing up — set when someone was sent here mid-task. */
+  next?: string
 }
 
-export default function SignupForm({ defaultEmail = '', defaultName = '', defaultRole = '' }: Props) {
+export default function SignupForm({ defaultEmail = '', defaultName = '', defaultRole = '', next = '' }: Props) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -54,7 +57,10 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
       }
     }
 
-    router.push(`/dashboard/${role}`)
+    // Someone who came here from a candidate they wanted goes back to that
+    // candidate, not to an empty dashboard — otherwise signing up loses the
+    // thing they were actually trying to do.
+    router.push(safeNextPath(next, `/dashboard/${role}`))
     router.refresh()
   }
 
@@ -105,7 +111,7 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
 
           <p className="auth-footer">
             Already have an account?{' '}
-            <Link href="/login">Sign in</Link>
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Sign in</Link>
           </p>
         </div>
       </div>

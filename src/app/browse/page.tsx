@@ -117,7 +117,9 @@ export default async function BrowsePage({
             </div>
           ) : (
             <>
-              <BrowseGrid cards={cards} />
+              <Suspense fallback={null}>
+                <BrowseGrid cards={cards} />
+              </Suspense>
               {truncated && (
                 <p className="browse-truncated">
                   That&apos;s as far as this list goes. Narrow it with the filters above, or{' '}

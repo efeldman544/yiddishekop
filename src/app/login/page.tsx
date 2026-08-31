@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { safeNextPath } from '@/lib/nextPath'
 import type { Role } from '@/types'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const params = useSearchParams()
+  const nextPath = params.get('next') ?? ''
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -36,7 +39,8 @@ export default function LoginPage() {
       .single<{ role: Role }>()
 
     const role: Role = profile?.role ?? (data.user.user_metadata?.role as Role) ?? 'candidate'
-    router.push(`/dashboard/${role}`)
+    // Back to whatever they were doing before they were asked to log in.
+    router.push(safeNextPath(params.get('next'), `/dashboard/${role}`))
     router.refresh()
   }
 
@@ -91,7 +95,7 @@ export default function LoginPage() {
 
           <p className="auth-footer">
             Don&apos;t have an account?{' '}
-            <Link href="/signup">Sign up</Link>
+            <Link href={nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'}>Sign up</Link>
           </p>
           <p className="auth-footer" style={{ marginTop: 8 }}>
             <Link href="/" style={{ color: 'var(--auth-dim)' }}>← Back to home</Link>
@@ -99,5 +103,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

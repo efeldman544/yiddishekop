@@ -686,6 +686,11 @@ input, textarea, select {
   background: var(--lp-accent); border-color: var(--lp-accent); color: #fff; font-weight: 600;
 }
 
+.lp .browse-card.is-wanted {
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lp-accent) 22%, transparent);
+}
+
 .lp .browse-more { display: flex; justify-content: center; margin-top: 28px; }
 .lp .browse-truncated {
   margin-top: 20px; text-align: center; font-size: 14.5px; color: var(--lp-text-dim); line-height: 1.6;
