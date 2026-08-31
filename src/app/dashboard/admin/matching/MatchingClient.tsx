@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { notifyAssigned } from '@/lib/notifyAssigned'
 
 export type MatchJob = {
   id: string
@@ -339,6 +340,12 @@ export default function MatchingClient({
         setAiError(`Couldn't save assignment: ${error.message}`)
       } else {
         setAssignments(prev => [...prev, { candidate_id: candidateId, job_id: selectedJobId }])
+        // Assigning here used to tell the employer nothing — the candidate
+        // simply appeared in their portal with no prompt to look.
+        notifyAssigned(
+          { candidate_id: candidateId, job_id: selectedJobId },
+          msg => setAiError(`Assigned, but the employer wasn't notified: ${msg}`),
+        )
       }
     }
     setToggling(null)

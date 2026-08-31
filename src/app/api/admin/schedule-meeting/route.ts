@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { notify, adminIds } from '@/lib/notify'
 
 function adminClient() {
   return createAdminClient(
@@ -79,31 +80,31 @@ export async function POST(req: Request) {
     hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
   })
 
-  const { data: admins } = await admin.from('profiles').select('id').eq('role', 'admin')
-
-  await admin.from('notifications').insert([
+  // The employer is the one who most needs to hear this, and they used to lose
+  // it whenever another recipient's row was rejected — a candidate added by an
+  // admin has no auth user, and one bad row aborts a multi-row insert. notify()
+  // retries per recipient so that can't happen.
+  const admins = await adminIds(admin)
+  const notified = await notify(admin, [
     {
       user_id: employer_id,
       type: 'meeting_scheduled',
       message: `Your meeting with ${candidateName} is scheduled for ${dateStr}.`,
       candidate_id,
-      read: false,
     },
     {
       user_id: candidate_id,
       type: 'meeting_scheduled',
       message: `A meeting has been scheduled for you on ${dateStr}.`,
       candidate_id,
-      read: false,
     },
-    ...(admins ?? []).map((a: { id: string }) => ({
-      user_id: a.id,
+    ...admins.map(id => ({
+      user_id: id,
       type: 'meeting_scheduled',
       message: `Meeting confirmed: ${employerName} + ${candidateName} on ${dateStr}`,
       candidate_id,
-      read: false,
     })),
   ])
 
-  return Response.json({ id: meeting.id })
+  return Response.json({ id: meeting.id, notified: notified.ok, notifyError: notified.error })
 }

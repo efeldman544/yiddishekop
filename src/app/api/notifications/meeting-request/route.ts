@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { notify } from '@/lib/notify'
 
 function adminClient() {
   return createAdminClient(
@@ -24,20 +25,15 @@ export async function POST(req: Request) {
     admin.from('profiles').select('id').eq('role', 'admin'),
   ])
 
-  if (!admins?.length) return new Response('OK', { status: 200 })
-
   const employerName = employer?.full_name ?? 'An employer'
   const candidateName = candidate?.full_name ?? 'a candidate'
 
-  await admin.from('notifications').insert(
-    admins.map((a: { id: string }) => ({
-      user_id: a.id,
-      type: 'meeting_request',
-      message: `${employerName} wants to meet ${candidateName}`,
-      candidate_id,
-      read: false,
-    }))
-  )
+  const result = await notify(admin, (admins ?? []).map((a: { id: string }) => ({
+    user_id: a.id,
+    type: 'meeting_request',
+    message: `${employerName} wants to meet ${candidateName}`,
+    candidate_id,
+  })))
 
-  return new Response('OK', { status: 200 })
+  return Response.json({ ok: true, notified: result.ok })
 }

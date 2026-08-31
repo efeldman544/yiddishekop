@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { INDUSTRIES as ALL_INDUSTRIES } from '@/lib/candidateOptions'
+import { notifyAssigned } from '@/lib/notifyAssigned'
 
 
 
@@ -42,6 +43,7 @@ export default function AdminControls({
   const [assignedIds, setAssignedIds] = useState<string[]>(initialAssignedIds)
   const [employerActions, setEmployerActions] = useState<Record<string, string | null>>(initialEmployerActions)
   const [togglingEmployer, setTogglingEmployer] = useState<string | null>(null)
+  const [assignError, setAssignError] = useState<string | null>(null)
 
   async function saveMeta() {
     setSavingMeta(true); setMetaSaved(false)
@@ -57,6 +59,7 @@ export default function AdminControls({
 
   async function toggleAssignment(employerId: string) {
     setTogglingEmployer(employerId)
+    setAssignError(null)
     const supabase = createClient()
     const isAssigned = assignedIds.includes(employerId)
     if (isAssigned) {
@@ -64,8 +67,21 @@ export default function AdminControls({
       setAssignedIds(prev => prev.filter(eid => eid !== employerId))
       setEmployerActions(prev => { const next = { ...prev }; delete next[employerId]; return next })
     } else {
-      await supabase.from('employer_candidate_assignments').insert({ employer_id: employerId, candidate_id: candidateId })
+      const { error } = await supabase
+        .from('employer_candidate_assignments')
+        .insert({ employer_id: employerId, candidate_id: candidateId })
+      if (error) {
+        setAssignError(`Couldn't assign: ${error.message}`)
+        setTogglingEmployer(null)
+        return
+      }
       setAssignedIds(prev => [...prev, employerId])
+      // A direct assignment used to notify nobody at all, so the employer had
+      // no way to know a candidate was waiting for them.
+      notifyAssigned(
+        { candidate_id: candidateId, employer_id: employerId },
+        msg => setAssignError(`Assigned, but the employer wasn't notified: ${msg}`),
+      )
     }
     setTogglingEmployer(null)
   }
@@ -107,6 +123,11 @@ export default function AdminControls({
       <Card>
         <CardHeader><CardTitle className="text-sm">Assign to employers</CardTitle></CardHeader>
         <CardContent>
+          {assignError && (
+            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {assignError}
+            </p>
+          )}
           {employers.length === 0 ? (
             <p className="text-xs text-muted-foreground">No employer accounts found.</p>
           ) : (
