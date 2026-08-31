@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as adminSupabase } from '@supabase/supabase-js'
 import { displayName } from '@/lib/candidateDisplay'
+import { notify, adminIds } from '@/lib/notify'
 
 function adminClient() {
   return adminSupabase(
@@ -59,26 +60,19 @@ export async function POST(req: Request) {
     console.error('introduction_requests insert failed:', insertError.message)
   }
 
-  const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin')
-  if (admins?.length) {
-    const { error: notifyError } = await db.from('notifications').insert(
-      admins.map((a: { id: string }) => ({
-        user_id: a.id,
-        type: 'intro_request',
-        message: `${who} requested an introduction to ${candidateName}`,
-        candidate_id: cp ? candidateId : null,
-        read: false,
-      }))
-    )
-    if (notifyError) {
-      console.error('intro notification failed:', notifyError.message)
-      // If neither the queue nor the bell captured it, tell the employer
-      // rather than showing a false success.
-      if (!recorded) {
-        return new Response('Could not record that request — please call us instead.', { status: 500 })
-      }
-    }
+  const admins = await adminIds(db)
+  const notified = await notify(db, admins.map(id => ({
+    user_id: id,
+    type: 'intro_request',
+    message: `${who} requested an introduction to ${candidateName}`,
+    candidate_id: cp ? candidateId : null,
+  })))
+
+  // If neither the queue nor the bell captured it, the request is genuinely
+  // lost — tell the employer rather than showing a false success.
+  if (!recorded && !notified.ok) {
+    return new Response('Could not record that request — please call us instead.', { status: 500 })
   }
 
-  return Response.json({ ok: true, recorded })
+  return Response.json({ ok: true, recorded, notified: notified.ok })
 }

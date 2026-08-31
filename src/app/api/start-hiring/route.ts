@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { notify, adminIds } from '@/lib/notify'
 
 function adminClient() {
   return createClient(
@@ -54,18 +55,14 @@ export async function POST(req: Request) {
     return new Response(error.message, { status: 500 })
   }
 
-  const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin')
-  if (admins?.length) {
-    await db.from('notifications').insert(
-      admins.map((a: { id: string }) => ({
-        user_id: a.id,
-        type: 'new_lead',
-        message: `New hiring inquiry: ${contact_name}${company_name ? ` (${company_name})` : ''} — ${role_title}`,
-        candidate_id: null,
-        read: false,
-      }))
-    )
-  }
+  const admins = await adminIds(db)
+  const notified = await notify(db, admins.map((id: string) => ({
+    user_id: id,
+    type: 'new_lead',
+    message: `New hiring inquiry: ${contact_name}${company_name ? ` (${company_name})` : ''} — ${role_title}`,
+  })))
 
-  return Response.json({ ok: true })
+  // The request itself is saved either way — say so rather than reporting a
+  // clean success when nobody was actually told.
+  return Response.json({ ok: true, notified: notified.ok })
 }
