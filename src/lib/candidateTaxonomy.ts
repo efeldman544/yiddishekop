@@ -9,17 +9,21 @@ import { cleanText } from './textClean'
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '')
 
-// Two list entries mean the same thing. Folding them keeps the filter from
-// splitting one real category across two buckets, so a search for software
-// people finds everyone regardless of which list they signed up under.
-const MERGED: Record<string, string> = {
+// Labels the app no longer offers but candidates are already stored under.
+// They mean the same thing as a current category, so folding them keeps one
+// real category from splitting across two buckets where neither filter finds
+// everyone.
+const RETIRED: Record<string, string> = {
   'Information Technology': 'Technology & Software',
 }
 
 /** The categories a candidate can actually be filed under after canonicalization. */
-export const BROWSE_INDUSTRIES: string[] = INDUSTRIES.filter(i => !(i in MERGED))
+export const BROWSE_INDUSTRIES: string[] = INDUSTRIES.filter(i => !(i in RETIRED))
 
-const CANON_BY_NORM = new Map(INDUSTRIES.map(i => [norm(i), MERGED[i] ?? (i as string)]))
+const CANON_BY_NORM = new Map<string, string>([
+  ...INDUSTRIES.map(i => [norm(i), RETIRED[i] ?? (i as string)] as [string, string]),
+  ...Object.entries(RETIRED).map(([from, to]) => [norm(from), to] as [string, string]),
+])
 
 // Ordered: more specific rules first, since "engineer" and "account" appear
 // inside several categories.

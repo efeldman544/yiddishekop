@@ -8,16 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { INDUSTRIES as ALL_INDUSTRIES } from '@/lib/candidateOptions'
 
-const ALL_INDUSTRIES = [
-  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
-  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
-  'Education & Training', 'Engineering', 'Healthcare & Medical',
-  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
-  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
-  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
-  'Sales & Business Development', 'Technology & Software', 'Other',
-]
+
 
 const STATUS_OPTIONS = ['active', 'inactive', 'placed']
 

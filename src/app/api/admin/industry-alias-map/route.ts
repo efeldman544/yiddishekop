@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as adminSupabase } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { INDUSTRIES as CURRENT_INDUSTRIES } from '@/lib/candidateOptions'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -11,16 +12,7 @@ function adminClient() {
   )
 }
 
-const CURRENT_INDUSTRIES = [
-  'Accounting & Finance', 'Administrative & Office Support', 'Arts & Creative',
-  'Construction & Engineering', 'Customer Service', 'Data & Analytics',
-  'Education & Training', 'Engineering', 'Healthcare & Medical',
-  'Hospitality & Travel', 'Human Resources', 'Information Technology',
-  'Insurance', 'Legal & Compliance', 'Logistics & Supply Chain',
-  'Manufacturing & Operations', 'Marketing & Advertising', 'Media & Communications',
-  'Nonprofit & Social Services', 'Real Estate', 'Retail & E-commerce',
-  'Sales & Business Development', 'Technology & Software', 'Other',
-]
+
 
 export async function GET() {
   // Auth — admin only
@@ -72,7 +64,7 @@ Respond with a JSON object only — no markdown, no explanation outside the JSON
   try {
     const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
     const parsed = JSON.parse(jsonText)
-    const validCategories = new Set(CURRENT_INDUSTRIES)
+    const validCategories = new Set<string>(CURRENT_INDUSTRIES)
     for (const key of legacyList) {
       const val = parsed[key]
       aliasMap[key] = typeof val === 'string' && validCategories.has(val) ? val : null
