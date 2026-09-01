@@ -55,9 +55,16 @@ export async function notify(
   const { error } = await db.from('notifications').insert(payload)
   if (!error) return { ok: true, delivered: payload.length, failed: 0 }
 
-  // Retry one at a time so a single unusable recipient doesn't cost everyone.
+  // A schema-level failure hits every row identically, so retrying per row
+  // just makes the same round trip N times.
+  if (isSchemaFailure(error.message)) {
+    console.error(`ALL notifications failed (${payload.length} recipients):`, error.message)
+    return { ok: false, delivered: 0, failed: payload.length, error: explain(error.message) }
+  }
+
+  // Otherwise it's likely one bad row — retry individually so a single
+  // unusable recipient doesn't cost everyone.
   let delivered = 0
-  let firstError = error.message
   for (const row of payload) {
     const { error: rowError } = await db.from('notifications').insert(row)
     if (rowError) {
@@ -69,14 +76,38 @@ export async function notify(
 
   const failed = payload.length - delivered
   if (failed === payload.length) {
-    console.error(`ALL notifications failed (${payload.length} recipients):`, firstError)
-    if (/does not exist|schema cache/i.test(firstError)) {
-      firstError = 'The notifications table is missing — run supabase/notifications.sql in the Supabase SQL editor.'
-      console.error(firstError)
-    }
+    console.error(`ALL notifications failed (${payload.length} recipients):`, error.message)
   }
 
-  return { ok: failed === 0, delivered, failed, error: failed > 0 ? firstError : undefined }
+  return { ok: failed === 0, delivered, failed, error: failed > 0 ? explain(error.message) : undefined }
+}
+
+function isSchemaFailure(message: string): boolean {
+  return /schema cache|does not exist/i.test(message)
+}
+
+/**
+ * Turn a database error into something that names the actual next step.
+ *
+ * PostgREST reports a missing table and a stale schema cache with the *same*
+ * message, so "the table is missing" is a guess — and a costly one, because it
+ * sends you to re-run SQL you have already run. Say which possibilities the
+ * message actually allows, and always keep the original text: it is the only
+ * thing that distinguishes them once you look.
+ */
+function explain(message: string): string {
+  const column = message.match(/Could not find the '([^']+)' column/i)
+  if (column) {
+    return `The notifications table has no '${column[1]}' column — re-run supabase/notifications.sql, `
+      + `which creates the table with the columns the app writes. (${message})`
+  }
+  if (isSchemaFailure(message)) {
+    return 'The notifications table is either missing or not yet visible to the API. '
+      + 'Run supabase/notifications.sql in the Supabase SQL editor — it creates the table '
+      + 'and reloads the schema cache, which fixes both cases. '
+      + `(${message})`
+  }
+  return message
 }
 
 /** The admins who should hear about incoming requests. */
