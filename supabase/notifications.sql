@@ -44,3 +44,9 @@ begin
 exception
   when duplicate_object then null;
 end $$;
+
+-- Tell PostgREST to pick the table up immediately. Without this the API can
+-- keep reporting "Could not find the table 'public.notifications' in the
+-- schema cache" for a while after the table exists, which looks exactly like
+-- the table never having been created.
+notify pgrst, 'reload schema';
