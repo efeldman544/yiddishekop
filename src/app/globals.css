@@ -727,6 +727,41 @@ input, textarea, select {
 }
 .lp .browse-gate-line a { color: var(--lp-accent-soft); text-decoration: underline; }
 
+/* An icon in front of an industry so a tag is recognised rather than read. */
+.lp .browse-tag-icon {
+  width: 13px; height: 13px; flex-shrink: 0; margin-right: 5px;
+  vertical-align: -2px; display: inline-block;
+}
+.lp .browse-tag { display: inline-flex; align-items: center; }
+
+/* Play marker on the avatar: says an interview exists, without implying it
+   plays here — the clip comes with the introduction. */
+.lp .cand-avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.lp .cand-play {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 17px; height: 17px; border-radius: 999px;
+  background: var(--lp-accent); color: #fff; border: 2px solid #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.lp .cand-play svg { width: 9px; height: 9px; margin-left: 1px; }
+
+/* The video row inside the dialog. */
+.cand-video {
+  display: flex; align-items: center; gap: 12px; margin-top: 18px;
+  padding: 14px; border: 1px solid var(--lp-line); border-radius: 10px;
+  background: #F7F9FC; text-decoration: none;
+}
+.cand-video strong { display: block; font-size: 14.5px; color: var(--lp-text); }
+.cand-video em { display: block; font-style: normal; font-size: 13px; color: var(--lp-text-dim); margin-top: 2px; }
+.cand-video-play {
+  width: 38px; height: 38px; border-radius: 999px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--lp-accent); color: #fff;
+}
+.cand-video-play svg { width: 17px; height: 17px; margin-left: 2px; }
+.cand-video-locked { background: #C1D7F0; color: #fff; }
+.cand-video-open:hover { border-color: var(--lp-accent); background: #F1F6FC; }
+
 /* ── Browse: candidate dialog ────────────────────────────────────────── */
 
 .cand-dialog-backdrop {

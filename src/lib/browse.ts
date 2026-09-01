@@ -35,6 +35,14 @@ export type BrowseCard = {
   languages: string | null
   usHours: boolean | null
   interviewed: boolean
+  /**
+   * There is a clip that would actually play. `interviewed` is a flag someone
+   * ticks; this is whether a video exists, so the play control can't promise
+   * something that isn't there.
+   */
+  hasVideo: boolean
+  /** This employer already has this candidate, so the clip is theirs to watch. */
+  assigned: boolean
 }
 
 export type BrowseFilters = {
@@ -174,6 +182,8 @@ export type BrowseResult = {
 export async function browseCandidates(
   filters: BrowseFilters,
   allowIntroRequests: boolean,
+  /** The signed-in employer, so their own assignments can be marked. */
+  viewerId?: string | null,
 ): Promise<BrowseResult> {
   const client = db()
   const { industry, employmentType, q } = filters
@@ -191,11 +201,33 @@ export async function browseCandidates(
 
   const videoQuery = client
     .from('video_candidates')
-    .select('id, name, current_job_title, location, fields_worked_in, employment_type')
+    .select('id, name, current_job_title, location, fields_worked_in, employment_type, mux_playback_id')
     .limit(FETCH_LIMIT)
 
-  const [{ data: profiles, error: profileError }, { data: videos, error: videoError }] =
-    await Promise.all([profileQuery, videoQuery])
+  // Which candidates have a clip, and which of them this employer already has.
+  // Both are small lookups and both change what the card is allowed to offer,
+  // so they belong in the same round trip as the candidates themselves.
+  const clipsQuery = client.from('videos').select('candidate_id').not('mux_playback_id', 'is', null)
+  const assignedQuery = viewerId
+    ? client.from('employer_candidate_assignments').select('candidate_id').eq('employer_id', viewerId)
+    : Promise.resolve({ data: [] as { candidate_id: string }[], error: null })
+  const jobAssignedQuery = viewerId
+    ? client.from('candidate_job_assignments').select('candidate_id, job_requirements!inner(employer_id)').eq('job_requirements.employer_id', viewerId)
+    : Promise.resolve({ data: [] as { candidate_id: string }[], error: null })
+
+  const [
+    { data: profiles, error: profileError },
+    { data: videos, error: videoError },
+    { data: clips },
+    { data: directAssigned },
+    { data: jobAssigned },
+  ] = await Promise.all([profileQuery, videoQuery, clipsQuery, assignedQuery, jobAssignedQuery])
+
+  const withClip = new Set((clips ?? []).map((v: { candidate_id: string }) => v.candidate_id))
+  const assignedIds = new Set([
+    ...(directAssigned ?? []).map((a: { candidate_id: string }) => a.candidate_id),
+    ...(jobAssigned ?? []).map((a: { candidate_id: string }) => a.candidate_id),
+  ])
 
   // supabase-js resolves with an `error` instead of rejecting, so a failed
   // query would otherwise look like an empty pool. Surface it as a failure.
@@ -211,7 +243,7 @@ export async function browseCandidates(
   }
   type VideoRow = {
     id: string; name: string | null; current_job_title: string | null; location: string | null
-    fields_worked_in: string[] | null; employment_type: string[] | null
+    fields_worked_in: string[] | null; employment_type: string[] | null; mux_playback_id: string | null
   }
 
   // Both extras stay server-side. The haystack holds the candidate's own raw
@@ -237,6 +269,8 @@ export async function browseCandidates(
           languages: cleanText(p.languages),
           usHours: p.us_hours_comfortable,
           interviewed: !!p.interviewed,
+          hasVideo: withClip.has(p.id),
+          assigned: assignedIds.has(p.id),
         },
         haystack: haystackFor(
           [title, p.current_job_title, p.roles_seeking, p.tools_software, p.location],
@@ -262,6 +296,8 @@ export async function browseCandidates(
           languages: null,
           usHours: null,
           interviewed: true,
+          hasVideo: !!v.mux_playback_id,
+          assigned: assignedIds.has(v.id),
         },
         haystack: haystackFor([title, v.current_job_title, v.location], industries),
         titleIndustry: inferIndustry(title),
@@ -316,7 +352,11 @@ export async function browseCandidates(
       const bTitle = b.titleIndustry === industry ? 0 : 1
       if (aTitle !== bTitle) return aTitle - bTitle
     }
-    if (a.card.interviewed !== b.card.interviewed) return a.card.interviewed ? -1 : 1
+    // Same signal the badge uses: a clip is proof of an interview even if
+    // nobody ticked the flag.
+    const aSeen = a.card.interviewed || a.card.hasVideo
+    const bSeen = b.card.interviewed || b.card.hasVideo
+    if (aSeen !== bSeen) return aSeen ? -1 : 1
     return a.card.title.localeCompare(b.card.title)
   })
 
