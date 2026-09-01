@@ -49,6 +49,7 @@ export default async function BrowsePage({
     ;({ cards, truncated, industries } = await browseCandidates(
       { industry: params.industry, employmentType: params.type, q: params.q },
       canRequestIntro,
+      canRequestIntro ? user?.id : null,
     ))
   } catch (e) {
     console.error('browse load failed:', e instanceof Error ? e.message : e)
@@ -84,8 +85,8 @@ export default async function BrowsePage({
 
           {!canRequestIntro && (
             <p className="browse-gate-line">
-              Full names stay private. <Link href="/signup?role=employer">Create a free hiring account</Link>{' '}
-              to see resumes and ask for an introduction.
+              <Link href="/signup?role=employer">Create a free hiring account</Link>{' '}
+              to see resumes, watch interviews, and ask for an introduction.
             </p>
           )}
 

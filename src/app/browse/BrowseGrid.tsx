@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { BrowseCard } from '@/lib/browse'
-import CandidateDialog, { PersonIcon } from './CandidateDialog'
+import CandidateDialog, { PersonIcon, PlayIcon } from './CandidateDialog'
+import IndustryIcon from '@/components/IndustryIcon'
 
 // Everyone who matches is already on the page — this only controls how many
 // are painted at once. Numbered pages would fight the filters (change a
@@ -65,8 +66,15 @@ export default function BrowseGrid({
               </button>
 
               <div className="browse-card-top">
-                <span className="cand-avatar" aria-hidden="true">
-                  {c.firstName ? c.firstName.charAt(0).toUpperCase() : <PersonIcon />}
+                <span className="cand-avatar-wrap">
+                  <span className="cand-avatar" aria-hidden="true">
+                    {c.firstName ? c.firstName.charAt(0).toUpperCase() : <PersonIcon />}
+                  </span>
+                  {/* Says an interview exists. It doesn't play here — the clip
+                      is part of the introduction, not the listing. */}
+                  {c.hasVideo && (
+                    <span className="cand-play" aria-hidden="true"><PlayIcon /></span>
+                  )}
                 </span>
                 <div className="browse-card-who">
                   <h3>{c.title}</h3>
@@ -78,9 +86,12 @@ export default function BrowseGrid({
               </div>
 
               <div className="browse-card-tags">
-                {c.interviewed && <span className="browse-badge browse-badge-strong">Interviewed</span>}
+                {(c.interviewed || c.hasVideo) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
                 {c.industries.slice(0, 1).map(i => (
-                  <span key={i} className="browse-tag">{i}</span>
+                  <span key={i} className="browse-tag">
+                    <IndustryIcon industry={i} className="browse-tag-icon" />
+                    {i}
+                  </span>
                 ))}
                 {c.employmentType.slice(0, 1).map(t => (
                   <span key={t} className="browse-tag browse-tag-muted">{t}</span>
