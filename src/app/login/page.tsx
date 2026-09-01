@@ -93,6 +93,9 @@ function LoginForm() {
             </button>
           </form>
 
+          <p className="auth-footer" style={{ marginTop: 14 }}>
+            <Link href="/forgot-password">Forgot your password?</Link>
+          </p>
           <p className="auth-footer">
             Don&apos;t have an account?{' '}
             <Link href={nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'}>Sign up</Link>

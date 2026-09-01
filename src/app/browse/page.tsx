@@ -59,19 +59,19 @@ export default async function BrowsePage({
     <div className="lp">
       <LpHeader />
 
-      <section style={{ padding: '72px 0 28px' }}>
+      {/* Deliberately short. Every line here is a line of candidates pushed
+          below the fold, and the candidates are the point of the page. */}
+      <section style={{ padding: '40px 0 20px' }}>
         <div className="wrap lp-page-head">
-          <div className="lp-sec-eyebrow">Available now</div>
           <h1 style={{
             fontFamily: 'var(--font-fraunces), Fraunces, serif', fontWeight: 600,
-            fontSize: 'clamp(32px,4.2vw,52px)', letterSpacing: '-0.02em', lineHeight: 1.05,
-            color: 'var(--lp-text)', marginTop: 14, marginBottom: 16,
+            fontSize: 'clamp(26px,3vw,36px)', letterSpacing: '-0.02em', lineHeight: 1.1,
+            color: 'var(--lp-text)', marginBottom: 8,
           }}>
-            Browse people who are ready to work.
+            Candidates ready to work
           </h1>
-          <p style={{ fontSize: 17.5, color: 'var(--lp-text-dim)', lineHeight: 1.6, maxWidth: 620 }}>
-            Everyone here has been screened by us; the ones we&apos;ve already interviewed are
-            marked. Filter to what you need, then tell us who you want to meet.
+          <p style={{ fontSize: 15.5, color: 'var(--lp-text-dim)', lineHeight: 1.5, maxWidth: 560 }}>
+            Screened by us. Tap anyone to see more.
           </p>
         </div>
       </section>
@@ -83,16 +83,10 @@ export default async function BrowsePage({
           </Suspense>
 
           {!canRequestIntro && (
-            <div className="browse-gate">
-              <div>
-                <strong>You&apos;re seeing anonymized profiles.</strong>
-                <p>
-                  Create a free hiring account to watch interview clips and request an
-                  introduction. We keep candidate details private until then.
-                </p>
-              </div>
-              <Link href="/signup?role=employer" className="lp-btn lp-btn-primary">Create free account</Link>
-            </div>
+            <p className="browse-gate-line">
+              Full names stay private. <Link href="/signup?role=employer">Create a free hiring account</Link>{' '}
+              to see resumes and ask for an introduction.
+            </p>
           )}
 
           {loadFailed ? (
@@ -118,7 +112,7 @@ export default async function BrowsePage({
           ) : (
             <>
               <Suspense fallback={null}>
-                <BrowseGrid cards={cards} />
+                <BrowseGrid cards={cards} canSeeResume={canRequestIntro} />
               </Suspense>
               {truncated && (
                 <p className="browse-truncated">
