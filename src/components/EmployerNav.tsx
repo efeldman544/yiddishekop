@@ -26,6 +26,11 @@ export default function EmployerNav() {
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* The portal is a dead end without this: an employer who has reviewed
+            their candidates has nowhere to go to find more. */}
+        <Link href="/browse" className="dash-link-dim text-sm transition-colors">
+          Browse candidates
+        </Link>
         <NotificationBell candidatePath="/dashboard/employer/candidates" />
         <SignOutButton />
       </div>
