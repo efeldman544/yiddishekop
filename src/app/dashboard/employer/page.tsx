@@ -4,16 +4,20 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import AssignedCandidateCard, { type AssignedCandidate } from './AssignedCandidateCard'
 
-type CandidateSummary = {
+type ProfileRow = {
   id: string
   full_name: string | null
   location: string | null
   current_job_title: string | null
-  fields_worked_in: string[]
-  employment_type: string[]
+  roles_seeking: string | null
+  fields_worked_in: string[] | null
+  employment_type: string[] | null
+  years_experience: string | null
+  languages: string | null
+  us_hours_comfortable: boolean | null
   resume_url: string | null
-  action?: string | null
 }
 
 type IntroRequest = {
@@ -23,19 +27,19 @@ type IntroRequest = {
   created_at: string
 }
 
-type VideoCandidate = {
+type VideoRow = {
   id: string
   name: string
   location: string | null
   current_job_title: string | null
-  fields_worked_in: string[]
+  fields_worked_in: string[] | null
+  employment_type: string[] | null
   mux_playback_id: string | null
 }
 
 export default function EmployerDashboard() {
   const router = useRouter()
-  const [candidates, setCandidates] = useState<CandidateSummary[]>([])
-  const [videoCandidates, setVideoCandidates] = useState<VideoCandidate[]>([])
+  const [candidates, setCandidates] = useState<AssignedCandidate[]>([])
   const [introRequests, setIntroRequests] = useState<IntroRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [employerName, setEmployerName] = useState<string | null>(null)
@@ -86,22 +90,68 @@ export default function EmployerDashboard() {
       if (candidateIds.length === 0) { setLoading(false); return }
 
 
-      const { data: profiles } = await supabase
-        .from('candidate_profiles')
-        .select('id, full_name, location, current_job_title, fields_worked_in, employment_type, resume_url')
-        .in('id', candidateIds)
+      // The interview clip is the thing an employer most wants to see, so it's
+      // fetched with the list rather than hidden behind the profile page.
+      const [{ data: profiles }, { data: videoData }, { data: clips }] = await Promise.all([
+        supabase
+          .from('candidate_profiles')
+          .select('id, full_name, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, resume_url')
+          .in('id', candidateIds),
+        supabase
+          .from('video_candidates')
+          .select('id, name, location, current_job_title, fields_worked_in, employment_type, mux_playback_id')
+          .in('id', candidateIds)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('videos')
+          .select('candidate_id, mux_playback_id, url, created_at')
+          .in('candidate_id', candidateIds)
+          .order('created_at', { ascending: false }),
+      ])
 
-      setCandidates((profiles ?? []).map((p: CandidateSummary) => ({
-        ...p, action: actionMap[p.id]?.action ?? null,
-      })))
+      // Newest clip per candidate; the query is already newest-first.
+      const clipFor: Record<string, { mux_playback_id: string | null; url: string | null }> = {}
+      for (const v of (clips ?? []) as { candidate_id: string; mux_playback_id: string | null; url: string | null }[]) {
+        if (!(v.candidate_id in clipFor)) clipFor[v.candidate_id] = v
+      }
 
-      const { data: videoData } = await supabase
-        .from('video_candidates')
-        .select('id, name, location, current_job_title, fields_worked_in, mux_playback_id')
-        .in('id', candidateIds)
-        .order('created_at', { ascending: false })
-      setVideoCandidates((videoData ?? []) as VideoCandidate[])
+      const fromProfiles: AssignedCandidate[] = ((profiles ?? []) as ProfileRow[]).map(p => ({
+        id: p.id,
+        kind: 'profile' as const,
+        name: p.full_name,
+        title: p.current_job_title,
+        rolesSeeking: p.roles_seeking,
+        location: p.location,
+        industries: p.fields_worked_in ?? [],
+        employmentType: p.employment_type ?? [],
+        yearsExperience: p.years_experience,
+        languages: p.languages,
+        usHours: p.us_hours_comfortable,
+        resumeUrl: p.resume_url,
+        muxPlaybackId: clipFor[p.id]?.mux_playback_id ?? null,
+        videoUrl: clipFor[p.id]?.url ?? null,
+        action: actionMap[p.id]?.action ?? null,
+      }))
 
+      const fromVideos: AssignedCandidate[] = ((videoData ?? []) as VideoRow[]).map(v => ({
+        id: v.id,
+        kind: 'video' as const,
+        name: v.name,
+        title: v.current_job_title,
+        rolesSeeking: null,
+        location: v.location,
+        industries: v.fields_worked_in ?? [],
+        employmentType: v.employment_type ?? [],
+        yearsExperience: null,
+        languages: null,
+        usHours: null,
+        resumeUrl: null,
+        muxPlaybackId: v.mux_playback_id,
+        videoUrl: null,
+        action: actionMap[v.id]?.action ?? null,
+      }))
+
+      setCandidates([...fromProfiles, ...fromVideos])
       setLoading(false)
     }
     load()
@@ -191,89 +241,25 @@ export default function EmployerDashboard() {
             </svg>
           </div>
           <p className="text-gray-900 font-semibold">No candidates yet</p>
-          <p className="text-sm text-gray-400 mt-1">Candidates matched to your roles will appear here.</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Candidates we share with you will appear here.
+          </p>
+          <Link
+            href="/browse"
+            className="mt-5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 transition-colors"
+          >
+            Browse candidates
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Candidates</p>
           {candidates.map(c => (
-            <div key={c.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-5">
-                <div className="flex items-start gap-5">
-                  <div className="shrink-0 w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base select-none">
-                    {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap mb-1">
-                      <p className="text-lg font-bold text-gray-950 tracking-tight">{c.full_name ?? 'Unnamed'}</p>
-                      {c.action === 'request_meeting' && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">Meeting requested</span>
-                      )}
-                      {c.action === 'pass' && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">Passed</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mb-3">
-                      {[c.current_job_title, c.location].filter(Boolean).join(' · ')}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.fields_worked_in?.map(f => (
-                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
-                      ))}
-                      {c.employment_type?.map(e => (
-                        <span key={e} className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <Link
-                    href={`/dashboard/employer/candidates/${c.id}`}
-                    className="shrink-0 text-sm font-medium text-gray-400 hover:text-gray-900 transition-colors"
-                  >
-                    View profile →
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <AssignedCandidateCard key={`${c.kind}-${c.id}`} c={c} />
           ))}
         </div>
       )}
 
-      {videoCandidates.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Video interviews</p>
-          {videoCandidates.map(c => (
-            <div key={c.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-5">
-                <div className="flex items-start gap-5">
-                  <div className="shrink-0 w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base select-none">
-                    {c.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap mb-1">
-                      <p className="text-lg font-bold text-gray-950 tracking-tight">{c.name}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-medium">Video interview</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mb-3">
-                      {[c.current_job_title, c.location].filter(Boolean).join(' · ')}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.fields_worked_in?.map(f => (
-                        <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <Link
-                    href={`/dashboard/employer/video-candidates/${c.id}`}
-                    className="shrink-0 text-sm font-medium text-gray-400 hover:text-gray-900 transition-colors"
-                  >
-                    Watch →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </main>
   )
 }
