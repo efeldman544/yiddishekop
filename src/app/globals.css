@@ -675,6 +675,96 @@ input, textarea, select {
 .lp .browse-card-sent { font-size: 13.5px; color: var(--lp-accent-soft); font-weight: 600; }
 .lp .browse-card-error { display: block; font-size: 12.5px; color: #fca5a5; margin-top: 6px; }
 
+/* ── Browse: candidate tiles ─────────────────────────────────────────── */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.lp .browse-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.lp .browse-controls .browse-search { flex: 1 1 320px; margin: 0; }
+.lp .browse-select select {
+  height: 42px; border: 1px solid var(--lp-line); border-radius: 10px;
+  padding: 0 34px 0 12px; font-size: 14px; background-color: #fff; color: var(--lp-text);
+  font-family: inherit; cursor: pointer;
+}
+
+/* A face, so a tile reads as a person rather than an open role. */
+.lp .cand-avatar {
+  width: 38px; height: 38px; border-radius: 999px; flex-shrink: 0;
+  background: var(--lp-accent-wash, #EAF1FA); color: var(--lp-accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; line-height: 1;
+}
+.lp .cand-avatar svg { width: 20px; height: 20px; }
+.lp .cand-avatar-lg { width: 52px; height: 52px; font-size: 20px; }
+.lp .cand-avatar-lg svg { width: 26px; height: 26px; }
+
+.lp .browse-card-tap { position: relative; cursor: pointer; transition: border-color .18s, box-shadow .18s, transform .18s; }
+.lp .browse-card-tap:hover { border-color: var(--lp-accent); box-shadow: 0 6px 20px rgba(22, 53, 95, .10); transform: translateY(-1px); }
+/* Covers the tile so the whole thing is clickable, while the tile's own
+   content stays selectable and screen-reader friendly. */
+.lp .browse-card-hit {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  background: none; border: 0; padding: 0; cursor: pointer; z-index: 1;
+}
+.lp .browse-card-hit:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; border-radius: 10px; }
+/* The base rule pushes its two children apart, which is right when a badge
+   sits opposite the title. Here the name belongs next to the avatar. */
+.lp .browse-card-tap .browse-card-top { display: flex; gap: 12px; align-items: center; justify-content: flex-start; }
+.lp .browse-card-who { min-width: 0; }
+
+/* The interviewed badge is the strongest signal on the page — it means an
+   employer can watch this person today — so it is filled, not outlined. */
+.lp .browse-badge-strong {
+  background: var(--lp-accent); color: #fff; border-color: var(--lp-accent);
+  font-weight: 700; letter-spacing: .02em;
+}
+
+.lp .browse-gate-line {
+  margin: 14px 0 4px; font-size: 14px; color: var(--lp-text-dim);
+}
+.lp .browse-gate-line a { color: var(--lp-accent-soft); text-decoration: underline; }
+
+/* ── Browse: candidate dialog ────────────────────────────────────────── */
+
+.cand-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 100; background: rgba(16, 37, 65, .55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  overflow-y: auto;
+}
+.cand-dialog {
+  position: relative; background: #fff; border-radius: 14px; width: 100%;
+  max-width: 520px; padding: 28px; box-shadow: 0 24px 60px rgba(16, 37, 65, .28);
+  max-height: calc(100vh - 40px); overflow-y: auto;
+}
+.cand-dialog-close {
+  position: absolute; top: 10px; right: 14px; background: none; border: 0;
+  font-size: 26px; line-height: 1; color: var(--lp-text-dim); cursor: pointer; padding: 4px 8px;
+}
+.cand-dialog-close:hover { color: var(--lp-text); }
+.cand-dialog-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+.cand-dialog-head h2 {
+  font-family: var(--font-fraunces), 'Fraunces', serif; font-size: 22px;
+  font-weight: 600; color: var(--lp-text); margin: 0 0 2px; line-height: 1.2;
+}
+.cand-dialog-who { font-size: 14.5px; color: var(--lp-text-dim); margin: 0 0 8px; }
+.cand-dialog-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px; margin: 18px 0 0; padding-top: 18px; border-top: 1px solid var(--lp-line);
+}
+.cand-dialog-meta dt {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--lp-text-dim); margin-bottom: 3px;
+}
+.cand-dialog-meta dd { margin: 0; font-size: 14.5px; color: var(--lp-text); }
+.cand-dialog-foot {
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--lp-line);
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.cand-dialog-note { font-size: 13px; color: var(--lp-text-dim); margin: 0; flex-basis: 100%; }
+
 .lp .browse-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
 .lp .browse-chip {
   border: 1px solid var(--lp-line); background: transparent; border-radius: 999px;

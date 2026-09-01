@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { displayTitle, cleanText } from './candidateDisplay'
+import { displayTitle, displayName, cleanText } from './candidateDisplay'
 import { canonicalIndustries, inferIndustry, BROWSE_INDUSTRIES } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
@@ -25,6 +25,8 @@ export type BrowseCard = {
    * and never travels with the card.
    */
   id: string | null
+  /** First name only. Browse shows who, not who exactly — the surname comes with the introduction. */
+  firstName: string | null
   title: string
   location: string | null
   industries: string[]
@@ -61,6 +63,18 @@ function looseMatch(value: string, filter: string): boolean {
   const b = filter.toLowerCase().replace(/[^a-z0-9]+/g, '')
   if (!a || !b) return false
   return a === b || a.startsWith(b) || b.startsWith(a)
+}
+
+/**
+ * Just the given name. A first name makes a card read as a person rather than
+ * an open role, which is what browse is for — but the surname is what an
+ * introduction is, so it never leaves the server.
+ */
+function firstNameOf(raw: string | null | undefined): string | null {
+  const cleaned = displayName(raw)
+  if (!cleaned) return null
+  const first = cleaned.split(/\s+/)[0].replace(/[^\p{L}'\-]/gu, '')
+  return first.length >= 2 ? first : null
 }
 
 function refFrom(id: string) {
@@ -171,13 +185,13 @@ export async function browseCandidates(
   // mismatch the taxonomy exists to remove.
   const profileQuery = client
     .from('candidate_profiles')
-    .select('id, current_job_title, roles_seeking, tools_software, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
+    .select('id, full_name, current_job_title, roles_seeking, tools_software, location, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed')
     .eq('status', 'active')
     .limit(FETCH_LIMIT)
 
   const videoQuery = client
     .from('video_candidates')
-    .select('id, current_job_title, location, fields_worked_in, employment_type')
+    .select('id, name, current_job_title, location, fields_worked_in, employment_type')
     .limit(FETCH_LIMIT)
 
   const [{ data: profiles, error: profileError }, { data: videos, error: videoError }] =
@@ -190,13 +204,13 @@ export async function browseCandidates(
   }
 
   type ProfileRow = {
-    id: string; current_job_title: string | null; roles_seeking: string | null
+    id: string; full_name: string | null; current_job_title: string | null; roles_seeking: string | null
     tools_software: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null; years_experience: string | null
     languages: string | null; us_hours_comfortable: boolean | null; interviewed: boolean | null
   }
   type VideoRow = {
-    id: string; current_job_title: string | null; location: string | null
+    id: string; name: string | null; current_job_title: string | null; location: string | null
     fields_worked_in: string[] | null; employment_type: string[] | null
   }
 
@@ -214,6 +228,7 @@ export async function browseCandidates(
           key: `p-${p.id}`,
           ref: refFrom(p.id),
           id: allowIntroRequests ? p.id : null,
+          firstName: firstNameOf(p.full_name),
           title,
           location: cleanText(p.location),
           industries,
@@ -238,6 +253,7 @@ export async function browseCandidates(
           key: `v-${v.id}`,
           ref: refFrom(v.id),
           id: allowIntroRequests ? v.id : null,
+          firstName: firstNameOf(v.name),
           title,
           location: cleanText(v.location),
           industries,
@@ -286,17 +302,21 @@ export async function browseCandidates(
       : card.industries.includes(industry)
   })
 
-  // Someone whose job title IS the thing you filtered for is a better answer
-  // than someone who merely ticked that field once, so title matches lead.
-  // Within each group, order by title so the grid reads consistently.
-  // Deliberately NOT interviewed-first: with the row cap that hid every
-  // candidate who hasn't been filmed yet.
+  // Order, most significant first:
+  //   1. Someone whose job title IS the thing you filtered for beats someone
+  //      who merely ticked that field once.
+  //   2. Interviewed candidates lead — an employer can watch them today, so
+  //      they're the stronger answer. This is safe now that the page reveals
+  //      everyone in batches; when the list was hard-capped, sorting this way
+  //      pushed every un-filmed candidate off the end entirely.
+  //   3. Title, so the grid reads consistently.
   filtered.sort((a, b) => {
     if (industry) {
       const aTitle = a.titleIndustry === industry ? 0 : 1
       const bTitle = b.titleIndustry === industry ? 0 : 1
       if (aTitle !== bTitle) return aTitle - bTitle
     }
+    if (a.card.interviewed !== b.card.interviewed) return a.card.interviewed ? -1 : 1
     return a.card.title.localeCompare(b.card.title)
   })
 

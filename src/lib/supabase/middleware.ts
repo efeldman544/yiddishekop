@@ -5,7 +5,10 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes — always accessible, skip Supabase entirely
-  const publicPaths = ['/', '/login', '/signup', '/start-hiring', '/privacy-policy', '/why-us', '/how-it-works', '/browse', '/for-candidates', '/auth/callback', '/api/webhooks', '/api/start-hiring']
+  // /forgot-password and /reset-password must be reachable while logged out —
+  // otherwise the only way to recover a password is to already have one, and an
+  // expired reset link lands on /login instead of saying it expired.
+  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/start-hiring', '/privacy-policy', '/why-us', '/how-it-works', '/browse', '/for-candidates', '/auth/callback', '/api/webhooks', '/api/start-hiring']
   if (publicPaths.some((p) => pathname === p || (p !== '/' && pathname.startsWith(p)))) {
     return NextResponse.next({ request })
   }

@@ -2,16 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { resumeFileName } from '@/lib/resumeUrl'
+import { contactRanges, findRedactionBoxes, unredactedContacts, type Rect, type TextItem } from '@/lib/redact'
 
 export const maxDuration = 60
 
-const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
-const PHONE_RES = [
-  /(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/g,
-  /\+[\d\s\-().]{7,20}/g,
-]
-
-type Rect = { x: number; y: number; w: number; h: number }
 
 // Convert a .docx to PDF: mammoth → styled HTML → headless Chromium print.
 // The result flows through the same pdfjs redaction pipeline as native PDFs.
@@ -53,7 +47,7 @@ async function docxToPdf(docx: Buffer): Promise<Buffer> {
 // OCR-redact an image resume (JPG/PNG): run tesseract to locate emails/phones, draw
 // gray pills over them on canvas, then wrap in a PDF. Falls back to a warning stamp
 // if OCR errors out.
-async function imageToRedactedPdf(img: Buffer): Promise<Buffer> {
+async function imageToRedactedPdf(img: Buffer): Promise<{ pdf: Buffer; ocrFailed: boolean }> {
   type OcrBox = { x: number; y: number; w: number; h: number }
   let ocrBoxes: OcrBox[] = []
   let ocrFailed = false
@@ -151,20 +145,7 @@ async function imageToRedactedPdf(img: Buffer): Promise<Buffer> {
     })
   }
 
-  return Buffer.from(await pdf.save())
-}
-
-// Find character ranges of contact info in a line of text
-function contactRanges(line: string): [number, number][] {
-  const ranges: [number, number][] = []
-  for (const re of [EMAIL_RE, ...PHONE_RES]) {
-    re.lastIndex = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(line)) !== null) {
-      if (m[0].length > 0) ranges.push([m.index, m.index + m[0].length])
-    }
-  }
-  return ranges
+  return { pdf: Buffer.from(await pdf.save()), ocrFailed }
 }
 
 export async function GET(
@@ -185,40 +166,13 @@ export async function GET(
     .eq('id', user.id)
     .single<{ role: string }>()
 
-  if (profile?.role === 'employer') {
-    // Authorized if the candidate reaches this employer either via one of
-    // their jobs (candidate_job_assignments) or via a direct admin assignment
-    // (employer_candidate_assignments) — mirrors what the employer portal shows
-    const { data: myJobs } = await supabase
-      .from('job_requirements')
-      .select('id')
-      .eq('employer_id', user.id)
-    const jobIds = (myJobs ?? []).map((j: { id: string }) => j.id)
-    // limit(1) + length check, NOT maybeSingle(): maybeSingle() errors out
-    // (data = null) when the candidate is assigned more than once — e.g. on
-    // two of the employer's jobs — which read as Forbidden for legitimate access
-    const [{ data: jobAssignments }, { data: directAssignments }] = await Promise.all([
-      jobIds.length > 0
-        ? supabase
-            .from('candidate_job_assignments')
-            .select('id')
-            .in('job_id', jobIds)
-            .eq('candidate_id', candidateId)
-            .limit(1)
-        : Promise.resolve({ data: [] as { id: string }[] }),
-      supabase
-        .from('employer_candidate_assignments')
-        .select('id')
-        .eq('employer_id', user.id)
-        .eq('candidate_id', candidateId)
-        .limit(1),
-    ])
-    if (!jobAssignments?.length && !directAssignments?.length) {
-      return new NextResponse('Forbidden', { status: 403 })
-    }
-  } else if (profile?.role !== 'admin') {
-    return new NextResponse('Forbidden', { status: 403 })
-  }
+  // Employers see redacted resumes without needing an assignment first —
+  // that's the point of browsing. Everything below guarantees the redaction, and
+  // refuses rather than serving anything it can't verify. Names are handled the
+  // same way as on browse: the resume is served under a redacted filename.
+  const isAdmin = profile?.role === 'admin'
+  const isEmployer = profile?.role === 'employer'
+  if (!isAdmin && !isEmployer) return new NextResponse('Forbidden', { status: 403 })
 
   const { data: cp } = await supabase
     .from('candidate_profiles')
@@ -294,7 +248,16 @@ export async function GET(
       // Image resume (JPG/PNG) — serve it as a viewable, stamped PDF directly.
       // No text layer means nothing to redact, so we skip the pdfjs pipeline.
       try {
-        const imgPdf = await imageToRedactedPdf(buffer)
+        const { pdf: imgPdf, ocrFailed } = await imageToRedactedPdf(buffer)
+        // A photo with unreadable text can't be redacted, so an employer must
+        // not receive it — there is no way to know what is on it.
+        if (ocrFailed && !isAdmin) {
+          return new NextResponse(
+            "This resume is a photo, and we can't automatically hide the candidate's contact "
+            + 'details on it. Ask us for an introduction and we\'ll share it with you directly.',
+            { status: 422 },
+          )
+        }
         const name = resumeFileName(cp.full_name)
         return new NextResponse(Buffer.from(imgPdf), {
           headers: {
@@ -357,6 +320,7 @@ export async function GET(
     const out = await PDFDocument.create()
 
     let totalTextLength = 0
+    let leaked = false
 
     for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
       // getPage() can trigger font-table parsing; keep it inside a guard so a
@@ -392,8 +356,7 @@ export async function GET(
         console.error(`text extraction failed on page ${pageNum}:`, textErr)
         return new NextResponse('This PDF has corrupted font data and cannot be auto-redacted — please re-save or re-print it as a fresh PDF', { status: 422 })
       }
-      type Item = { str: string; rect: Rect }
-      const items: Item[] = []
+      const items: TextItem[] = []
 
       for (const raw of textContent.items) {
         if (!('str' in raw) || !raw.str) continue
@@ -411,45 +374,15 @@ export async function GET(
         })
       }
 
-      // Group items into visual lines by y position
-      const lines = new Map<number, Item[]>()
-      for (const item of items) {
-        const key = Math.round(item.rect.y / 4)
-        if (!lines.has(key)) lines.set(key, [])
-        lines.get(key)!.push(item)
-      }
+      const boxes: Rect[] = findRedactionBoxes(items)
 
-      // Collect redaction boxes for this page, merging adjacent ones on the same
-      // line into a single clean pill instead of several choppy rectangles
-      const boxes: Rect[] = []
-      for (const lineItems of lines.values()) {
-        lineItems.sort((a, b) => a.rect.x - b.rect.x)
-        // Join without separators so contact info split across items still matches
-        let joined = ''
-        const spans: { start: number; end: number; item: Item }[] = []
-        for (const item of lineItems) {
-          spans.push({ start: joined.length, end: joined.length + item.str.length, item })
-          joined += item.str
-        }
-        const lineBoxes: Rect[] = []
-        for (const [mStart, mEnd] of contactRanges(joined)) {
-          for (const span of spans) {
-            if (span.end > mStart && span.start < mEnd) {
-              lineBoxes.push({ ...span.item.rect })
-            }
-          }
-        }
-        // Merge boxes on this line that touch or overlap horizontally
-        lineBoxes.sort((a, b) => a.x - b.x)
-        for (const b of lineBoxes) {
-          const last = boxes[boxes.length - 1]
-          if (last && Math.abs(last.y - b.y) < 6 && b.x <= last.x + last.w + 12) {
-            last.w = Math.max(last.w, b.x + b.w - last.x)
-            last.h = Math.max(last.h, b.h)
-          } else {
-            boxes.push(b)
-          }
-        }
+      // A miss must never be silent. If anything still reads as contact info
+      // after the boxes are placed, say so on the page rather than handing over
+      // an address nobody realises is there.
+      const missed = unredactedContacts(items, boxes)
+      if (missed.length > 0) {
+        console.error(`redaction miss on page ${pageNum}: ${missed.length} item(s)`)
+        leaked = true
       }
 
       // Soft gray pills over contact info
@@ -482,14 +415,26 @@ export async function GET(
     // Scanned PDFs have no extractable text, so we can't locate and redact contact info.
     // Rather than refusing to serve the resume at all, stamp a visible notice on the first
     // page and serve the rendered image as-is so employers can still read the resume.
-    if (totalTextLength < 50) {
+    if ((totalTextLength < 50 || leaked) && !isAdmin) {
+      return new NextResponse(
+        "We can't automatically hide this candidate's contact details on this resume — "
+        + "it's a scan or an image rather than text. Ask us for an introduction and we'll "
+        + 'share it with you directly.',
+        { status: 422 },
+      )
+    }
+
+    if (totalTextLength < 50 || leaked) {
       const firstPage = out.getPages()[0]
       const { width, height } = firstPage.getSize()
       const font = await out.embedFont(StandardFonts.Helvetica)
       firstPage.drawRectangle({ x: 0, y: height - 28, width, height: 28, color: rgb(0.98, 0.93, 0.73) })
-      firstPage.drawText('Scanned document — contact information could not be redacted automatically', {
-        x: 10, y: height - 18, size: 9, font, color: rgb(0.45, 0.35, 0.05),
-      })
+      firstPage.drawText(
+        leaked
+          ? 'Contact details on this resume may not be fully redacted — please do not contact the candidate directly'
+          : 'Scanned document — contact information could not be redacted automatically',
+        { x: 10, y: height - 18, size: 9, font, color: rgb(0.45, 0.35, 0.05) },
+      )
     }
 
     const pdfBytes = await out.save()
