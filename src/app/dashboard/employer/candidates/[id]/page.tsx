@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoPlayer from './VideoPlayer'
 import CandidateActions from './CandidateActions'
 import { resumeHref } from '@/lib/resumeUrl'
+import { displayTitle, displayName } from '@/lib/candidateDisplay'
+import { canonicalIndustries } from '@/lib/candidateTaxonomy'
 
 type Video = {
   id: string
@@ -76,12 +78,14 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
 
       <Card className="mb-6">
         <CardContent className="pt-5">
-          <h1 className="text-2xl font-bold tracking-tight">{candidate.full_name ?? 'Unnamed'}</h1>
+          {/* Same cleanup as the card this was opened from, so the title
+              doesn't change on the way in. */}
+          <h1 className="text-2xl font-bold tracking-tight">{displayName(candidate.full_name) ?? 'Unnamed'}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {[candidate.current_job_title, candidate.location].filter(Boolean).join(' · ')}
+            {[displayTitle(candidate.current_job_title, candidate.roles_seeking, candidate.fields_worked_in), candidate.location].filter(Boolean).join(' · ')}
           </p>
           <div className="flex flex-wrap gap-1 mt-3">
-            {candidate.fields_worked_in?.map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
+            {canonicalIndustries(candidate.fields_worked_in).filter(f => f !== 'Other').map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
             {candidate.employment_type?.map(e => <Badge key={e} variant="outline" className="text-xs">{e}</Badge>)}
           </div>
         </CardContent>

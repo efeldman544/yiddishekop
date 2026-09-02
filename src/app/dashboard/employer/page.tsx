@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import AssignedCandidateCard, { type AssignedCandidate } from './AssignedCandidateCard'
+import { introStatusForEmployer } from '@/lib/candidateStatus'
 
 type ProfileRow = {
   id: string
@@ -17,6 +18,7 @@ type ProfileRow = {
   years_experience: string | null
   languages: string | null
   us_hours_comfortable: boolean | null
+  interviewed: boolean | null
   resume_url: string | null
 }
 
@@ -95,7 +97,7 @@ export default function EmployerDashboard() {
       const [{ data: profiles }, { data: videoData }, { data: clips }] = await Promise.all([
         supabase
           .from('candidate_profiles')
-          .select('id, full_name, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, resume_url')
+          .select('id, full_name, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, languages, us_hours_comfortable, interviewed, resume_url')
           .in('id', candidateIds),
         supabase
           .from('video_candidates')
@@ -127,6 +129,7 @@ export default function EmployerDashboard() {
         yearsExperience: p.years_experience,
         languages: p.languages,
         usHours: p.us_hours_comfortable,
+        interviewed: !!p.interviewed,
         resumeUrl: p.resume_url,
         muxPlaybackId: clipFor[p.id]?.mux_playback_id ?? null,
         videoUrl: clipFor[p.id]?.url ?? null,
@@ -145,6 +148,7 @@ export default function EmployerDashboard() {
         yearsExperience: null,
         languages: null,
         usHours: null,
+        interviewed: true,
         resumeUrl: null,
         muxPlaybackId: v.mux_playback_id,
         videoUrl: null,
@@ -203,12 +207,10 @@ export default function EmployerDashboard() {
         <div className="space-y-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Introductions you requested</p>
           {introRequests.map(r => {
-            const label = r.status === 'actioned' ? 'Introduced'
-              : r.status === 'dismissed' ? 'Closed'
-              : 'With our team'
-            const tone = r.status === 'actioned'
+            const { label, tone: toneName } = introStatusForEmployer(r.status)
+            const tone = toneName === 'done'
               ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-              : r.status === 'dismissed'
+              : toneName === 'closed'
                 ? 'bg-gray-100 text-gray-500 border-gray-200'
                 : 'bg-amber-50 text-amber-700 border-amber-200'
             return (

@@ -26,7 +26,9 @@ export default function CandidateNav() {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <NotificationBell candidatePath="" />
+        {/* Candidates have no per-candidate page to open; send them to their
+            own dashboard rather than marking a notification read and sitting still. */}
+        <NotificationBell candidatePath="" fallbackPath="/dashboard/candidate" />
         <SignOutButton />
       </div>
     </header>

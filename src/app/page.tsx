@@ -40,15 +40,15 @@ export default async function LandingPage() {
           <div className="lp-eyebrow">Pre-screened remote staff</div>
           <h1>Your next hire is <span className="it">already</span> here.</h1>
           <p className="lp-lead">
-            We&apos;ve already screened and interviewed them. Browse short video clips of the{' '}
-            <strong>strongest candidates</strong> and pick who you want to meet.
+            We&apos;ve already screened them, and interviewed the strongest on video. Browse{' '}
+            <strong>people who are ready to work</strong> and pick who you want to meet.
           </p>
           <div className="lp-hero-cta">
             <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           </div>
           <div className="lp-hero-note">
             <span><span className="lp-dot" />Screened &amp; vetted first</span>
-            <span><span className="lp-dot" />Every candidate on video</span>
+            <span><span className="lp-dot" />The strongest on video</span>
             <span><span className="lp-dot" />People who understand your world</span>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default async function LandingPage() {
           <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
-            Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}
+            Looking for something specific? <Link href="/start-hiring">Ask us to source it</Link> · Prefer to talk?{' '}
             <a href="tel:6314943567">631 494 3567</a>
           </div>
         </div>

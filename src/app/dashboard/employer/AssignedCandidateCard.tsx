@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { displayTitle, displayName } from '@/lib/candidateDisplay'
 import { canonicalIndustries } from '@/lib/candidateTaxonomy'
 import { resumeHref } from '@/lib/resumeUrl'
+import { isInterviewed } from '@/lib/candidateStatus'
 import VideoPlayer from './candidates/[id]/VideoPlayer'
 
 // Laid out like the browse cards — role first, then who they are, then the
@@ -24,6 +25,7 @@ export type AssignedCandidate = {
   yearsExperience: string | null
   languages: string | null
   usHours: boolean | null
+  interviewed: boolean
   resumeUrl: string | null
   muxPlaybackId: string | null
   videoUrl: string | null
@@ -36,6 +38,7 @@ export default function AssignedCandidateCard({ c }: { c: AssignedCandidate }) {
   // "Other" tells an employer nothing, and browse omits it — match that.
   const industries = canonicalIndustries(c.industries).filter(i => i !== 'Other')
   const hasVideo = !!(c.muxPlaybackId || c.videoUrl)
+  const interviewed = isInterviewed({ interviewed: c.interviewed, hasVideo })
   const profileHref = c.kind === 'video'
     ? `/dashboard/employer/video-candidates/${c.id}`
     : `/dashboard/employer/candidates/${c.id}`
@@ -52,7 +55,7 @@ export default function AssignedCandidateCard({ c }: { c: AssignedCandidate }) {
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {hasVideo && (
+            {interviewed && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">
                 Interviewed
               </span>

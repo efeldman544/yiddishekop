@@ -5,11 +5,17 @@ import { useState } from 'react'
 export default function RequestIntroButton({
   candidateId,
   candidateRef,
+  alreadyRequested = false,
 }: {
   candidateId: string
   candidateRef: string
+  /** An open request from a previous visit — without this the button reset on
+      every reload and invited a second request for the same person. */
+  alreadyRequested?: boolean
 }) {
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>(
+    alreadyRequested ? 'sent' : 'idle',
+  )
   const [message, setMessage] = useState<string | null>(null)
 
   async function request() {

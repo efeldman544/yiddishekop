@@ -43,6 +43,8 @@ export type BrowseCard = {
   hasVideo: boolean
   /** This employer already has this candidate, so the clip is theirs to watch. */
   assigned: boolean
+  /** They have already asked for this introduction and it is still open. */
+  requested: boolean
 }
 
 export type BrowseFilters = {
@@ -171,23 +173,6 @@ export async function poolIndustries(): Promise<string[]> {
   }
 }
 
-export async function poolStats(): Promise<{ total: number; interviewed: number }> {
-  try {
-    const client = db()
-    const [{ count: profileCount }, { count: interviewedCount }, { count: videoCount }] = await Promise.all([
-      client.from('candidate_profiles').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      client.from('candidate_profiles').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('interviewed', true),
-      client.from('video_candidates').select('id', { count: 'exact', head: true }),
-    ])
-    return {
-      total: (profileCount ?? 0) + (videoCount ?? 0),
-      interviewed: (interviewedCount ?? 0) + (videoCount ?? 0),
-    }
-  } catch {
-    return { total: 0, interviewed: 0 }
-  }
-}
-
 export type BrowseResult = {
   cards: BrowseCard[]
   /** True when the display cap cut the list — the page says so rather than pretending that's everyone. */
@@ -229,6 +214,11 @@ export async function browseCandidates(
   // Both are small lookups and both change what the card is allowed to offer,
   // so they belong in the same round trip as the candidates themselves.
   const clipsQuery = client.from('videos').select('candidate_id').not('mux_playback_id', 'is', null)
+  // Open requests, so the button says "Requested" on arrival rather than only
+  // until the page reloads.
+  const requestedQuery = viewerId
+    ? client.from('introduction_requests').select('candidate_id, candidate_ref').eq('employer_id', viewerId).eq('status', 'new')
+    : Promise.resolve({ data: [] as { candidate_id: string | null; candidate_ref: string | null }[], error: null })
   const assignedQuery = viewerId
     ? client.from('employer_candidate_assignments').select('candidate_id').eq('employer_id', viewerId)
     : Promise.resolve({ data: [] as { candidate_id: string }[], error: null })
@@ -242,9 +232,16 @@ export async function browseCandidates(
     { data: clips },
     { data: directAssigned },
     { data: jobAssigned },
-  ] = await Promise.all([profileQuery, videoQuery, clipsQuery, assignedQuery, jobAssignedQuery])
+    { data: requested },
+  ] = await Promise.all([profileQuery, videoQuery, clipsQuery, assignedQuery, jobAssignedQuery, requestedQuery])
 
   const withClip = new Set((clips ?? []).map((v: { candidate_id: string }) => v.candidate_id))
+  // Requests are matched by id where there is one and by reference otherwise,
+  // the same way the API records them.
+  const requestedKeys = new Set(
+    (requested ?? []).flatMap((r: { candidate_id: string | null; candidate_ref: string | null }) =>
+      [r.candidate_id, r.candidate_ref].filter(Boolean) as string[]),
+  )
   const assignedIds = new Set([
     ...(directAssigned ?? []).map((a: { candidate_id: string }) => a.candidate_id),
     ...(jobAssigned ?? []).map((a: { candidate_id: string }) => a.candidate_id),
@@ -292,6 +289,7 @@ export async function browseCandidates(
           interviewed: !!p.interviewed,
           hasVideo: withClip.has(p.id),
           assigned: assignedIds.has(p.id),
+          requested: requestedKeys.has(p.id),
         },
         haystack: haystackFor(
           [title, p.current_job_title, p.roles_seeking, p.tools_software, p.location],
@@ -319,6 +317,7 @@ export async function browseCandidates(
           interviewed: true,
           hasVideo: !!v.mux_playback_id,
           assigned: assignedIds.has(v.id),
+          requested: requestedKeys.has(v.id) || requestedKeys.has(refFrom(v.id)),
         },
         haystack: haystackFor([title, v.current_job_title, v.location], industries),
         titleIndustry: inferIndustry(title),

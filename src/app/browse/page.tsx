@@ -131,7 +131,7 @@ export default async function BrowsePage({
               We source for specific roles too. Tell us what you need and we&apos;ll go find and
               interview candidates for it.
             </p>
-            <Link href="/start-hiring" className="lp-btn lp-btn-ghost">Request a role</Link>
+            <Link href="/start-hiring" className="lp-btn lp-btn-ghost">Ask us to source a role</Link>
           </div>
         </div>
       </section>

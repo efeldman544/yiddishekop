@@ -45,6 +45,24 @@ export async function POST(req: Request) {
     displayName(cp?.full_name ?? vc?.name) ?? `Candidate #${candidateRef}`
   const who = me.full_name ?? me.email ?? 'An employer'
 
+  // One open request per employer/candidate. Nothing stopped a second before:
+  // the button only remembered "sent" in local state, so a reload let the same
+  // person be asked for again and the queue filled with duplicates of one pair.
+  // A video candidate has no candidate_profiles row, so candidate_id is null
+  // for them and the reference is the only thing identifying who was asked for.
+  let openRequests = db
+    .from('introduction_requests')
+    .select('id')
+    .eq('employer_id', user.id)
+    .eq('status', 'new')
+  openRequests = cp
+    ? openRequests.eq('candidate_id', candidateId)
+    : openRequests.eq('candidate_ref', candidateRef)
+  const { data: existing } = await openRequests.limit(1)
+  if (existing?.length) {
+    return Response.json({ ok: true, recorded: true, duplicate: true, notified: true })
+  }
+
   // Durable queue entry. Tolerated if the migration hasn't been run yet —
   // the notification below still gets through, so the request is never lost.
   let recorded = true

@@ -1,5 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { displayTitle, displayName } from '@/lib/candidateDisplay'
+import { canonicalIndustries } from '@/lib/candidateTaxonomy'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import VideoPlayer from '@/app/dashboard/employer/candidates/[id]/VideoPlayer'
@@ -55,10 +57,10 @@ export default async function EmployerVideoCandidatePage({ params }: { params: P
 
       <Card>
         <CardContent className="pt-5">
-          <h1 className="text-2xl font-bold tracking-tight">{c.name}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{[c.current_job_title, c.location].filter(Boolean).join(' · ')}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{displayName(c.name) ?? 'Candidate'}</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{[displayTitle(c.current_job_title, null, c.fields_worked_in), c.location].filter(Boolean).join(' · ')}</p>
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {c.fields_worked_in?.map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
+            {canonicalIndustries(c.fields_worked_in).filter(f => f !== 'Other').map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
             {c.employment_type?.map(e => <Badge key={e} variant="outline" className="text-xs">{e}</Badge>)}
           </div>
         </CardContent>
