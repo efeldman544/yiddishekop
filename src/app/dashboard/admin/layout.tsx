@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebar />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="dash-dark h-14 border-b px-6 flex items-center justify-end shrink-0 gap-3">
+        <header className="dash-dark h-16 border-b px-6 flex items-center justify-end shrink-0 gap-3">
           <NotificationBell />
           <SignOutButton />
         </header>

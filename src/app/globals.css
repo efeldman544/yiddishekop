@@ -361,7 +361,7 @@ input, textarea, select {
   background: rgba(255,255,255,0.88); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--lp-line);
 }
-.lp .lp-nav { display: flex; align-items: center; justify-content: space-between; height: 78px; }
+.lp .lp-nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .lp .lp-logo { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 27px; letter-spacing: -0.01em; }
 .lp .lp-logo span { color: var(--lp-accent); }
 .lp .lp-nav-links { display: flex; gap: 36px; align-items: center; }
@@ -515,7 +515,7 @@ input, textarea, select {
   .lp .lp-pain-grid { gap: 1px; }
   .lp .lp-nav-links { display: none; }
   .lp .lp-nav-links.open {
-    display: flex; position: absolute; top: 78px; left: 0; right: 0; flex-direction: column;
+    display: flex; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column;
     background: var(--lp-surface); padding: 24px 32px; gap: 20px;
     border-bottom: 1px solid var(--lp-line); align-items: flex-start;
     z-index: 40;
@@ -540,57 +540,45 @@ input, textarea, select {
   .lp .lp-hero { padding: 72px 0 60px; }
 }
 
-/* auth pages dark/gold theme */
-.auth-dark {
-  min-height: 100vh; display: flex; background: var(--lp-bg);
-  font-family: 'Inter', var(--font-geist-sans), sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-.auth-dark * { box-sizing: border-box; }
-.auth-dark .auth-panel {
-  width: 320px; flex-shrink: 0; background: var(--lp-surface);
-  display: none; flex-direction: column; justify-content: space-between;
-  padding: 48px 40px; border-right: 1px solid var(--lp-line);
-}
-@media (min-width: 768px) { .auth-dark .auth-panel { display: flex; } }
-.auth-dark .auth-logo { display: inline-block; font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 26px; letter-spacing: -0.01em; color: var(--lp-text); text-decoration: none; }
-.auth-dark .auth-logo span { color: var(--lp-accent); }
-.auth-dark .auth-tagline { font-size: 14px; color: var(--lp-text-dim); margin-top: 28px; line-height: 1.65; }
-.auth-dark .auth-copy { font-size: 12px; color: var(--lp-on-navy-dim); }
-.auth-dark .auth-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
-.auth-dark .auth-box { width: 100%; max-width: 360px; }
-.auth-dark .auth-logo-mobile { display: inline-block; font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 24px; letter-spacing: -0.01em; color: var(--lp-text); margin-bottom: 32px; text-decoration: none; }
-.auth-dark .auth-logo-mobile span { color: var(--lp-accent); }
-.auth-dark .auth-heading { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 30px; color: var(--lp-text); letter-spacing: -0.02em; margin-bottom: 6px; }
-.auth-dark .auth-sub { font-size: 15px; color: var(--lp-text-dim); margin-bottom: 32px; }
-.auth-dark .auth-field { margin-bottom: 18px; }
-.auth-dark .auth-label { display: block; font-size: 13px; font-weight: 500; color: var(--lp-text-dim); margin-bottom: 7px; }
-.auth-dark .auth-input {
+/* Auth pages — the site's chrome with a form in the middle, not a separate
+   layout. Only the form controls are styled here; everything around them comes
+   from the same rules as every other page. */
+.lp.auth-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--lp-bg); }
+.auth-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px 64px; }
+.auth-box { width: 100%; max-width: 380px; }
+.auth-foot { margin-top: 28px; font-size: 13.5px; }
+.auth-foot a { color: var(--lp-text-dim); }
+.auth-foot a:hover { color: var(--lp-accent-soft); }
+.lp .auth-heading { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 24px; line-height: 1.2; color: var(--lp-text); letter-spacing: -0.02em; margin-bottom: 6px; }
+.auth-sub { font-size: 14.5px; color: var(--lp-text-dim); margin-bottom: 26px; }
+.auth-field { margin-bottom: 18px; }
+.auth-label { display: block; font-size: 13px; font-weight: 500; color: var(--lp-text-dim); margin-bottom: 7px; }
+.auth-input {
   width: 100%; padding: 11px 14px; border-radius: 4px; font-size: 15px; font-family: inherit;
   background: #F8FBFE; border: 1px solid var(--lp-line); color: var(--lp-text);
   outline: none; transition: border-color .2s;
 }
-.auth-dark .auth-input::placeholder { color: rgba(11,37,69,0.40); }
-.auth-dark .auth-input:focus { border-color: var(--lp-accent); }
-.auth-dark .auth-btn {
+.auth-input::placeholder { color: rgba(11,37,69,0.40); }
+.auth-input:focus { border-color: var(--lp-accent); }
+.auth-btn {
   width: 100%; padding: 13px; border-radius: 4px; font-size: 15px; font-weight: 600;
   background: var(--lp-accent); color: var(--lp-bg); border: none; cursor: pointer;
   transition: background .2s; margin-top: 8px; font-family: inherit;
 }
-.auth-dark .auth-btn:hover { background: var(--lp-accent-soft); }
-.auth-dark .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.auth-dark .auth-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 11px 14px; font-size: 13.5px; color: #fca5a5; margin-bottom: 18px; }
-.auth-dark .auth-footer { text-align: center; font-size: 14px; color: var(--lp-text-dim); margin-top: 24px; }
-.auth-dark .auth-footer a { color: var(--lp-accent-soft); font-weight: 600; text-decoration: none; }
-.auth-dark .auth-select {
+.auth-btn:hover { background: var(--lp-accent-soft); }
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 11px 14px; font-size: 13.5px; color: #fca5a5; margin-bottom: 18px; }
+.auth-footer { font-size: 14px; color: var(--lp-text-dim); margin-top: 18px; }
+.auth-footer a { color: var(--lp-accent-soft); font-weight: 600; text-decoration: none; }
+.auth-select {
   width: 100%; padding: 11px 14px; border-radius: 4px; font-size: 15px; font-family: inherit;
   background: #F8FBFE; border: 1px solid var(--lp-line); color: var(--lp-text);
   outline: none; transition: border-color .2s; appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2355708C' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
 }
-.auth-dark .auth-select:focus { border-color: var(--lp-accent); }
-.auth-dark .auth-select option { background: var(--lp-surface); color: var(--lp-text); }
+.auth-select:focus { border-color: var(--lp-accent); }
+.auth-select option { background: var(--lp-surface); color: var(--lp-text); }
 
 /* The /start-hiring form reuses the auth field classes but lives inside the .lp
    landing theme, not .auth-dark — re-scope the same dark-field styling to .lp so
@@ -638,11 +626,11 @@ input, textarea, select {
 .dash-link-dim:hover { color: var(--lp-on-navy); }
 
 /* Auth side panel keeps the navy brand block against the white form area. */
-.auth-dark .auth-panel { background: var(--lp-navy); border-right-color: var(--lp-navy-line); }
-.auth-dark .auth-panel .auth-logo { color: var(--lp-on-navy); }
-.auth-dark .auth-panel .auth-logo span { color: var(--lp-accent-bright); }
-.auth-dark .auth-panel .auth-tagline { color: var(--lp-on-navy-dim); }
-.auth-dark .auth-select option { background: var(--lp-bg); color: var(--lp-text); }
+.auth-panel { background: var(--lp-navy); border-right-color: var(--lp-navy-line); }
+.auth-panel .auth-logo { color: var(--lp-on-navy); }
+.auth-panel .auth-logo span { color: var(--lp-accent-bright); }
+.auth-panel .auth-tagline { color: var(--lp-on-navy-dim); }
+.auth-select option { background: var(--lp-bg); color: var(--lp-text); }
 
 /* ── Browse candidates ─────────────────────────────────────────────── */
 .lp .browse-filters { margin-bottom: 28px; }

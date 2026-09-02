@@ -84,7 +84,7 @@ export default function AdminSidebar() {
   return (
     <aside className="dash-dark w-[220px] shrink-0 h-screen border-r flex flex-col">
       {/* Brand */}
-      <div className="px-5 h-14 flex items-center border-b border-inherit shrink-0">
+      <div className="px-5 h-16 flex items-center border-b border-inherit shrink-0">
         <Link href="/" className="dash-brand">Yiddishe<span>Kop</span></Link>
       </div>
 
