@@ -37,10 +37,10 @@ export default function VideoCandidatesPage() {
   if (loading) return <div className="text-sm text-gray-400 py-12 text-center">Loading…</div>
 
   return (
-    <div className="px-8 py-8 space-y-6">
+    <div className="dash-page">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Video Interviews</h2>
+          <h2 className="page-title">Video Interviews</h2>
           <p className="text-sm text-gray-400 mt-1">Candidates who interviewed but aren&apos;t in the main database.</p>
         </div>
         <div className="flex gap-2">

@@ -129,6 +129,18 @@ input, textarea, select {
     @apply flex-1 w-full max-w-2xl mx-auto px-6 py-8;
   }
 
+  /* ── Dashboard page shells ───────────────────────────
+     Every page had picked its own padding, max width and spacing, so moving
+     between them shifted the content sideways. Two shells: full width for the
+     admin pages, which sit beside a sidebar, and centred for the employer and
+     candidate portals, which don't. */
+  .dash-page {
+    @apply px-8 py-8 space-y-6;
+  }
+  .dash-page-centered {
+    @apply max-w-5xl mx-auto px-6 py-8 space-y-6;
+  }
+
   /* ── Typography ──────────────────────────────────── */
   .page-title {
     @apply text-2xl text-gray-950 tracking-tight;
@@ -311,6 +323,14 @@ input, textarea, select {
   --lp-accent-bright: #9ABBE3; /* indigo-300 — accents on navy */
   --lp-line: rgba(42,98,174,0.16);
 
+  /* A second accent, so the page isn't blue on blue on blue. Warm gold sits
+     against the navy the way the original brand did, and is rationed: section
+     eyebrows, step numerals, and the rule under a heading. Never a button —
+     one primary action colour, and that stays blue. */
+  --lp-gold: #B8873B;
+  --lp-gold-soft: #D9A94F;
+  --lp-gold-wash: #FBF5EA;
+
   --lp-navy: #16355F;          /* indigo-900 */
   --lp-navy-2: #1C4275;
   --lp-on-navy: #F1F6FC;
@@ -358,7 +378,7 @@ input, textarea, select {
 .lp .lp-nav-toggle { display: none; background: none; border: none; color: var(--lp-text); font-size: 26px; cursor: pointer; padding: 0; }
 
 /* hero */
-.lp .lp-hero { padding: 110px 0 96px; position: relative; text-align: center; }
+.lp .lp-hero { padding: 84px 0 72px; position: relative; text-align: center; }
 .lp .lp-hero::before {
   content: ""; position: absolute; inset: 0; z-index: -1;
   background: radial-gradient(55% 45% at 50% 0%, rgba(42,98,174,0.07), transparent 70%);
@@ -386,8 +406,8 @@ input, textarea, select {
 .lp .lp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lp-accent); display: inline-block; flex: none; }
 
 /* sections */
-.lp section { padding: 96px 0; }
-.lp .lp-sec-head { max-width: 680px; margin-bottom: 58px; }
+.lp section { padding: 64px 0; }
+.lp .lp-sec-head { max-width: 680px; margin-bottom: 36px; }
 .lp .lp-sec-eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; color: var(--lp-accent); margin-bottom: 18px; }
 .lp h2 { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: clamp(32px,3.6vw,48px); line-height: 1.05; letter-spacing: -0.02em; }
 .lp h2 .it { font-style: italic; color: var(--lp-accent-mid); }
@@ -476,10 +496,10 @@ input, textarea, select {
 .lp .lp-foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--lp-line); font-size: 13px; color: var(--lp-text-dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 
 /* reveal animation */
-.lp .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
-.lp .reveal.in { opacity: 1; transform: none; }
+.js-reveal .lp .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+.js-reveal .lp .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
-  .lp .reveal { opacity: 1; transform: none; transition: none; }
+  .js-reveal .lp .reveal { opacity: 1; transform: none; transition: none; }
 }
 
 /* responsive */
@@ -913,3 +933,32 @@ input, textarea, select {
 
 /* Left-aligned page headers (browse): h1 is centred by default for the hero */
 .lp .lp-page-head h1 { margin-left: 0; max-width: 860px; }
+
+/* ── Second accent ────────────────────────────────────────────────────
+   Small, repeated marks rather than large areas — enough to warm the page
+   without competing with the one blue that means "act here". */
+
+.lp .lp-sec-eyebrow, .lp .lp-eyebrow { color: var(--lp-gold); }
+.lp .lp-sec-head h2::after {
+  content: ''; display: block; width: 42px; height: 3px; border-radius: 2px;
+  background: var(--lp-gold-soft); margin: 16px 0 0;
+}
+/* Centred only where the heading itself is centred. */
+.lp .lp-hero h1::after, .lp .lp-cta-final h2::after { margin-left: auto; margin-right: auto; }
+.lp .lp-page-head h1::after { margin-left: 0; }
+.lp .lp-step-n {
+  background: var(--lp-gold-wash); color: var(--lp-gold);
+  border: 1px solid rgba(184,135,59,.28);
+}
+.lp .lp-tag { background: var(--lp-gold-wash); color: var(--lp-gold); }
+
+/* On the navy bands the gold has to lift, not sink. */
+.lp .lp-cta-final .lp-sec-eyebrow, .lp footer .lp-sec-eyebrow { color: var(--lp-gold-soft); }
+.lp .lp-cta-final h2::after { background: var(--lp-gold-soft); }
+
+/* The answer under each problem on /why-us. */
+.lp .lp-fix {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--lp-line); color: var(--lp-text);
+}
+.lp .lp-fix b { color: var(--lp-accent-soft); }

@@ -52,7 +52,7 @@ export default function BookingPage() {
         strategy="afterInteractive"
         onReady={() => setScriptReady(true)}
       />
-      <main className="max-w-3xl mx-auto px-6 py-8">
+      <main className="dash-page-centered">
         {booked ? (
           <Card className="text-center p-10">
             <CardContent className="pt-0">
@@ -64,7 +64,7 @@ export default function BookingPage() {
         ) : (
           <>
             <div className="mb-8">
-              <h2 className="text-2xl font-bold tracking-tight">Book your screening call</h2>
+              <h2 className="page-title">Book your screening call</h2>
               <p className="text-sm text-muted-foreground mt-1">Pick a time that works for you. The call takes about 15–20 minutes.</p>
             </div>
             <Card className="overflow-hidden">

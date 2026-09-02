@@ -48,7 +48,7 @@ export default function RecordingsClient({
   return (
     <main className="px-8 py-8 space-y-5 overflow-auto">
       <div className="flex items-end justify-between mb-2">
-        <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Unassigned Recordings</h2>
+        <h2 className="page-title">Unassigned Recordings</h2>
         <span className="text-sm text-gray-400 mb-1">{recordings.length} total</span>
       </div>
 

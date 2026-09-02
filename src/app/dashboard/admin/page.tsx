@@ -378,10 +378,10 @@ export default function AdminDashboard() {
   }
 
   return (
-    <main className="px-8 py-8 space-y-5 overflow-auto">
+    <main className="dash-page">
 
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Candidates</h1>
+          <h1 className="page-title">Candidates</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-400">{candidates.length} total</span>
             <AddCandidatesPanel onAdded={fetchCandidates} />

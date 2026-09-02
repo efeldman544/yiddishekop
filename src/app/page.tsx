@@ -54,31 +54,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── PROBLEM ── */}
-      <section className="lp-band" id="problem">
-        <div className="wrap">
-          <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">The real problem</div>
-            <h2>Hiring isn&apos;t hard because there aren&apos;t enough applicants.</h2>
-            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. So you sift, interview strangers, and hope you guessed right.</p>
-          </div>
-          <div className="lp-pain-grid reveal">
-            <div className="lp-pain">
-              <h3>Who&apos;s actually qualified?</h3>
-              <p>The hardest part of hiring isn&apos;t finding applicants. It&apos;s knowing which of them is genuinely right for your work.</p>
-            </div>
-            <div className="lp-pain">
-              <h3>Who can you trust?</h3>
-              <p>A résumé tells you what someone typed. It doesn&apos;t tell you whether they&apos;ll show up, communicate, or last.</p>
-            </div>
-            <div className="lp-pain">
-              <h3>How do you avoid a bad hire?</h3>
-              <p>A wrong hire costs months and real money. Most owners would rather be confident before they commit.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── HOW IT WORKS ── */}
       <section id="how">
         <div className="wrap">
@@ -98,79 +73,6 @@ export default async function LandingPage() {
             <div className="lp-step reveal">
               <div className="lp-step-head"><div className="lp-step-n">3</div><h3>You watch &amp; choose</h3></div>
               <p>You meet the ones you chose, live. Pick who you hire — the decision is yours.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── SCREENING ── */}
-      <section className="lp-band">
-        <div className="wrap">
-          <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">Inside the screening</div>
-            <h2>What happens before a candidate reaches you.</h2>
-            <p>No black box. Every person in the pool has already been through all of this:</p>
-          </div>
-          <div className="lp-screen-list reveal">
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Sourced and screened by us</b> — we go and find them; they don&apos;t arrive from a generic job board.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Resume &amp; background review</b> — experience verified against what the work actually needs.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>First-round interview, recorded</b> — we ask the questions you&apos;d ask, on video, so you can see and hear how they answer.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Selected with a reason</b> — every candidate we show you comes with why we chose them.</span></div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── VALUE ── */}
-      <section>
-        <div className="wrap">
-          <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">Why YiddisheKop</div>
-            <h2>Better candidates. <span className="it">Less guesswork.</span></h2>
-          </div>
-          <div className="lp-vals">
-            <div className="lp-val reveal">
-              <div className="lp-tag">Vetted first</div>
-              <h3>We do the sifting</h3>
-              <p>Every candidate is screened and interviewed before they ever reach you. You spend your time on the few worth meeting — not the pile that isn&apos;t.</p>
-            </div>
-            <div className="lp-val reveal">
-              <div className="lp-tag">On video</div>
-              <h3>Judge the real person</h3>
-              <p>You see and hear each candidate answer real questions — so you&apos;re deciding on a person, not a piece of paper.</p>
-            </div>
-            <div className="lp-val reveal">
-              <div className="lp-tag">Confidence</div>
-              <h3>Know who you&apos;re hiring</h3>
-              <p>You review candidates with the reasoning behind each pick. No guessing, no gambling on strangers.</p>
-            </div>
-            <div className="lp-val reveal">
-              <div className="lp-tag">Understands your world</div>
-              <h3>People who fit</h3>
-              <p>Qualified, pre-screened remote professionals who understand how a frum business runs — the calendar, the culture, the unspoken things you&apos;d otherwise have to explain.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── PROOF ── */}
-      <section className="lp-band">
-        <div className="wrap">
-          <div className="lp-sec-head reveal">
-            <div className="lp-sec-eyebrow">Proof, not promises</div>
-            <h2>What working with us has actually looked like.</h2>
-          </div>
-          <div className="lp-proof-grid">
-            <div className="lp-proof reveal">
-              <h3>Clients come back to hire again.</h3>
-              <p>Our earliest clients returned for their next hire after seeing how the first one went.</p>
-            </div>
-            <div className="lp-proof reveal">
-              <h3>Placements that last.</h3>
-              <p>Our placements stick. Clients tell us their hires are still going strong months later — because the fit was right from the start.</p>
-            </div>
-            <div className="lp-proof reveal">
-              <h3>The clips do the convincing.</h3>
-              <p>Clients consistently tell us the interview videos are what gave them confidence in the people they reviewed.</p>
             </div>
           </div>
         </div>

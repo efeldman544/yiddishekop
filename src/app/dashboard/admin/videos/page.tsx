@@ -664,12 +664,12 @@ export default function VideosPage() {
   const doneBulk = bulkRows.filter(r => r.status === 'done').length
 
   return (
-    <div className="px-8 py-8 space-y-8 max-w-5xl">
+    <div className="dash-page">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Videos &amp; Transcripts</h2>
+          <h2 className="page-title">Videos &amp; Transcripts</h2>
           <p className="text-sm text-gray-400 mt-1">All interview recordings and transcripts in one place.</p>
         </div>
         <Button variant="outline" onClick={() => { setBulkOpen(o => !o); setBulkRows([]) }}>

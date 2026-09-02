@@ -97,25 +97,15 @@ export default function ForCandidatesPage() {
         </div>
       </section>
 
-      {/* ── ROLES ── */}
-      <section className="lp-band">
-        <div className="wrap">
-          <div className="lp-sec-head">
-            <div className="lp-sec-eyebrow">What we place</div>
-            <h2>Remote roles across the work you already do.</h2>
-            <p>Bookkeeping and admin, customer service and sales, design, marketing, development, and more — full-time or part-time.</p>
-          </div>
-        </div>
-      </section>
-
       {/* ── FINAL CTA ── */}
       <section className="lp-cta-final">
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Get started</div>
           <h2>Create your profile today.</h2>
           <p>
-            It takes a few minutes, it&apos;s free, and it puts you in front of businesses that are
-            hiring right now.
+            Bookkeeping and admin, customer service and sales, design, marketing, development and
+            more — full-time or part-time. It takes a few minutes, it&apos;s free, and it puts you in
+            front of businesses hiring right now.
           </p>
           <Link href="/signup?role=candidate" className="lp-btn lp-btn-primary lp-btn-lg">Create your profile</Link>
           <div className="lp-cta-contact">
