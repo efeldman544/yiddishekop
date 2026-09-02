@@ -210,9 +210,9 @@ export default function IntroRequestsPage() {
   const done = requests.filter(r => r.status !== 'new')
 
   return (
-    <main className="px-8 py-8 space-y-5">
+    <main className="dash-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Requests</h1>
+        <h1 className="page-title">Requests</h1>
         <span className="text-sm text-gray-400">{open.length + meetings.length} awaiting action</span>
       </div>
 

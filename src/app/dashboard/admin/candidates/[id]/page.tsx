@@ -47,7 +47,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
         <CardContent className="pt-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight">{cp.full_name ?? 'Unnamed'}</h2>
+              <h2 className="page-title">{cp.full_name ?? 'Unnamed'}</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {[cp.current_job_title, cp.location].filter(Boolean).join(' · ')}
               </p>

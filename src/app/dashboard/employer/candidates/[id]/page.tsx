@@ -84,7 +84,7 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
           </div>
           {/* Same cleanup as the card this was opened from, so the title
               doesn't change on the way in. */}
-          <h1 className="text-2xl font-bold tracking-tight">{displayName(candidate.full_name) ?? 'Unnamed'}</h1>
+          <h1 className="page-title">{displayName(candidate.full_name) ?? 'Unnamed'}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {[displayTitle(candidate.current_job_title, candidate.roles_seeking, candidate.fields_worked_in), candidate.location].filter(Boolean).join(' · ')}
           </p>

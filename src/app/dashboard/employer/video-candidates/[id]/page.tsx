@@ -58,7 +58,7 @@ export default async function EmployerVideoCandidatePage({ params }: { params: P
 
       <Card>
         <CardContent className="pt-5">
-          <h1 className="text-2xl font-bold tracking-tight">{displayName(c.name) ?? 'Candidate'}</h1>
+          <h1 className="page-title">{displayName(c.name) ?? 'Candidate'}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{[displayTitle(c.current_job_title, null, c.fields_worked_in), c.location].filter(Boolean).join(' · ')}</p>
           <div className="flex flex-wrap gap-1.5 mt-3">
             {canonicalIndustries(c.fields_worked_in).filter(f => f !== 'Other').map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}

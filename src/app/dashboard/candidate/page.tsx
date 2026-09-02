@@ -51,10 +51,10 @@ export default async function CandidateDashboard() {
   const step2Done = !!cp?.screening_booked
 
   return (
-    <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+    <main className="dash-page-centered">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-950 tracking-tight">
+          <h1 className="page-title">
             {profile?.full_name ? `Welcome, ${profile.full_name}` : 'Dashboard'}
           </h1>
           <p className="text-sm text-gray-400 mt-1">Track your application and manage your profile.</p>

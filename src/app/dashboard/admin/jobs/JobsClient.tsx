@@ -292,7 +292,7 @@ export default function JobsClient({
         {activeTab === 'jobs' ? (
           <>
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Job Board</h2>
+              <h2 className="page-title">Job Board</h2>
               <Button onClick={openNew}>+ New job</Button>
             </div>
 
@@ -345,7 +345,7 @@ export default function JobsClient({
         ) : (
           <>
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-950 tracking-tight">Employers</h2>
+              <h2 className="page-title">Employers</h2>
               <Button onClick={openNewEmployer}>+ Add employer</Button>
             </div>
             {loadingEmployers ? (

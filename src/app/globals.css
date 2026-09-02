@@ -129,6 +129,18 @@ input, textarea, select {
     @apply flex-1 w-full max-w-2xl mx-auto px-6 py-8;
   }
 
+  /* ── Dashboard page shells ───────────────────────────
+     Every page had picked its own padding, max width and spacing, so moving
+     between them shifted the content sideways. Two shells: full width for the
+     admin pages, which sit beside a sidebar, and centred for the employer and
+     candidate portals, which don't. */
+  .dash-page {
+    @apply px-8 py-8 space-y-6;
+  }
+  .dash-page-centered {
+    @apply max-w-5xl mx-auto px-6 py-8 space-y-6;
+  }
+
   /* ── Typography ──────────────────────────────────── */
   .page-title {
     @apply text-2xl text-gray-950 tracking-tight;
