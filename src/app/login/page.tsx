@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { safeNextPath } from '@/lib/nextPath'
 import type { Role } from '@/types'
+import AuthShell from '@/components/AuthShell'
 
 function LoginForm() {
   const router = useRouter()
@@ -45,19 +46,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="auth-dark">
-      {/* Left panel */}
-      <div className="auth-panel">
-        <div>
-          <Link href="/" className="auth-logo">Yiddishe<span>Kop</span></Link>
-          <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
-        </div>
-        <p className="auth-copy">© 2026 YiddisheKop</p>
-      </div>
-
-      {/* Main */}
-      <div className="auth-main">
-        <div className="auth-box">
+    <AuthShell>
           <h1 className="auth-heading">Welcome back</h1>
           <p className="auth-sub">Sign in to your account</p>
 
@@ -100,12 +89,7 @@ function LoginForm() {
             Don&apos;t have an account?{' '}
             <Link href={nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'}>Sign up</Link>
           </p>
-          <p className="auth-footer" style={{ marginTop: 8 }}>
-            <Link href="/" style={{ color: 'var(--auth-dim)' }}>← Back to home</Link>
-          </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   )
 }
 

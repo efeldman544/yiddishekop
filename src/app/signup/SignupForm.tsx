@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { safeNextPath } from '@/lib/nextPath'
 import type { Role } from '@/types'
+import AuthShell from '@/components/AuthShell'
 
 type Props = {
   defaultEmail?: string
@@ -65,19 +66,7 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
   }
 
   return (
-    <div className="auth-dark">
-      {/* Left panel */}
-      <div className="auth-panel">
-        <div>
-          <Link href="/" className="auth-logo">Yiddishe<span>Kop</span></Link>
-          <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
-        </div>
-        <p className="auth-copy">© 2026 YiddisheKop</p>
-      </div>
-
-      {/* Main */}
-      <div className="auth-main">
-        <div className="auth-box">
+    <AuthShell>
           <h1 className="auth-heading">Create an account</h1>
           <p className="auth-sub">Join YiddisheKop today</p>
 
@@ -113,8 +102,6 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
             Already have an account?{' '}
             <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Sign in</Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   )
 }

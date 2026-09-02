@@ -46,18 +46,6 @@ const NAV = [
     ),
   },
   {
-    // Was reachable only by typing the URL: the one component linking to it
-    // (AdminNav) had been replaced by this sidebar and left unimported.
-    label: 'Recordings',
-    href: '/dashboard/admin/recordings',
-    exact: false,
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 11a7 7 0 0 1-14 0M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm0 0v4m-3 0h6" />
-      </svg>
-    ),
-  },
-  {
     label: 'Videos',
     href: '/dashboard/admin/videos',
     exact: false,
@@ -84,7 +72,7 @@ export default function AdminSidebar() {
   return (
     <aside className="dash-dark w-[220px] shrink-0 h-screen border-r flex flex-col">
       {/* Brand */}
-      <div className="px-5 h-14 flex items-center border-b border-inherit shrink-0">
+      <div className="px-5 h-16 flex items-center border-b border-inherit shrink-0">
         <Link href="/" className="dash-brand">Yiddishe<span>Kop</span></Link>
       </div>
 

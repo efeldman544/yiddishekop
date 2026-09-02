@@ -10,7 +10,7 @@ export default function CandidateNav() {
   const isRoot = pathname === '/dashboard/candidate'
 
   return (
-    <header className="dash-dark h-14 border-b px-6 flex items-center justify-between shrink-0">
+    <header className="dash-dark h-16 border-b px-6 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-4">
         <Link href="/" className="dash-brand">Yiddishe<span>Kop</span></Link>
         {!isRoot && (

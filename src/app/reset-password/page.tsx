@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/types'
+import AuthShell from '@/components/AuthShell'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -52,17 +53,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="auth-dark">
-      <div className="auth-panel">
-        <div>
-          <Link href="/" className="auth-logo">Yiddishe<span>Kop</span></Link>
-          <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
-        </div>
-        <p className="auth-copy">© 2026 YiddisheKop</p>
-      </div>
-
-      <div className="auth-main">
-        <div className="auth-box">
+    <AuthShell>
           <h1 className="auth-heading">Choose a new password</h1>
 
           {!ready ? (
@@ -100,8 +91,6 @@ export default function ResetPasswordPage() {
               </form>
             </>
           )}
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   )
 }

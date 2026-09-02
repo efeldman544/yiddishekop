@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import AuthShell from '@/components/AuthShell'
 
 export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
@@ -28,17 +29,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="auth-dark">
-      <div className="auth-panel">
-        <div>
-          <Link href="/" className="auth-logo">Yiddishe<span>Kop</span></Link>
-          <p className="auth-tagline">Connecting great talent with the businesses that need them.</p>
-        </div>
-        <p className="auth-copy">© 2026 YiddisheKop</p>
-      </div>
-
-      <div className="auth-main">
-        <div className="auth-box">
+    <AuthShell>
           <h1 className="auth-heading">Reset your password</h1>
 
           {sent ? (
@@ -78,8 +69,6 @@ export default function ForgotPasswordPage() {
               </p>
             </>
           )}
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   )
 }
