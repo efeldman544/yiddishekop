@@ -48,7 +48,7 @@ export default async function LandingPage() {
           </div>
           <div className="lp-hero-note">
             <span><span className="lp-dot" />Screened &amp; vetted first</span>
-            <span><span className="lp-dot" />The strongest on video</span>
+            <span><span className="lp-dot" />Watch them before you meet</span>
             <span><span className="lp-dot" />People who understand your world</span>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default async function LandingPage() {
         <div className="wrap">
           <div className="lp-sec-head reveal">
             <div className="lp-sec-eyebrow">What we place</div>
-            <h2>Remote roles, filled with people you&apos;d actually hire.</h2>
+            <h2>Roles across every part of your business.</h2>
             <p>Full-time or part-time, working in your hours.</p>
           </div>
           <div className="lp-roles reveal">
