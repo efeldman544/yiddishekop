@@ -697,9 +697,10 @@ input, textarea, select {
 .lp .browse-controls .browse-search { flex: 1 1 320px; margin: 0; }
 .lp .browse-select select {
   height: 42px; border: 1px solid var(--lp-line); border-radius: 10px;
-  padding: 0 34px 0 12px; font-size: 14px; background-color: #fff; color: var(--lp-text);
-  font-family: inherit; cursor: pointer;
+  padding: 0 30px 0 12px; font-size: 13.5px; background-color: #fff;
+  color: var(--lp-text-dim); font-family: inherit; cursor: pointer;
 }
+.lp .browse-select select:hover { color: var(--lp-text); }
 
 /* A face, so a tile reads as a person rather than an open role. */
 .lp .cand-avatar {
@@ -733,10 +734,7 @@ input, textarea, select {
   font-weight: 700; letter-spacing: .02em;
 }
 
-.lp .browse-gate-line {
-  margin: 14px 0 4px; font-size: 14px; color: var(--lp-text-dim);
-}
-.lp .browse-gate-line a { color: var(--lp-accent-soft); text-decoration: underline; }
+.lp .browse-gate-link { color: var(--lp-accent-soft); text-decoration: underline; }
 
 /* An icon in front of an industry so a tag is recognised rather than read. */
 .lp .browse-tag-icon {
@@ -761,6 +759,16 @@ input, textarea, select {
 .cand-video-play svg { width: 17px; height: 17px; margin-left: 2px; }
 .cand-video-locked { background: #C1D7F0; color: #fff; }
 .cand-video-open:hover { border-color: var(--lp-accent); background: #F1F6FC; }
+
+/* One row of pills, clipped rather than wrapped, so every card in the grid is
+   the same height and the rows line up. */
+.lp .browse-card-tags-tight {
+  flex-wrap: nowrap; overflow: hidden; margin-top: 12px;
+}
+.lp .browse-card-tags-tight > * { flex-shrink: 0; }
+.lp .browse-card-tags-tight .browse-tag {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex-shrink: 1;
+}
 
 /* ── Browse: candidate dialog ────────────────────────────────────────── */
 

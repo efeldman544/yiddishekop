@@ -71,8 +71,17 @@ export default async function BrowsePage({
           }}>
             Candidates ready to work
           </h1>
-          <p style={{ fontSize: 15.5, color: 'var(--lp-text-dim)', lineHeight: 1.5, maxWidth: 560 }}>
+          <p style={{ fontSize: 15.5, color: 'var(--lp-text-dim)', lineHeight: 1.5, maxWidth: 620 }}>
             Screened by us. Tap anyone to see more.
+            {!canRequestIntro && (
+              <>
+                {' '}
+                <Link href="/signup?role=employer" className="browse-gate-link">
+                  Create a free account
+                </Link>{' '}
+                for resumes and interviews.
+              </>
+            )}
           </p>
         </div>
       </section>
@@ -82,13 +91,6 @@ export default async function BrowsePage({
           <Suspense fallback={null}>
             <BrowseFilters industries={industries} />
           </Suspense>
-
-          {!canRequestIntro && (
-            <p className="browse-gate-line">
-              <Link href="/signup?role=employer">Create a free hiring account</Link>{' '}
-              to see resumes, watch interviews, and ask for an introduction.
-            </p>
-          )}
 
           {loadFailed ? (
             <div className="browse-empty">

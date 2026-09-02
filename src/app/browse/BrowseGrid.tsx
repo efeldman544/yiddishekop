@@ -81,16 +81,16 @@ export default function BrowseGrid({
                 </div>
               </div>
 
-              <div className="browse-card-tags">
+              {/* Two pills, one row. Three wrapped onto a second line and made
+                  a grid of a dozen cards read as a wall. Availability is a
+                  filter and is in the panel; it doesn't earn space here. */}
+              <div className="browse-card-tags browse-card-tags-tight">
                 {(c.interviewed || c.hasVideo) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
                 {c.industries.slice(0, 1).map(i => (
                   <span key={i} className="browse-tag">
                     <IndustryIcon industry={i} className="browse-tag-icon" />
                     {i}
                   </span>
-                ))}
-                {c.employmentType.slice(0, 1).map(t => (
-                  <span key={t} className="browse-tag browse-tag-muted">{t}</span>
                 ))}
               </div>
             </article>
