@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { displayTitle, displayName, cleanText } from './candidateDisplay'
-import { canonicalIndustries, inferIndustry, BROWSE_INDUSTRIES } from './candidateTaxonomy'
+import { canonicalIndustries, inferIndustry, tidyCase, BROWSE_INDUSTRIES } from './candidateTaxonomy'
 
 // SERVER ONLY — uses the service-role key. Never import from a client
 // component. Anonymization happens here, before data leaves the server, so a
@@ -85,6 +85,23 @@ function firstNameOf(raw: string | null | undefined): string | null {
   return first.length >= 2 ? first : null
 }
 
+/**
+ * Locations are typed by hand, so they arrive in every casing at once —
+ * "LAKEWOOD, NJ" beside "safed" beside "Monsey, NY".
+ *
+ * Title-casing an all-caps entry has to lowercase it first, which would turn
+ * NJ into Nj. Two-letter words in a place name are state and country codes, so
+ * they go back to capitals afterwards.
+ */
+function tidyLocation(raw: string | null | undefined): string | null {
+  const t = cleanText(raw)
+  if (!t) return null
+  return tidyCase(t).replace(/\b([A-Za-z]{2})\b(?=[,\s]|$)/g, (m, code, offset) =>
+    // Only trailing codes: "Tel Aviv" must not become "Tel AVIV", and a leading
+    // two-letter word is a word, not a code.
+    offset > 0 ? code.toUpperCase() : m)
+}
+
 function refFrom(id: string) {
   return id.replace(/-/g, '').slice(0, 4).toUpperCase()
 }
@@ -108,9 +125,13 @@ function cardIndustries(
 ): string[] {
   const out: string[] = []
   const add = (c: string | null) => { if (c && c !== 'Other' && !out.includes(c)) out.push(c) }
-  for (const c of canonicalIndustries(stored)) add(c)
+  // The title first, because the card leads with it and shows only the first
+  // category. Stored fields led before, which is how an "Accountant" ended up
+  // tagged Healthcare & Medical — a field they once ticked, contradicting the
+  // job title printed directly above it.
   add(inferIndustry(title))
   add(inferIndustry(rolesSeeking))
+  for (const c of canonicalIndustries(stored)) add(c)
   return out
 }
 
@@ -262,7 +283,7 @@ export async function browseCandidates(
           id: allowIntroRequests ? p.id : null,
           firstName: firstNameOf(p.full_name),
           title,
-          location: cleanText(p.location),
+          location: tidyLocation(p.location),
           industries,
           employmentType: p.employment_type ?? [],
           yearsExperience: cleanText(p.years_experience),
@@ -289,7 +310,7 @@ export async function browseCandidates(
           id: allowIntroRequests ? v.id : null,
           firstName: firstNameOf(v.name),
           title,
-          location: cleanText(v.location),
+          location: tidyLocation(v.location),
           industries,
           employmentType: v.employment_type ?? [],
           yearsExperience: null,
