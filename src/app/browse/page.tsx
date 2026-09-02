@@ -71,18 +71,14 @@ export default async function BrowsePage({
           }}>
             Candidates ready to work
           </h1>
-          <p style={{ fontSize: 15.5, color: 'var(--lp-text-dim)', lineHeight: 1.5, maxWidth: 620 }}>
-            Screened by us. Tap anyone to see more.
-            {!canRequestIntro && (
-              <>
-                {' '}
-                <Link href="/signup?role=employer" className="browse-gate-link">
-                  Create a free account
-                </Link>{' '}
-                for resumes and interviews.
-              </>
-            )}
-          </p>
+          {!canRequestIntro && (
+            <p style={{ fontSize: 15.5, color: 'var(--lp-text-dim)', lineHeight: 1.5, maxWidth: 620 }}>
+              <Link href="/signup?role=employer" className="browse-gate-link">
+                Create a free account
+              </Link>{' '}
+              for resumes and interviews.
+            </p>
+          )}
         </div>
       </section>
 

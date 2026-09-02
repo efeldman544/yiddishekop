@@ -8,10 +8,8 @@ import { EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
 // all 23 meant most of them returned nobody, and an empty result is
 // indistinguishable from a broken filter.
 //
-// Only the first few are shown as chips. A row of twenty chips pushed the
-// candidates themselves below the fold, which is the one thing this page has
-// to get right; the rest stay one click away in the dropdown.
-const VISIBLE_CHIPS = 5
+// One dropdown, not a chip row: the chips took a full line above the grid and
+// the candidates are what the page is for.
 
 export default function BrowseFilters({ industries }: { industries: string[] }) {
   const router = useRouter()
@@ -35,12 +33,11 @@ export default function BrowseFilters({ industries }: { industries: string[] }) 
 
   const hasFilters = !!(industry || type || params.get('q'))
 
-  // A chosen industry always gets a chip, even when it isn't in the top few or
-  // has been filtered out of the pool — otherwise an empty page gives no clue
-  // what is filtering it.
-  const chips = industries.slice(0, VISIBLE_CHIPS)
-  if (industry && !chips.includes(industry)) chips.unshift(industry)
-  const rest = industries.filter(i => !chips.includes(i))
+  // A chosen industry the pool no longer contains still needs to appear in the
+  // list, or the select would show "All industries" while the page is filtered.
+  const options = industry && !industries.includes(industry)
+    ? [industry, ...industries]
+    : industries
 
   return (
     <div className="browse-filters">
@@ -60,6 +57,18 @@ export default function BrowseFilters({ industries }: { industries: string[] }) 
         </form>
 
         <label className="browse-select">
+          <span className="sr-only">Industry</span>
+          <select
+            value={industry}
+            onChange={e => apply({ industry: e.target.value })}
+            aria-label="Industry"
+          >
+            <option value="">All industries</option>
+            {options.map(i => <option key={i} value={i}>{i}</option>)}
+          </select>
+        </label>
+
+        <label className="browse-select">
           <span className="sr-only">Availability</span>
           <select value={type} onChange={e => apply({ type: e.target.value })} aria-label="Availability">
             <option value="">Any availability</option>
@@ -67,54 +76,17 @@ export default function BrowseFilters({ industries }: { industries: string[] }) 
           </select>
         </label>
 
-        {rest.length > 0 && (
-          <label className="browse-select">
-            <span className="sr-only">More industries</span>
-            <select
-              value={chips.includes(industry) ? '' : industry}
-              onChange={e => apply({ industry: e.target.value })}
-              aria-label="More industries"
-            >
-              <option value="">More industries…</option>
-              {rest.map(i => <option key={i} value={i}>{i}</option>)}
-            </select>
-          </label>
-        )}
-      </div>
-
-      {chips.length > 0 && (
-        <div className="browse-chips" role="group" aria-label="Filter by industry">
+        {hasFilters && (
           <button
             type="button"
-            className={`browse-chip${industry ? '' : ' is-on'}`}
-            aria-pressed={!industry}
-            onClick={() => apply({ industry: '' })}
+            className="browse-clear"
+            onClick={() => { setQ(''); startTransition(() => router.push(pathname, { scroll: false })) }}
           >
-            All
+            Clear
           </button>
-          {chips.map(i => (
-            <button
-              key={i}
-              type="button"
-              className={`browse-chip${industry === i ? ' is-on' : ''}`}
-              aria-pressed={industry === i}
-              onClick={() => apply({ industry: industry === i ? '' : i })}
-            >
-              {i}
-            </button>
-          ))}
-          {hasFilters && (
-            <button
-              type="button"
-              className="browse-clear"
-              onClick={() => { setQ(''); startTransition(() => router.push(pathname, { scroll: false })) }}
-            >
-              Clear
-            </button>
-          )}
-          {isPending && <span className="browse-pending">Updating…</span>}
-        </div>
-      )}
+        )}
+        {isPending && <span className="browse-pending">Updating…</span>}
+      </div>
     </div>
   )
 }

@@ -808,17 +808,6 @@ input, textarea, select {
 }
 .cand-dialog-note { font-size: 13px; color: var(--lp-text-dim); margin: 0; flex-basis: 100%; }
 
-.lp .browse-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
-.lp .browse-chip {
-  border: 1px solid var(--lp-line); background: transparent; border-radius: 999px;
-  padding: 7px 14px; font-size: 13.5px; font-weight: 500; color: var(--lp-text-dim);
-  cursor: pointer; transition: all .18s; font-family: inherit;
-}
-.lp .browse-chip:hover { border-color: var(--lp-accent); color: var(--lp-text); }
-.lp .browse-chip.is-on {
-  background: var(--lp-accent); border-color: var(--lp-accent); color: #fff; font-weight: 600;
-}
-
 .lp .browse-card.is-wanted {
   border-color: var(--lp-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lp-accent) 22%, transparent);
