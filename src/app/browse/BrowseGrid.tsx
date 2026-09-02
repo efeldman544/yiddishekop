@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import type { BrowseCard } from '@/lib/browse'
 import CandidateDialog, { PersonIcon } from './CandidateDialog'
 import IndustryIcon from '@/components/IndustryIcon'
+import { isInterviewed } from '@/lib/candidateStatus'
 
 // Everyone who matches is already on the page — this only controls how many
 // are painted at once. Numbered pages would fight the filters (change a
@@ -85,7 +86,7 @@ export default function BrowseGrid({
                   a grid of a dozen cards read as a wall. Availability is a
                   filter and is in the panel; it doesn't earn space here. */}
               <div className="browse-card-tags browse-card-tags-tight">
-                {(c.interviewed || c.hasVideo) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
+                {isInterviewed(c) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
                 {c.industries.slice(0, 1).map(i => (
                   <span key={i} className="browse-tag">
                     <IndustryIcon industry={i} className="browse-tag-icon" />

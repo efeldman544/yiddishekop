@@ -12,7 +12,16 @@ type Notification = {
   created_at: string
 }
 
-export default function NotificationBell({ candidatePath = '/dashboard/admin/candidates' }: { candidatePath?: string }) {
+export default function NotificationBell({
+  candidatePath = '/dashboard/admin/candidates',
+  fallbackPath,
+}: {
+  candidatePath?: string
+  /** Where to go when a notification names no candidate, or this role has no
+      per-candidate page. Without it, clicking marked the item read and sat
+      still, which reads as a broken control. */
+  fallbackPath?: string
+}) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
@@ -67,6 +76,7 @@ export default function NotificationBell({ candidatePath = '/dashboard/admin/can
     setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
     setOpen(false)
     if (candidatePath && n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
+    else if (fallbackPath) router.push(fallbackPath)
   }
 
   const unreadCount = notifications.filter(n => !n.read).length

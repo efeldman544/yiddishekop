@@ -43,7 +43,7 @@ export default function HowItWorksPage() {
           <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">
-            Looking for something specific? <Link href="/start-hiring">Request a role</Link> · Prefer to talk?{' '}
+            Looking for something specific? <Link href="/start-hiring">Ask us to source it</Link> · Prefer to talk?{' '}
             <a href="tel:6314943567">631 494 3567</a>
           </div>
         </div>

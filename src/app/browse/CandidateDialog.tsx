@@ -6,6 +6,7 @@ import type { BrowseCard } from '@/lib/browse'
 import RequestIntroButton from './RequestIntroButton'
 import { resumeHref } from '@/lib/resumeUrl'
 import IndustryIcon from '@/components/IndustryIcon'
+import { isInterviewed } from '@/lib/candidateStatus'
 
 // The detail an employer wants once a card has caught their eye. Keeping it
 // here rather than on every card is what lets the grid stay scannable — the
@@ -55,7 +56,7 @@ export default function CandidateDialog({
               {card.firstName ?? `Candidate #${card.ref}`}
               {card.location && <> · {card.location}</>}
             </p>
-            {(card.interviewed || card.hasVideo) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
+            {isInterviewed(card) && <span className="browse-badge browse-badge-strong">Interviewed</span>}
           </div>
         </div>
 
@@ -105,9 +106,22 @@ export default function CandidateDialog({
         </dl>
 
         <div className="cand-dialog-foot">
-          {card.id ? (
+          {card.assigned && card.id ? (
+            // Offering an introduction to somebody already shared with them
+            // contradicts the panel above, which just told them it's theirs.
             <>
-              <RequestIntroButton candidateId={card.id} candidateRef={card.ref} />
+              <Link href={`/dashboard/employer/candidates/${card.id}`} className="lp-btn lp-btn-primary">
+                Open in your portal
+              </Link>
+              <p className="cand-dialog-note">This candidate is already shared with you.</p>
+            </>
+          ) : card.id ? (
+            <>
+              <RequestIntroButton
+                candidateId={card.id}
+                candidateRef={card.ref}
+                alreadyRequested={card.requested}
+              />
               {canSeeResume && (
                 <a
                   href={resumeHref(card.id, card.firstName)}

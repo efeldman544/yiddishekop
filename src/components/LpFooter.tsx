@@ -19,7 +19,7 @@ export default function LpFooter() {
               <h4>Hire</h4>
               <Link href="/browse">Browse candidates</Link>
               <Link href="/how-it-works">How it works</Link>
-              <Link href="/start-hiring">Request a role</Link>
+              <Link href="/start-hiring">Ask us to source a role</Link>
             </div>
             <div className="lp-foot-col">
               <h4>Work with us</h4>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { notifyAssigned } from '@/lib/notifyAssigned'
+import { introStatusForAdmin } from '@/lib/candidateStatus'
 
 type Request = {
   id: string
@@ -15,6 +16,18 @@ type Request = {
   created_at: string
 }
 
+// An employer asks for someone two ways: "Request introduction" on browse
+// before they have them, and "Request meeting" in their portal once a
+// candidate has been shared. Those wrote to different tables and surfaced on
+// different admin pages, so half the asks were easy to miss. Both are shown
+// here now — the queue is the thing to work through.
+type MeetingRequest = {
+  id: string
+  candidate_id: string
+  employer_id: string
+  candidateName: string | null
+}
+
 export default function IntroRequestsPage() {
   const [requests, setRequests] = useState<Request[]>([])
   const [employers, setEmployers] = useState<Record<string, string>>({})
@@ -23,6 +36,7 @@ export default function IntroRequestsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
   const [rowError, setRowError] = useState<Record<string, string>>({})
+  const [meetings, setMeetings] = useState<MeetingRequest[]>([])
 
   useEffect(() => {
     async function load() {
@@ -70,9 +84,56 @@ export default function IntroRequestsPage() {
         setAssigned(new Set(pairs.filter(r => have.has(`${r.employer_id}:${r.candidate_id}`)).map(r => r.id)))
       }
 
+      // Meeting requests: an assignment the employer has flagged, from either
+      // the job-based or the direct table.
+      const [{ data: jobActs }, { data: directActs }] = await Promise.all([
+        supabase
+          .from('candidate_job_assignments')
+          .select('id, candidate_id, action, job_requirements!inner(employer_id)')
+          .eq('action', 'request_meeting'),
+        supabase
+          .from('employer_candidate_assignments')
+          .select('id, candidate_id, employer_id, action')
+          .eq('action', 'request_meeting'),
+      ])
+      type JobAct = { id: string; candidate_id: string; job_requirements: { employer_id: string } | { employer_id: string }[] }
+      type DirectAct = { id: string; candidate_id: string; employer_id: string }
+      const asked: { id: string; candidate_id: string; employer_id: string }[] = [
+        ...((jobActs ?? []) as JobAct[]).map(a => ({
+          id: a.id,
+          candidate_id: a.candidate_id,
+          employer_id: Array.isArray(a.job_requirements)
+            ? a.job_requirements[0]?.employer_id
+            : a.job_requirements?.employer_id,
+        })).filter(a => !!a.employer_id) as { id: string; candidate_id: string; employer_id: string }[],
+        ...((directActs ?? []) as DirectAct[]).map(a => ({
+          id: a.id, candidate_id: a.candidate_id, employer_id: a.employer_id,
+        })),
+      ]
+
+      if (asked.length > 0) {
+        const { data: names } = await supabase
+          .from('candidate_profiles').select('id, full_name').in('id', asked.map(a => a.candidate_id))
+        const nameFor: Record<string, string | null> = {}
+        for (const n of (names ?? []) as { id: string; full_name: string | null }[]) nameFor[n.id] = n.full_name
+        setMeetings(asked.map(a => ({ ...a, candidateName: nameFor[a.candidate_id] ?? null })))
+
+        const missing = [...new Set(asked.map(a => a.employer_id))].filter(id => !(id in employers))
+        if (missing.length > 0) {
+          const { data: profs } = await supabase
+            .from('profiles').select('id, full_name, email').in('id', missing)
+          setEmployers(prev => {
+            const next = { ...prev }
+            for (const p of profs ?? []) next[p.id] = p.full_name ?? p.email ?? 'Unknown'
+            return next
+          })
+        }
+      }
+
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function noteError(id: string, message: string) {
@@ -151,12 +212,37 @@ export default function IntroRequestsPage() {
   return (
     <main className="px-8 py-8 space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Introduction requests</h1>
-        <span className="text-sm text-gray-400">{open.length} awaiting action</span>
+        <h1 className="text-2xl font-bold text-gray-950 tracking-tight">Requests</h1>
+        <span className="text-sm text-gray-400">{open.length + meetings.length} awaiting action</span>
       </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {meetings.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+            Meeting requests
+          </p>
+          {meetings.map(m => (
+            <div key={m.id} className="bg-white rounded-xl border border-indigo-200 shadow-sm px-5 py-4">
+              <p className="font-semibold text-gray-900">
+                {employers[m.employer_id] ?? 'Unknown employer'}
+                <span className="font-normal text-gray-400"> wants to meet </span>
+                <Link href={`/dashboard/admin/candidates/${m.candidate_id}`} className="text-indigo-700 hover:underline">
+                  {m.candidateName ?? 'a candidate'}
+                </Link>
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Asked from their portal, after the candidate was shared with them ·{' '}
+                <Link href="/dashboard/admin/matching?tab=meetings" className="text-indigo-700 hover:underline">
+                  Schedule it
+                </Link>
+              </p>
+            </div>
+          ))}
+        </div>
       )}
 
       {loading ? (
@@ -168,6 +254,9 @@ export default function IntroRequestsPage() {
         </div>
       ) : (
         <div className="space-y-3">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+            Introduction requests
+          </p>
           {[...open, ...done].map(r => (
             <div
               key={r.id}
@@ -191,7 +280,7 @@ export default function IntroRequestsPage() {
                       month: 'short', day: 'numeric', year: 'numeric',
                       hour: '2-digit', minute: '2-digit',
                     })}
-                    {r.status !== 'new' && <> · {r.status}</>}
+                    {r.status !== 'new' && <> · {introStatusForAdmin(r.status)}</>}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
