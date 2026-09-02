@@ -495,6 +495,17 @@ input, textarea, select {
   }
   .lp .lp-nav-toggle { display: block; }
   .lp .lp-nav-right .lp-btn-ghost { display: none; }
+  /* Desktop padding leaves the label no room once the menu button appears, so
+     it wrapped to two lines and grew to 74px inside a 78px bar — which is what
+     made it look oversized and jammed against the logo. */
+  .lp .lp-nav-right .lp-btn-primary { font-size: 13.5px; padding: 9px 14px; white-space: nowrap; }
+  .lp .lp-logo { flex-shrink: 0; }
+}
+@media (max-width: 640px) {
+  /* Below this there is genuinely no room beside the logo and the menu button.
+     Nothing is lost: the menu's first link is Browse, and the hero's own
+     button is directly below the fold line. */
+  .lp .lp-nav-right .lp-btn-primary { display: none; }
 }
 @media (max-width: 520px) {
   .lp .wrap { padding: 0 22px; }
@@ -733,17 +744,6 @@ input, textarea, select {
   vertical-align: -2px; display: inline-block;
 }
 .lp .browse-tag { display: inline-flex; align-items: center; }
-
-/* Play marker on the avatar: says an interview exists, without implying it
-   plays here — the clip comes with the introduction. */
-.lp .cand-avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
-.lp .cand-play {
-  position: absolute; right: -3px; bottom: -3px;
-  width: 17px; height: 17px; border-radius: 999px;
-  background: var(--lp-accent); color: #fff; border: 2px solid #fff;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.lp .cand-play svg { width: 9px; height: 9px; margin-left: 1px; }
 
 /* The video row inside the dialog. */
 .cand-video {
