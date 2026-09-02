@@ -13,7 +13,9 @@ export default function LpHeader() {
       <div className="wrap lp-nav">
         <Link href="/" className="lp-logo">Yiddishe<span>Kop</span></Link>
         <nav className={`lp-nav-links${menuOpen ? ' open' : ''}`}>
-          <Link href="/browse" onClick={closeMenu}>Browse</Link>
+          {/* Duplicates the Browse candidates button beside it on desktop, so
+              it only appears in the menu — where that button is hidden. */}
+          <Link href="/browse" onClick={closeMenu} className="lp-nav-menu-only">Browse</Link>
           <Link href="/how-it-works" onClick={closeMenu}>How it works</Link>
           <Link href="/why-us" onClick={closeMenu}>Why us</Link>
           <Link href="/for-candidates" onClick={closeMenu}>For candidates</Link>
