@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { BrowseCard } from '@/lib/browse'
-import CandidateDialog, { PersonIcon, PlayIcon } from './CandidateDialog'
+import CandidateDialog, { PersonIcon } from './CandidateDialog'
 import IndustryIcon from '@/components/IndustryIcon'
 
 // Everyone who matches is already on the page — this only controls how many
@@ -66,15 +66,11 @@ export default function BrowseGrid({
               </button>
 
               <div className="browse-card-top">
-                <span className="cand-avatar-wrap">
-                  <span className="cand-avatar" aria-hidden="true">
-                    {c.firstName ? c.firstName.charAt(0).toUpperCase() : <PersonIcon />}
-                  </span>
-                  {/* Says an interview exists. It doesn't play here — the clip
-                      is part of the introduction, not the listing. */}
-                  {c.hasVideo && (
-                    <span className="cand-play" aria-hidden="true"><PlayIcon /></span>
-                  )}
+                {/* No play marker here: the Interviewed badge already says a
+                    clip exists, and a play symbol on a card that can't play
+                    reads as a broken control. The panel handles the video. */}
+                <span className="cand-avatar" aria-hidden="true">
+                  {c.firstName ? c.firstName.charAt(0).toUpperCase() : <PersonIcon />}
                 </span>
                 <div className="browse-card-who">
                   <h3>{c.title}</h3>
