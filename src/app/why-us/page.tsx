@@ -16,23 +16,43 @@ export default function WhyUsPage() {
       <section className="lp-band" style={{ paddingTop: 80 }}>
         <div className="wrap">
           <div className="lp-sec-head">
-            <div className="lp-sec-eyebrow">The real problem</div>
+            <div className="lp-sec-eyebrow">Why YiddisheKop</div>
             <h2>Hiring isn&apos;t hard because there aren&apos;t enough applicants.</h2>
-            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. So you sift, interview strangers, and hope you guessed right.</p>
+            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. Here&apos;s what we do about each part of that.</p>
           </div>
           <div className="lp-pain-grid">
             <div className="lp-pain">
               <h3>Who&apos;s actually qualified?</h3>
-              <p>The hardest part of hiring isn&apos;t finding applicants. It&apos;s knowing which of them is genuinely right for your work.</p>
+              <p>A résumé tells you what someone typed, not whether they can do the work.</p>
+              <p className="lp-fix"><b>So we check first.</b> Every candidate&apos;s experience is verified against what the job actually needs, before they reach you.</p>
             </div>
             <div className="lp-pain">
               <h3>Who can you trust?</h3>
-              <p>A résumé tells you what someone typed. It doesn&apos;t tell you whether they&apos;ll show up, communicate, or last.</p>
+              <p>You can&apos;t tell from a page whether someone will show up, communicate, or last.</p>
+              <p className="lp-fix"><b>So we interview them on video.</b> You watch them answer the questions you&apos;d ask, before you spend an hour of your own.</p>
             </div>
             <div className="lp-pain">
               <h3>How do you avoid a bad hire?</h3>
-              <p>A wrong hire costs months and real money. Most owners would rather be confident before they commit.</p>
+              <p>A wrong hire costs months and real money.</p>
+              <p className="lp-fix"><b>So you decide from evidence.</b> You meet only the people you picked, and the final call is always yours.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="wrap">
+          <div className="lp-sec-head">
+            <div className="lp-sec-eyebrow">What we do</div>
+            <h2>The work happens <span className="it">before</span> you see anyone.</h2>
+            <p>By the time a candidate appears in your list, all of this is already done.</p>
+          </div>
+          <div className="lp-screen-list">
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>We go and find them</b> — sourced by us, not forwarded from a job board.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Experience verified</b> — checked against what the work actually needs.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, so you can see and hear the answers.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Shown with a reason</b> — every candidate comes with why we picked them.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>You choose</b> — meet only who you want, and hire on your own judgement.</span></div>
           </div>
         </div>
       </section>

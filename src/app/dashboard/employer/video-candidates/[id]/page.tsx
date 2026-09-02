@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import BackButton from '@/components/BackButton'
 import { displayTitle, displayName } from '@/lib/candidateDisplay'
 import { canonicalIndustries } from '@/lib/candidateTaxonomy'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -53,7 +54,7 @@ export default async function EmployerVideoCandidatePage({ params }: { params: P
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-      <Link href="/dashboard/employer" className="text-sm text-gray-400 hover:text-gray-700">← Back</Link>
+      <BackButton fallback="/dashboard/employer" />
 
       <Card>
         <CardContent className="pt-5">

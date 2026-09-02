@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoPlayer from './VideoPlayer'
 import CandidateActions from './CandidateActions'
 import { resumeHref } from '@/lib/resumeUrl'
+import BackButton from '@/components/BackButton'
 import { displayTitle, displayName } from '@/lib/candidateDisplay'
 import { canonicalIndustries } from '@/lib/candidateTaxonomy'
 
@@ -78,6 +79,9 @@ export default async function EmployerCandidatePage({ params }: { params: Promis
 
       <Card className="mb-6">
         <CardContent className="pt-5">
+          <div className="mb-3">
+            <BackButton fallback="/dashboard/employer" />
+          </div>
           {/* Same cleanup as the card this was opened from, so the title
               doesn't change on the way in. */}
           <h1 className="text-2xl font-bold tracking-tight">{displayName(candidate.full_name) ?? 'Unnamed'}</h1>
