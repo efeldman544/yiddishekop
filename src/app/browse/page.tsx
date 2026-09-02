@@ -116,8 +116,8 @@ export default async function BrowsePage({
               {truncated && (
                 <p className="browse-truncated">
                   That&apos;s as far as this list goes. Narrow it with the filters above, or{' '}
-                  <Link href="/start-hiring">tell us what you&apos;re looking for</Link> and
-                  we&apos;ll shortlist for you.
+                  <Link href="/start-hiring">tell us what you&apos;re looking for</Link>{' '}
+                  and we&apos;ll shortlist for you.
                 </p>
               )}
             </>
