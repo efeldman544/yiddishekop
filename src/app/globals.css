@@ -332,6 +332,8 @@ input, textarea, select {
   --lp-gold-wash: #FBF5EA;
 
   --lp-navy: #16355F;          /* indigo-900 */
+  --lp-navy-deep: #102541;     /* indigo-950 — the footer, so the closing band
+                                  above it has an edge to end against */
   --lp-navy-2: #1C4275;
   --lp-on-navy: #F1F6FC;
   --lp-on-navy-dim: #A9C1E2;
@@ -481,19 +483,19 @@ input, textarea, select {
 /* CTA final */
 .lp .lp-cta-final { background: var(--lp-surface); border-top: 1px solid var(--lp-line); text-align: center; }
 .lp .lp-cta-final h2 { margin-bottom: 22px; }
-.lp .lp-cta-final p { font-size: 18px; color: var(--lp-text-dim); max-width: 560px; margin: 0 auto 36px; }
+.lp .lp-cta-final p { font-size: 18px; color: var(--lp-text-dim); max-width: 560px; margin: 0 auto 28px; }
 .lp .lp-cta-contact { margin-top: 24px; font-size: 14.5px; color: var(--lp-text-dim); }
 .lp .lp-cta-contact a { color: var(--lp-accent-soft); font-weight: 600; }
 
 /* footer */
-.lp footer { border-top: 1px solid var(--lp-line); padding: 54px 0 40px; }
+.lp footer { border-top: 1px solid var(--lp-line); padding: 44px 0 32px; }
 .lp .lp-foot-grid { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 30px; }
 .lp .lp-foot-tag { max-width: 340px; font-size: 14px; color: var(--lp-text-dim); margin-top: 14px; }
 .lp .lp-foot-cols { display: flex; gap: 64px; flex-wrap: wrap; }
 .lp .lp-foot-col h4 { font-size: 12.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lp-text-dim); margin-bottom: 14px; }
 .lp .lp-foot-col a { display: block; font-size: 14.5px; color: var(--lp-text-dim); margin-bottom: 9px; transition: color .15s; }
 .lp .lp-foot-col a:hover { color: var(--lp-accent-soft); }
-.lp .lp-foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--lp-line); font-size: 13px; color: var(--lp-text-dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.lp .lp-foot-bottom { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--lp-line); font-size: 13px; color: var(--lp-text-dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 
 /* reveal animation */
 .js-reveal .lp .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
@@ -910,10 +912,11 @@ input, textarea, select {
 .lp .lp-cta-final .lp-btn-primary { background: var(--lp-on-navy); color: var(--lp-navy); }
 .lp .lp-cta-final .lp-btn-primary:hover { background: #FFFFFF; }
 
-/* Navy footer */
+/* Navy footer — a shade below the closing band. Both were --lp-navy, which
+   read as one tall field of colour with faint lines drawn through it. */
 .lp footer {
-  background: var(--lp-navy);
-  border-top: 1px solid var(--lp-navy-line);
+  background: var(--lp-navy-deep);
+  border-top: none;
   color: var(--lp-on-navy-dim);
 }
 .lp footer .lp-logo { color: var(--lp-on-navy); }
@@ -944,7 +947,7 @@ input, textarea, select {
   background: var(--lp-gold-soft); margin: 16px 0 0;
 }
 /* Centred only where the heading itself is centred. */
-.lp .lp-hero h1::after, .lp .lp-cta-final h2::after { margin-left: auto; margin-right: auto; }
+.lp .lp-cta-final .lp-sec-head h2::after { margin-left: auto; margin-right: auto; }
 .lp .lp-page-head h1::after { margin-left: 0; }
 .lp .lp-step-n {
   background: var(--lp-gold-wash); color: var(--lp-gold);
@@ -954,7 +957,6 @@ input, textarea, select {
 
 /* On the navy bands the gold has to lift, not sink. */
 .lp .lp-cta-final .lp-sec-eyebrow, .lp footer .lp-sec-eyebrow { color: var(--lp-gold-soft); }
-.lp .lp-cta-final h2::after { background: var(--lp-gold-soft); }
 
 /* The answer under each problem on /why-us. */
 .lp .lp-fix {
@@ -962,3 +964,13 @@ input, textarea, select {
   border-top: 1px solid var(--lp-line); color: var(--lp-text);
 }
 .lp .lp-fix b { color: var(--lp-accent-soft); }
+
+/* The closing band is the end of the page, not a section with more to follow. */
+.lp .lp-cta-final { padding: 64px 0 52px; }
+.lp .lp-cta-contact { margin-top: 22px; }
+
+/* Shown only in the mobile menu: on desktop the Browse candidates button is
+   right beside it and says the same thing. */
+@media (min-width: 901px) {
+  .lp .lp-nav-links a.lp-nav-menu-only { display: none; }
+}
