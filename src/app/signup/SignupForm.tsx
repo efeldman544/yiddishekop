@@ -68,7 +68,16 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
   return (
     <AuthShell>
           <h1 className="auth-heading">Create an account</h1>
-          <p className="auth-sub">Join YiddisheKop today</p>
+          {/* The role is already known here — either from ?role= or the moment
+              they pick one — so the line can say what they actually get
+              instead of restating the heading. */}
+          <p className="auth-sub">
+            {role === 'employer'
+              ? 'Free. See resumes, watch interviews, and ask to meet anyone you like.'
+              : role === 'candidate'
+                ? 'Free. One interview with us, and we put you in front of businesses that are hiring.'
+                : 'Free, and takes about a minute.'}
+          </p>
 
           {error && <div className="auth-error">{error}</div>}
 
