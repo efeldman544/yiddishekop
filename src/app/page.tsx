@@ -7,10 +7,10 @@ import { poolIndustries } from '@/lib/browse'
 
 export const metadata: Metadata = {
   title: 'YiddisheKop',
-  description: 'Your next hire is already here. Browse pre-screened remote candidates from the frum community — see the strongest people on video and pick who you want to meet.',
+  description: 'Your next hire is already here. Browse pre-screened remote candidates from the frum community — watch their interviews and pick who you want to meet.',
   openGraph: {
     title: 'YiddisheKop | Pre-Screened Remote Staff for Frum Businesses',
-    description: 'Your next hire is already here. Browse pre-screened remote candidates — the strongest people, on video.',
+    description: 'Your next hire is already here. Browse pre-screened remote candidates from the frum community — watch their interviews and pick who you want to meet.',
     url: 'https://yiddishekop.app',
     siteName: 'YiddisheKop',
     locale: 'en_US',
@@ -40,8 +40,9 @@ export default async function LandingPage() {
           <div className="lp-eyebrow">Pre-screened remote staff</div>
           <h1>Your next hire is <span className="it">already</span> here.</h1>
           <p className="lp-lead">
-            We&apos;ve already screened them, and interviewed the strongest on video. Browse{' '}
-            <strong>people who are ready to work</strong> and pick who you want to meet.
+            We&apos;ve already screened them, and many have a recorded interview you can
+            watch. Browse <strong>people who are ready to work</strong> and pick who you want
+            to meet.
           </p>
           <div className="lp-hero-cta">
             <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
