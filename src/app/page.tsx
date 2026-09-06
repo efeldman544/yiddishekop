@@ -40,9 +40,8 @@ export default async function LandingPage() {
           <div className="lp-eyebrow">Pre-screened remote staff</div>
           <h1>Your next hire is <span className="it">already</span> here.</h1>
           <p className="lp-lead">
-            We&apos;ve already screened them, and many have a recorded interview you can
-            watch. Browse <strong>people who are ready to work</strong> and pick who you want
-            to meet.
+            We&apos;ve already screened them, and interviewed them on video. Browse{' '}
+            <strong>people who are ready to work</strong> and pick who you want to meet.
           </p>
           <div className="lp-hero-cta">
             <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
