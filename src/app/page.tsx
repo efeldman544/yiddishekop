@@ -64,7 +64,7 @@ export default async function LandingPage() {
           <div className="lp-steps">
             <div className="lp-step reveal">
               <div className="lp-step-head"><div className="lp-step-n">1</div><h3>Browse the pool</h3></div>
-              <p>Everyone here is already screened and interviewed. Filter by role, industry, and availability to see who fits.</p>
+              <p>Everyone here is screened before they appear. Filter by role, industry, and availability to see who fits your business.</p>
             </div>
             <div className="lp-step reveal">
               <div className="lp-step-head"><div className="lp-step-n">2</div><h3>Tell us who you like</h3></div>
