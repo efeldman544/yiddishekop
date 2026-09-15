@@ -29,7 +29,7 @@ export default function WhyUsPage() {
             <div className="lp-pain">
               <h3>Who can you trust?</h3>
               <p>You can&apos;t tell from a page whether someone will show up, communicate, or last.</p>
-              <p className="lp-fix"><b>So we interview them on video.</b> You watch them answer the questions you&apos;d ask, before you spend an hour of your own.</p>
+              <p className="lp-fix"><b>So we do the first interview on video.</b> You watch them answer the questions you&apos;d ask, before you spend an hour of your own.</p>
             </div>
             <div className="lp-pain">
               <h3>How do you avoid a bad hire?</h3>
@@ -45,10 +45,10 @@ export default function WhyUsPage() {
           <div className="lp-sec-head">
             <div className="lp-sec-eyebrow">What we do</div>
             <h2>The work happens <span className="it">before</span> you see anyone.</h2>
-            <p>By the time a candidate appears in your list, all of this is already done.</p>
+            <p>This is the work that happens before a candidate reaches you. None of it is left for you to do.</p>
           </div>
           <div className="lp-screen-list">
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>We go and find them</b> — sourced by us, not forwarded from a job board.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Reviewed before they&apos;re listed</b> — nobody is listed here because they applied. Every profile is checked by us before it appears.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Experience verified</b> — checked against what the work actually needs.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, so you can see and hear the answers.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Shown with a reason</b> — every candidate comes with why we picked them.</span></div>

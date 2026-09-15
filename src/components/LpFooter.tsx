@@ -10,8 +10,7 @@ export default function LpFooter() {
           <div>
             <div className="lp-logo">Yiddishe<span>Kop</span></div>
             <p className="lp-foot-tag">
-              Pre-screened remote staff for frum businesses. Vetted, interviewed,
-              and worth your time.
+              Pre-screened remote staff, vetted and worth your time.
             </p>
           </div>
           <div className="lp-foot-cols">
