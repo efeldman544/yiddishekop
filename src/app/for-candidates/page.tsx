@@ -59,7 +59,7 @@ export default function ForCandidatesPage() {
             </div>
             <div className="lp-step">
               <div className="lp-step-head"><div className="lp-step-n">3</div><h3>We put you forward</h3></div>
-              <p>Employers browse people we&apos;ve already vetted. When one wants to meet you, we get in touch with the details: who the business is, what the role involves, and what they&apos;re offering.</p>
+              <p>Employers browse people we&apos;ve already vetted. When one wants to meet you, we get in touch first and tell you who they are before anything moves.</p>
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function ForCandidatesPage() {
             <div className="lp-val">
               <div className="lp-tag">Private</div>
               <h3>Private until we introduce you</h3>
-              <p>Browsing employers see a first name and a role — never your surname, your contact details or your résumé. Those reach a business only when we introduce you.</p>
+              <p>Browsing employers see a first name and a role. Your contact details stay with us — nobody can approach you directly, and a business only reaches you once we introduce you.</p>
             </div>
             <div className="lp-val">
               <div className="lp-tag">Real roles</div>

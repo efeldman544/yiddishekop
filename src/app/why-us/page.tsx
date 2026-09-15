@@ -48,7 +48,7 @@ export default function WhyUsPage() {
             <p>This is the work that happens before a candidate reaches you. None of it is left for you to do.</p>
           </div>
           <div className="lp-screen-list">
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Reviewed before they&apos;re listed</b> — nobody is listed here because they applied. Every profile is checked by us before it appears.</span></div>
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Reviewed before they&apos;re listed</b> — every profile is checked by us before it appears.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Experience verified</b> — checked against what the work actually needs.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, so you can see and hear the answers.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Shown with a reason</b> — every candidate comes with why we picked them.</span></div>
