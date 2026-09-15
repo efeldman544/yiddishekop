@@ -17,8 +17,8 @@ export default function WhyUsPage() {
         <div className="wrap">
           <div className="lp-sec-head">
             <div className="lp-sec-eyebrow">Why YiddisheKop</div>
-            <h2>Hiring isn&apos;t hard because there aren&apos;t enough applicants.</h2>
-            <p>It&apos;s hard because you can&apos;t tell, from a résumé, who&apos;s actually a good fit. Here&apos;s what we do about each part of that.</p>
+            <h2>Watch them before you meet them.</h2>
+            <p>A résumé tells you what someone typed. Our interviews show you how they think, how they speak, and whether they&apos;re worth your time.</p>
           </div>
           <div className="lp-pain-grid">
             <div className="lp-pain">
@@ -48,9 +48,9 @@ export default function WhyUsPage() {
             <p>This is the work that happens before a candidate reaches you. None of it is left for you to do.</p>
           </div>
           <div className="lp-screen-list">
+            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, and record it. You see and hear the answers before you decide whether to meet them.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Reviewed before they&apos;re listed</b> — every profile is checked by us before it appears.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Experience verified</b> — checked against what the work actually needs.</span></div>
-            <div className="lp-screen-item"><span className="lp-dot" /><span><b>Interviewed on video</b> — we ask the questions you&apos;d ask, so you can see and hear the answers.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>Shown with a reason</b> — every candidate comes with why we picked them.</span></div>
             <div className="lp-screen-item"><span className="lp-dot" /><span><b>You choose</b> — meet only who you want, and hire on your own judgement.</span></div>
           </div>
@@ -84,7 +84,7 @@ export default function WhyUsPage() {
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Ready?</div>
           <h2>See who&apos;s available.</h2>
-          <p>Browse the candidates we&apos;ve already screened, and tell us who you&apos;d like to meet.</p>
+          <p>Browse who&apos;s available, ask for an introduction, and watch their interview before you meet anyone.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">Prefer to talk? <a href="tel:6314943567">631 494 3567</a></div>
         </div>
