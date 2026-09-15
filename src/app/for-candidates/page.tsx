@@ -59,7 +59,7 @@ export default function ForCandidatesPage() {
             </div>
             <div className="lp-step">
               <div className="lp-step-head"><div className="lp-step-n">3</div><h3>We put you forward</h3></div>
-              <p>Employers browse people we&apos;ve already vetted. When one wants to meet you, we get in touch first and tell you who they are before anything moves.</p>
+              <p>Your interview goes out to frum businesses that are hiring. They watch you answer before they decide — so you&apos;re a person they&apos;ve seen, not a résumé in a pile. When one wants to meet you, we get in touch first.</p>
             </div>
           </div>
         </div>

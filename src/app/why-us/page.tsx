@@ -23,13 +23,13 @@ export default function WhyUsPage() {
           <div className="lp-pain-grid">
             <div className="lp-pain">
               <h3>Who&apos;s actually qualified?</h3>
-              <p>A résumé tells you what someone typed, not whether they can do the work.</p>
+              <p>A résumé lists what someone has done, not whether they can do it.</p>
               <p className="lp-fix"><b>So we check first.</b> Every candidate&apos;s experience is verified against what the job actually needs, before they reach you.</p>
             </div>
             <div className="lp-pain">
               <h3>Who can you trust?</h3>
               <p>You can&apos;t tell from a page whether someone will show up, communicate, or last.</p>
-              <p className="lp-fix"><b>So we do the first interview on video.</b> You watch them answer the questions you&apos;d ask, before you spend an hour of your own.</p>
+              <p className="lp-fix"><b>So we do the first interview on video.</b> You watch how someone handles a real conversation, before you spend an hour of your own.</p>
             </div>
             <div className="lp-pain">
               <h3>How do you avoid a bad hire?</h3>
@@ -83,7 +83,7 @@ export default function WhyUsPage() {
       <section className="lp-cta-final">
         <div className="wrap">
           <div className="lp-sec-eyebrow" style={{ textAlign: 'center' }}>Ready?</div>
-          <h2>See who&apos;s available.</h2>
+          <h2>See who&apos;s out there.</h2>
           <p>Browse who&apos;s available, ask for an introduction, and watch their interview before you meet anyone.</p>
           <Link href="/browse" className="lp-btn lp-btn-primary lp-btn-lg">Browse candidates</Link>
           <div className="lp-cta-contact">Prefer to talk? <a href="tel:6314943567">631 494 3567</a></div>
