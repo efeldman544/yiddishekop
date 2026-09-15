@@ -127,6 +127,14 @@ export default function CandidateProfilePage() {
       setError(upsertError.message)
       setSaving(false)
     } else {
+      // Tell the admins there's a profile worth looking at. The route ignores
+      // repeats, so editing later doesn't announce the same person again, and
+      // a failure here must not swallow a save that already succeeded.
+      await fetch('/api/notifications/new-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'profile' }),
+      }).catch(() => {})
       router.push('/dashboard/candidate')
     }
   }

@@ -56,6 +56,15 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
       if (role === 'employer') {
         await fetch('/api/auth/link-jobs', { method: 'POST' }).catch(() => {})
       }
+
+      // Signing up happens entirely in the browser, so nothing on the server
+      // saw it and no admin was told. Failing to notify must not block the
+      // account that was just created.
+      await fetch('/api/notifications/new-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'signup' }),
+      }).catch(() => {})
     }
 
     // Someone who came here from a candidate they wanted goes back to that
