@@ -119,30 +119,50 @@ function covered(rect: Rect, boxes: Rect[]): boolean {
 /**
  * Contact details still readable after the boxes are applied.
  *
- * The point is that a redaction miss should never be silent. This re-reads the
- * page the way a person would — every item in reading order, across line
- * boundaries — and reports anything that matches but wasn't covered, so the
- * caller can warn instead of quietly handing over an address.
+ * The point is that a redaction miss should never be silent, so this re-reads
+ * the page and reports anything that still matches but wasn't covered.
+ *
+ * Two things keep it from crying wolf, both of which it used to do on almost
+ * every resume:
+ *
+ * The scan runs over one or two lines at a time, not the whole page glued into
+ * a single string. Items are joined without separators — that is what catches
+ * an address split across items — but joining *every* line that way ran the
+ * name straight into the email below it, so the regex matched
+ * "Dahanesther.dahan@gmail.comObjective" and the heading at the end of that,
+ * being ordinary text, was of course not covered.
+ *
+ * And a match only counts as a miss if what's left showing is itself contact
+ * info. The regex reaches past the address into whatever words sit beside it,
+ * so "not every item is covered" catches those neighbours rather than a leak.
+ * Re-reading just the uncovered items answers the question that matters: can
+ * someone still read an address off this page?
  */
 export function unredactedContacts(items: TextItem[], boxes: Rect[]): string[] {
   const lines = groupIntoLines(items)
-  const missed: string[] = []
+  const missed = new Set<string>()
 
-  // Whole page as one string, so an address broken across two lines is seen.
-  let text = ''
-  const spans: { start: number; end: number; item: TextItem }[] = []
-  for (const line of lines) {
-    for (const item of line) {
+  // Each line with the one after it, so a detail broken over a line break is
+  // still seen. Overlapping windows scan most lines twice; the set dedupes.
+  for (let i = 0; i < lines.length; i++) {
+    const window = [...lines[i], ...(lines[i + 1] ?? [])]
+
+    let text = ''
+    const spans: { start: number; end: number; item: TextItem }[] = []
+    for (const item of window) {
       spans.push({ start: text.length, end: text.length + item.str.length, item })
       text += item.str
     }
-  }
 
-  for (const [start, end] of contactRanges(text)) {
-    const touching = spans.filter(s => s.end > start && s.start < end)
-    if (touching.length > 0 && !touching.every(s => covered(s.item.rect, boxes))) {
-      missed.push(text.slice(start, end))
+    for (const [start, end] of contactRanges(text)) {
+      const touching = spans.filter(s => s.end > start && s.start < end)
+      const uncovered = touching.filter(s => !covered(s.item.rect, boxes))
+      if (uncovered.length === 0) continue
+
+      const stillReadable = uncovered.map(s => s.item.str).join('')
+      if (contactRanges(stillReadable).length > 0) missed.add(stillReadable)
     }
   }
-  return missed
+
+  return [...missed]
 }
