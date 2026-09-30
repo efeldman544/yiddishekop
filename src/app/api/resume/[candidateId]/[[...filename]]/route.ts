@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { resumeFileName } from '@/lib/resumeUrl'
-import { contactRanges, findRedactionBoxes, unredactedContacts, type Rect, type TextItem } from '@/lib/redact'
+import { contactRanges, nameRanges, findRedactionBoxes, unredactedContacts, type Rect, type TextItem } from '@/lib/redact'
 
 export const maxDuration = 60
 
@@ -47,9 +47,9 @@ async function docxToPdf(docx: Buffer): Promise<Buffer> {
 // OCR-redact an image resume (JPG/PNG): run tesseract to locate emails/phones, draw
 // gray pills over them on canvas, then wrap in a PDF. Falls back to a warning stamp
 // if OCR errors out.
-async function imageToRedactedPdf(img: Buffer): Promise<{ pdf: Buffer; ocrFailed: boolean }> {
+async function imageToRedactedPdf(img: Buffer, fullName: string | null): Promise<{ pdf: Buffer; ocrFailed: boolean }> {
   type OcrBox = { x: number; y: number; w: number; h: number }
-  let ocrBoxes: OcrBox[] = []
+  const ocrBoxes: OcrBox[] = []
   let ocrFailed = false
 
   try {
@@ -81,7 +81,7 @@ async function imageToRedactedPdf(img: Buffer): Promise<{ pdf: Buffer; ocrFailed
           spans.push({ start: joined.length, end: joined.length + w.text.length, bbox: w.bbox })
           joined += w.text
         }
-        for (const [mStart, mEnd] of contactRanges(joined)) {
+        for (const [mStart, mEnd] of [...contactRanges(joined), ...nameRanges(joined, fullName)]) {
           const hit = spans.filter(s => s.end > mStart && s.start < mEnd)
           if (hit.length > 0) {
             ocrBoxes.push({
@@ -248,7 +248,7 @@ export async function GET(
       // Image resume (JPG/PNG) — serve it as a viewable, stamped PDF directly.
       // No text layer means nothing to redact, so we skip the pdfjs pipeline.
       try {
-        const { pdf: imgPdf, ocrFailed } = await imageToRedactedPdf(buffer)
+        const { pdf: imgPdf, ocrFailed } = await imageToRedactedPdf(buffer, cp.full_name)
         // A photo with unreadable text can't be redacted, so an employer must
         // not receive it — there is no way to know what is on it.
         if (ocrFailed && !isAdmin) {
@@ -374,7 +374,7 @@ export async function GET(
         })
       }
 
-      const boxes: Rect[] = findRedactionBoxes(items)
+      const boxes: Rect[] = findRedactionBoxes(items, cp.full_name)
 
       // A miss must never be silent. If anything still reads as contact info
       // after the boxes are placed, say so on the page rather than handing over

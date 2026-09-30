@@ -31,6 +31,57 @@ export function contactRanges(line: string): [number, number][] {
   return ranges
 }
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Where the candidate's own name appears in a line of text.
+ *
+ * Browse shows a first name, so that is not the part worth hiding — the
+ * surname is, and it sits in 48pt at the top of nearly every resume. Covering
+ * contact details while leaving that there meant an employer learned exactly
+ * who they were looking at.
+ *
+ * Three shapes are matched, because a page's text items are joined without
+ * separators and the name is rarely one tidy item:
+ *
+ *  - the whole name as a run, which catches "EstherDahan" when nothing
+ *    separates the two items, and where the word boundaries below can't help
+ *  - the same reversed, for the "Dahan, Esther" header style
+ *  - each part after the first on its own, bounded by letters and digits so a
+ *    short surname doesn't fire inside an unrelated word
+ *
+ * Only the first part is left showing. Somebody called "Esther" with no
+ * surname on file has nothing here to hide, and gets no boxes.
+ */
+export function nameRanges(line: string, fullName: string | null | undefined): [number, number][] {
+  const parts = String(fullName ?? '').trim().split(/\s+/)
+    .map(p => p.replace(/[^\p{L}'\-]/gu, ''))
+    .filter(p => p.length >= 2)
+  if (parts.length < 2) return []
+
+  // What may sit between two parts of a name as it's written on a page:
+  // nothing at all, a space, a comma, a full stop, a hyphen.
+  const GAP = "[\\s.,'\\-]*"
+  const patterns = [
+    new RegExp(parts.map(escapeRe).join(GAP), 'giu'),
+    new RegExp([...parts].reverse().map(escapeRe).join(GAP), 'giu'),
+    ...parts.slice(1).map(p =>
+      new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(p)}(?![\\p{L}\\p{N}])`, 'giu')),
+  ]
+
+  const ranges: [number, number][] = []
+  for (const re of patterns) {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(line)) !== null) {
+      if (m[0].length > 0) ranges.push([m.index, m.index + m[0].length])
+      else re.lastIndex++
+    }
+  }
+  return ranges
+}
+
 /**
  * Group text items into visual lines.
  *
@@ -76,15 +127,18 @@ function joinLine(line: TextItem[]) {
   return { text, spans }
 }
 
-/** Boxes covering every piece of contact info found in the page's text. */
-export function findRedactionBoxes(items: TextItem[]): Rect[] {
+/**
+ * Boxes covering every piece of contact info found in the page's text, and the
+ * candidate's own name when one is known.
+ */
+export function findRedactionBoxes(items: TextItem[], fullName?: string | null): Rect[] {
   const boxes: Rect[] = []
 
   for (const line of groupIntoLines(items)) {
     const { text, spans } = joinLine(line)
 
     const lineBoxes: Rect[] = []
-    for (const [start, end] of contactRanges(text)) {
+    for (const [start, end] of [...contactRanges(text), ...nameRanges(text, fullName)]) {
       for (const span of spans) {
         if (span.end > start && span.start < end) lineBoxes.push({ ...span.item.rect })
       }
