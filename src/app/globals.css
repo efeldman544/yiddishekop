@@ -339,6 +339,11 @@ input, textarea, select {
   --lp-on-navy-dim: #A9C1E2;
   --lp-navy-line: rgba(241,246,252,0.15);
   --lp-maxw: 1180px;
+  /* The bar's height. The Browse button inside it is about 46px tall, so 64px
+     left only 9px of navy above and below it and the bar read as a band
+     wrapped tight around a button. The mobile override below drops this back
+     down, where the button shrinks to about 34px. */
+  --lp-nav-h: 80px;
 }
 
 .lp {
@@ -361,7 +366,7 @@ input, textarea, select {
   background: rgba(255,255,255,0.88); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--lp-line);
 }
-.lp .lp-nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.lp .lp-nav { display: flex; align-items: center; justify-content: space-between; height: var(--lp-nav-h); }
 .lp .lp-logo { font-family: var(--font-fraunces), 'Fraunces', serif; font-weight: 600; font-size: 27px; letter-spacing: -0.01em; }
 .lp .lp-logo span { color: var(--lp-accent); }
 .lp .lp-nav-links { display: flex; gap: 36px; align-items: center; }
@@ -513,9 +518,12 @@ input, textarea, select {
 @media (max-width: 900px) {
   .lp .lp-pain-grid, .lp .lp-steps, .lp .lp-vals, .lp .lp-portals, .lp .lp-proof-grid, .lp .lp-screen-list { grid-template-columns: 1fr; }
   .lp .lp-pain-grid { gap: 1px; }
+  /* The button shrinks here, so the desktop height would leave a deep empty
+     band above and below it. */
+  .lp { --lp-nav-h: 64px; }
   .lp .lp-nav-links { display: none; }
   .lp .lp-nav-links.open {
-    display: flex; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column;
+    display: flex; position: absolute; top: var(--lp-nav-h); left: 0; right: 0; flex-direction: column;
     background: var(--lp-surface); padding: 24px 32px; gap: 20px;
     border-bottom: 1px solid var(--lp-line); align-items: flex-start;
     z-index: 40;
