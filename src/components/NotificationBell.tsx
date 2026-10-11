@@ -8,6 +8,9 @@ type Notification = {
   id: string
   message: string
   candidate_id: string | null
+  /** Where this one opens, when it isn't about a candidate. Older rows have
+      none, which is the behaviour below falling back to candidate_id. */
+  link: string | null
   read: boolean
   created_at: string
 }
@@ -75,7 +78,10 @@ export default function NotificationBell({
     await supabase.from('notifications').update({ read: true }).eq('id', n.id)
     setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
     setOpen(false)
-    if (candidatePath && n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
+    // A row that names its own destination wins: an employer signup has no
+    // candidate page to open and used to go nowhere at all.
+    if (n.link) router.push(n.link)
+    else if (candidatePath && n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
     else if (fallbackPath) router.push(fallbackPath)
   }
 

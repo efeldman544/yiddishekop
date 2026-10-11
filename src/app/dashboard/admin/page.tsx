@@ -121,10 +121,13 @@ function IndustryFilter({ industries, toggleIndustry, clearIndustries }: {
   )
 }
 
-const STATUS_OPTIONS = ['active', 'inactive', 'placed']
+// 'pending' first: it's the one that needs doing something about. A profile
+// starts here and stays off browse until it's approved.
+const STATUS_OPTIONS = ['pending', 'active', 'inactive', 'placed']
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 
 const STATUS_COLORS: Record<string, string> = {
+  pending:  'bg-amber-50 text-amber-700 border border-amber-200',
   active:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
   inactive: 'bg-gray-100 text-gray-500 border border-gray-200',
   placed:   'bg-indigo-50 text-indigo-600 border border-indigo-200',
@@ -148,6 +151,7 @@ export default function AdminDashboard() {
   const [employment, setEmployment] = useState('')
   const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [togglingInterviewed, setTogglingInterviewed] = useState<string | null>(null)
+  const [approving, setApproving] = useState<string | null>(null)
 
   const [jobs, setJobs] = useState<JobOption[]>([])
   // jobAssignments[candidateId] = array of assigned jobIds
@@ -213,6 +217,25 @@ export default function AdminDashboard() {
     }
     loadIndustryAliases()
   }, [])
+
+  // A candidate profile starts as 'pending' and browse only lists 'active',
+  // so until this is clicked nobody outside the admin sees them. That is what
+  // makes "every profile is checked by us before it appears" true.
+  async function approveCandidate(candidateId: string) {
+    setApproving(candidateId)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('candidate_profiles').update({ status: 'active' }).eq('id', candidateId)
+    // supabase-js resolves with an error rather than throwing, so without this
+    // a failed approval would look exactly like a successful one.
+    if (error) {
+      console.error('approval failed:', error.message)
+      window.alert(`Could not approve: ${error.message}`)
+    } else {
+      setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: 'active' } : c))
+    }
+    setApproving(null)
+  }
 
   async function toggleInterviewed(candidateId: string, current: boolean | null) {
     setTogglingInterviewed(candidateId)
@@ -549,6 +572,16 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {c.status === 'pending' && (
+                        <button
+                          type="button"
+                          disabled={approving === c.id}
+                          onClick={() => approveCandidate(c.id)}
+                          className="text-xs px-2.5 py-1 rounded-full border font-medium transition-colors bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {approving === c.id ? 'Approving…' : 'Approve for browse'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={togglingInterviewed === c.id}
