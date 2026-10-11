@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { safeNextPath } from '@/lib/nextPath'
+import { nameProblem } from '@/lib/nameCheck'
 import type { Role } from '@/types'
 import AuthShell from '@/components/AuthShell'
 
@@ -21,6 +22,9 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [role, setRole] = useState<Role | ''>(defaultRole)
+  // Set when the account was created but isn't signed in yet, which is what
+  // Supabase returns once email confirmation is switched on.
+  const [confirmSent, setConfirmSent] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -28,12 +32,17 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
 
     if (!role) { setError('Please select a role.'); return }
 
-    setLoading(true)
     const form = e.currentTarget
     const email = (form.elements.namedItem('email') as HTMLInputElement).value
     const password = (form.elements.namedItem('password') as HTMLInputElement).value
-    const full_name = (form.elements.namedItem('full_name') as HTMLInputElement).value
+    const full_name = (form.elements.namedItem('full_name') as HTMLInputElement).value.trim()
 
+    // The database refuses these too. Checking here is what turns a raw
+    // constraint violation into a sentence the person can act on.
+    const badName = nameProblem(full_name)
+    if (badName) { setError(badName); return }
+
+    setLoading(true)
     const supabase = createClient()
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -47,7 +56,22 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
       return
     }
 
+    // With email confirmation on, Supabase returns the user but no session:
+    // the account exists and nobody is signed in. Everything below needs a
+    // session — the profile write, the job linking, the notification — and
+    // pushing them to a dashboard would land them on a logged-out page. The
+    // database trigger has already written their profile and told the admins,
+    // so there is nothing left to do but tell them to go and confirm.
+    if (data.user && !data.session) {
+      setConfirmSent(email)
+      setLoading(false)
+      return
+    }
+
     if (data.user) {
+      // A trigger on auth.users writes this row too, which is what makes the
+      // confirmation path above work. Doing it here as well costs nothing and
+      // keeps the row correct if the trigger hasn't been installed yet.
       const { error: upsertError } = await supabase.from('profiles').upsert({ id: data.user.id, email, full_name, role })
       if (upsertError) console.error('Profile upsert failed:', upsertError.message)
 
@@ -72,6 +96,22 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
     // thing they were actually trying to do.
     router.push(safeNextPath(next, `/dashboard/${role}`))
     router.refresh()
+  }
+
+  if (confirmSent) {
+    return (
+      <AuthShell>
+        <h1 className="auth-heading">Check your email</h1>
+        <p className="auth-sub">
+          Your account is created. We&apos;ve sent a link to <strong>{confirmSent}</strong> —
+          open it and you&apos;re in.
+        </p>
+        <p className="auth-footer">
+          Nothing arrived? Look in your spam folder, or{' '}
+          <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>try signing in</Link>.
+        </p>
+      </AuthShell>
+    )
   }
 
   return (

@@ -26,6 +26,8 @@ export type NotificationRow = {
   type: string
   message: string
   candidate_id?: string | null
+  /** Where the bell should open, for a notification that names no candidate. */
+  link?: string | null
 }
 
 export type NotifyResult = {
@@ -49,6 +51,7 @@ export async function notify(
     type: r.type,
     message: r.message,
     candidate_id: r.candidate_id ?? null,
+    link: r.link ?? null,
     read: false,
   }))
 
