@@ -19,7 +19,7 @@
 -- ── 1. Link spam in names ──────────────────────────────────────────────
 
 -- Clear out what's already there, or the constraint below can't be added.
--- Notifications about those accounts go too; they are the ones with the
+-- Notifications about those accounts go too. They are the ones with the
 -- spam in them.
 delete from public.notifications
 where message ~* '(https?://|www\.|bit\.ly|t\.me|tinyurl|<[a-z/])';
