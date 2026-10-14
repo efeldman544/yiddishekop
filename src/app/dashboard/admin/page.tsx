@@ -124,6 +124,18 @@ function IndustryFilter({ industries, toggleIndustry, clearIndustries }: {
 // 'pending' first: it's the one that needs doing something about. A profile
 // starts here and stays off browse until it's approved.
 const STATUS_OPTIONS = ['pending', 'active', 'inactive', 'placed']
+
+/**
+ * Whether they've actually filled anything in.
+ *
+ * A candidate now gets a row the moment they create an account, so the admin
+ * can see they exist. That row is empty until they reach the profile form,
+ * and the two are very different things to an admin: one needs chasing, the
+ * other needs approving.
+ */
+function hasFilledInProfile(c: { current_job_title: string | null; location: string | null; fields_worked_in: string[] | null }): boolean {
+  return !!(c.current_job_title || c.location || (c.fields_worked_in?.length ?? 0) > 0)
+}
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 
 const STATUS_COLORS: Record<string, string> = {
@@ -508,6 +520,11 @@ export default function AdminDashboard() {
                               {c.status}
                             </span>
                           )}
+                          {!hasFilledInProfile(c) && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
+                              Signed up · profile empty
+                            </span>
+                          )}
                           {c.interviewed && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Interviewed ✓</span>
                           )}
@@ -572,7 +589,10 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {c.status === 'pending' && (
+                      {/* Approving an empty profile would put a blank card on
+                          browse, so there's nothing to approve until they've
+                          filled something in. */}
+                      {c.status === 'pending' && hasFilledInProfile(c) && (
                         <button
                           type="button"
                           disabled={approving === c.id}
