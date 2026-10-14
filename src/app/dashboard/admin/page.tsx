@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import AddCandidatesPanel from './AddCandidatesPanel'
 import { INDUSTRIES as SHARED_INDUSTRIES } from '@/lib/candidateOptions'
+import { isProfileFilledIn } from '@/lib/profileFilledIn'
 
 type Candidate = {
   id: string
@@ -16,6 +17,8 @@ type Candidate = {
   email: string | null
   location: string | null
   current_job_title: string | null
+  // Part of what makes a profile count as filled in, so the badge needs it.
+  roles_seeking: string | null
   fields_worked_in: string[]
   employment_type: string[]
   years_experience: string | null
@@ -125,17 +128,11 @@ function IndustryFilter({ industries, toggleIndustry, clearIndustries }: {
 // starts here and stays off browse until it's approved.
 const STATUS_OPTIONS = ['pending', 'active', 'inactive', 'placed']
 
-/**
- * Whether they've actually filled anything in.
- *
- * A candidate now gets a row the moment they create an account, so the admin
- * can see they exist. That row is empty until they reach the profile form,
- * and the two are very different things to an admin: one needs chasing, the
- * other needs approving.
- */
-function hasFilledInProfile(c: { current_job_title: string | null; location: string | null; fields_worked_in: string[] | null }): boolean {
-  return !!(c.current_job_title || c.location || (c.fields_worked_in?.length ?? 0) > 0)
-}
+// A candidate gets a row the moment they create an account, so the admin can
+// see they exist. That row is empty until they reach the profile form, and
+// the database holds it back from browse until it isn't — then lists them
+// without being asked. So 'pending' here means one thing: nothing filled in
+// yet. Those people need chasing, not approving.
 const EMPLOYMENT_OPTIONS = ['Full Time', 'Part Time']
 
 const STATUS_COLORS: Record<string, string> = {
@@ -268,7 +265,7 @@ export default function AdminDashboard() {
 
       let query = supabase
         .from('candidate_profiles')
-        .select('id, full_name, email, location, current_job_title, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
+        .select('id, full_name, email, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
         .order('full_name', { ascending: true })
 
     if (search.trim()) {
@@ -520,7 +517,7 @@ export default function AdminDashboard() {
                               {c.status}
                             </span>
                           )}
-                          {!hasFilledInProfile(c) && (
+                          {!isProfileFilledIn(c) && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
                               Signed up · profile empty
                             </span>
@@ -589,10 +586,13 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Approving an empty profile would put a blank card on
-                          browse, so there's nothing to approve until they've
-                          filled something in. */}
-                      {c.status === 'pending' && hasFilledInProfile(c) && (
+                      {/* A filled-in profile is listed by the database without
+                          being asked, so this only appears if that hasn't
+                          happened — before auto_approve.sql has been run, or
+                          for a row that somehow slipped past it. Approving an
+                          empty profile would put a blank card on browse, so
+                          it never offers that. */}
+                      {c.status === 'pending' && isProfileFilledIn(c) && (
                         <button
                           type="button"
                           disabled={approving === c.id}
