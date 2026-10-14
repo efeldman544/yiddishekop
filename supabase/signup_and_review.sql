@@ -97,6 +97,25 @@ begin
   values (new.id, v_email, v_name, v_role)
   on conflict (id) do nothing;
 
+  -- The admin candidates tab lists candidate_profiles, and that row was only
+  -- created when the candidate filled in the profile form. So "a new candidate
+  -- signed up" arrived about somebody who could not be found anywhere in the
+  -- admin, and the notification itself opened a candidate page with no record
+  -- behind it. Giving them an empty row at signup puts them in the list from
+  -- the moment they exist; the form upserts onto the same row later.
+  --
+  -- It starts pending like any other, so an empty profile cannot reach browse.
+  -- Guarded because signing up failing is far worse than being listed late.
+  if v_role = 'candidate' then
+    begin
+      insert into public.candidate_profiles (id, full_name, email, status)
+      values (new.id, v_name, v_email, 'pending')
+      on conflict (id) do nothing;
+    exception when others then
+      raise warning 'could not create candidate_profiles row for %: %', new.id, sqlerrm;
+    end;
+  end if;
+
   -- Telling the admins is worth doing but never worth losing the account
   -- over, so a failure here is swallowed. The notifications table may not
   -- even exist yet on a fresh project.
@@ -148,6 +167,16 @@ alter table public.candidate_profiles add constraint candidate_profiles_status_c
 
 alter table public.candidate_profiles alter column status set default 'pending';
 
+-- Everyone who already signed up as a candidate and never reached the form.
+-- Without this they stay invisible in the admin forever, which is the state
+-- that prompted all of the above.
+insert into public.candidate_profiles (id, full_name, email, status)
+select p.id, p.full_name, p.email, 'pending'
+from public.profiles p
+where p.role = 'candidate'
+  and not exists (select 1 from public.candidate_profiles c where c.id = p.id)
+on conflict (id) do nothing;
+
 
 -- ── 5. Make the API see all of it now ──────────────────────────────────
 -- Without this the columns can exist while the API still reports them
@@ -185,6 +214,13 @@ select 'new candidates start pending',
     select column_default from information_schema.columns
     where table_schema = 'public' and table_name = 'candidate_profiles' and column_name = 'status'
   ) like '%pending%' then 'OK' else 'STILL DEFAULTS TO ACTIVE' end
+union all
+-- Should be zero. Any other number is a candidate account the admin cannot
+-- see, which is what the backfill above exists to prevent.
+select 'candidate accounts missing from the admin list',
+  (select count(*)::text from public.profiles p
+   where p.role = 'candidate'
+     and not exists (select 1 from public.candidate_profiles c where c.id = p.id))
 union all
 -- These stay visible on browse. Only profiles created from now on wait.
 select 'candidates live on browse today',
