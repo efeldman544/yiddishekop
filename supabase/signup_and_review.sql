@@ -74,12 +74,29 @@ where type = 'new_signup' and candidate_id is null and link is null;
 -- carries, so it lands either way. Turning confirmation on in
 -- Authentication -> Sign In / Providers becomes safe once this is in place.
 
+-- What the body does, kept out here on purpose. See the note under section 5
+-- about why there are no comments inside it.
+--
+--   * writes the profiles row, so the account has a role
+--   * gives a candidate an empty candidate_profiles row, because the admin
+--     candidates tab lists that table and nothing else. Without it somebody
+--     who signed up but never reached the profile form could not be found
+--     anywhere in the admin, and the notification about them opened a page
+--     with no record behind it. It starts pending, so an empty profile
+--     cannot reach browse, and the profile form upserts onto the same row
+--     later
+--   * tells the admins, in the same wording the app uses, so whichever gets
+--     there first the other one sees it and nobody is announced twice
+--
+-- The last two are wrapped in their own exception blocks: being listed late
+-- is a nuisance, failing to sign up is not.
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $handle_new_user$
 declare
   v_name  text;
   v_email text;
@@ -97,15 +114,6 @@ begin
   values (new.id, v_email, v_name, v_role)
   on conflict (id) do nothing;
 
-  -- The admin candidates tab lists candidate_profiles, and that row was only
-  -- created when the candidate filled in the profile form. So "a new candidate
-  -- signed up" arrived about somebody who could not be found anywhere in the
-  -- admin, and the notification itself opened a candidate page with no record
-  -- behind it. Giving them an empty row at signup puts them in the list from
-  -- the moment they exist; the form upserts onto the same row later.
-  --
-  -- It starts pending like any other, so an empty profile cannot reach browse.
-  -- Guarded because signing up failing is far worse than being listed late.
   if v_role = 'candidate' then
     begin
       insert into public.candidate_profiles (id, full_name, email, status)
@@ -116,15 +124,10 @@ begin
     end;
   end if;
 
-  -- Telling the admins is worth doing but never worth losing the account
-  -- over, so a failure here is swallowed. The notifications table may not
-  -- even exist yet on a fresh project.
   begin
     v_message := 'New ' || v_role || ' account: ' || coalesce(v_name, v_email, 'Someone')
                  || case when v_email is not null then ' (' || v_email || ')' else '' end;
 
-    -- The same wording the app uses, so whichever gets there first, the other
-    -- one sees it and doesn't announce the same person twice.
     if not exists (
       select 1 from public.notifications
       where type = 'new_signup' and message = v_message
@@ -143,7 +146,7 @@ begin
 
   return new;
 end;
-$$;
+$handle_new_user$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -176,6 +179,24 @@ from public.profiles p
 where p.role = 'candidate'
   and not exists (select 1 from public.candidate_profiles c where c.id = p.id)
 on conflict (id) do nothing;
+
+
+-- ── A note on the function above ───────────────────────────────────────
+--
+-- It is written to survive a client that splits a script on semicolons
+-- without understanding that a function body is one single value. The SQL
+-- editor did exactly that and reported
+--
+--   ERROR: 42601: syntax error at or near "if"
+--
+-- which is the second half of the body arriving on its own as if it were a
+-- statement. Two things keep it in one piece: the body is quoted with a named
+-- tag, $handle_new_user$ rather than a bare $$, and it carries no comments,
+-- because a semicolon inside one is another place to be cut in half. That is
+-- why the explanation sits outside the function.
+--
+-- If a client still refuses it: run the file with everything selected, or
+-- paste the function on its own and then the rest.
 
 
 -- ── 5. Make the API see all of it now ──────────────────────────────────
