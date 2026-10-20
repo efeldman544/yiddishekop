@@ -36,24 +36,28 @@ function escapeRe(s: string): string {
 }
 
 /**
- * Where the candidate's own name appears in a line of text.
+ * Where the parts of the candidate's name that have to be hidden appear.
  *
- * Browse shows a first name, so that is not the part worth hiding — the
- * surname is, and it sits in 48pt at the top of nearly every resume. Covering
- * contact details while leaving that there meant an employer learned exactly
- * who they were looking at.
+ * Browse shows a first name, so the first name is not what needs hiding — the
+ * surname is, and it sits in 28pt at the top of nearly every resume.
  *
- * Three shapes are matched, because a page's text items are joined without
- * separators and the name is rarely one tidy item:
+ * The ranges returned cover the surname only. The first version of this
+ * matched the whole name as one run, which meant the box went over the whole
+ * "Daniella Shnider" heading and an employer saw a grey pill where browse had
+ * just shown them a first name. Here the run is matched to find the surname
+ * reliably — including when the page's text items are glued together as
+ * "DaniellaShnider", where a word boundary can't help — but only the part
+ * after the given name is handed back.
  *
- *  - the whole name as a run, which catches "EstherDahan" when nothing
- *    separates the two items, and where the word boundaries below can't help
- *  - the same reversed, for the "Dahan, Esther" header style
+ * Three shapes, because a name is rarely one tidy item:
+ *
+ *  - the name in order, hiding everything after the given name
+ *  - the name reversed, for the "Shnider, Daniella" heading style
  *  - each part after the first on its own, bounded by letters and digits so a
  *    short surname doesn't fire inside an unrelated word
  *
- * Only the first part is left showing. Somebody called "Esther" with no
- * surname on file has nothing here to hide, and gets no boxes.
+ * Somebody with no surname on file has nothing here to hide, and gets no
+ * boxes.
  */
 export function nameRanges(line: string, fullName: string | null | undefined): [number, number][] {
   const parts = String(fullName ?? '').trim().split(/\s+/)
@@ -61,22 +65,31 @@ export function nameRanges(line: string, fullName: string | null | undefined): [
     .filter(p => p.length >= 2)
   if (parts.length < 2) return []
 
+  const given = escapeRe(parts[0])
+  const rest = parts.slice(1).map(escapeRe)
   // What may sit between two parts of a name as it's written on a page:
   // nothing at all, a space, a comma, a full stop, a hyphen.
   const GAP = "[\\s.,'\\-]*"
-  const patterns = [
-    new RegExp(parts.map(escapeRe).join(GAP), 'giu'),
-    new RegExp([...parts].reverse().map(escapeRe).join(GAP), 'giu'),
-    ...parts.slice(1).map(p =>
-      new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(p)}(?![\\p{L}\\p{N}])`, 'giu')),
+
+  // Each pattern brackets the given name so it can be excluded from the range.
+  // `hide` says which side of the match to keep.
+  const patterns: { re: RegExp; hide: 'after' | 'before' | 'all' }[] = [
+    { re: new RegExp(`(${given}${GAP})(${rest.join(GAP)})`, 'giu'), hide: 'after' },
+    { re: new RegExp(`(${[...rest].reverse().join(GAP)})(${GAP}${given})`, 'giu'), hide: 'before' },
+    ...rest.map(p => ({
+      re: new RegExp(`(?<![\\p{L}\\p{N}])${p}(?![\\p{L}\\p{N}])`, 'giu'),
+      hide: 'all' as const,
+    })),
   ]
 
   const ranges: [number, number][] = []
-  for (const re of patterns) {
+  for (const { re, hide } of patterns) {
     let m: RegExpExecArray | null
     while ((m = re.exec(line)) !== null) {
-      if (m[0].length > 0) ranges.push([m.index, m.index + m[0].length])
-      else re.lastIndex++
+      if (m[0].length === 0) { re.lastIndex++; continue }
+      const start = hide === 'after' ? m.index + m[1].length : m.index
+      const end = hide === 'before' ? m.index + m[1].length : m.index + m[0].length
+      if (end > start) ranges.push([start, end])
     }
   }
   return ranges
@@ -114,11 +127,13 @@ export function groupIntoLines(items: TextItem[]): TextItem[][] {
   return lines.map(l => l.items)
 }
 
-/** The text of a line as the regexes see it, with the span each item occupies. */
-function joinLine(line: TextItem[]) {
+type Span = { start: number; end: number; item: TextItem }
+
+/** The text of some items as the regexes see it, with each item's span in it. */
+function join(items: TextItem[]): { text: string; spans: Span[] } {
   let text = ''
-  const spans: { start: number; end: number; item: TextItem }[] = []
-  for (const item of line) {
+  const spans: Span[] = []
+  for (const item of items) {
     // Joined without separators so an address split across items still reads as
     // one string.
     spans.push({ start: text.length, end: text.length + item.str.length, item })
@@ -128,25 +143,98 @@ function joinLine(line: TextItem[]) {
 }
 
 /**
+ * Every stretch of the page the patterns should be run over: each line, and
+ * each line with the one after it.
+ *
+ * The pairs matter. A narrow column wraps an address across a line break, so
+ * "Daniellashnider@y" sits on one line and "ahoo.com" on the next, and neither
+ * half matches anything on its own — the first has no dot after the @, the
+ * second has no @ at all. Scanning a line at a time, as the boxes used to,
+ * covered neither, and the address was served in full.
+ *
+ * Boxes and the safety net below both read these, so anything the net can see
+ * is something the boxes have already had a chance to cover.
+ */
+function scanWindows(items: TextItem[]): { text: string; spans: Span[] }[] {
+  const lines = groupIntoLines(items)
+  const windows = lines.map(line => join(line))
+  for (let i = 0; i + 1 < lines.length; i++) {
+    windows.push(join([...lines[i], ...lines[i + 1]]))
+  }
+  return windows
+}
+
+/**
+ * The part of an item's box covering characters `start`..`end` of the line.
+ *
+ * Contact details take the whole item — covering a word of ordinary text
+ * beside an address costs nothing, and a box that stops short of a digit does.
+ * A name can't afford that: the surname often shares one text item with the
+ * given name, and browse has already shown that given name, so blanking the
+ * whole heading hides something the employer is meant to see.
+ *
+ * The split is proportional to character count, which is approximate in a
+ * proportional font, so it errs outward by half a character at each end. Half
+ * a surname showing is the failure that matters here.
+ */
+function partOfItem(span: Span, start: number, end: number): Rect {
+  const rect = span.item.rect
+  const len = span.end - span.start
+  const from = Math.max(0, start - span.start)
+  const to = Math.min(len, end - span.start)
+  if (len <= 0 || to <= from || (from <= 0 && to >= len)) return { ...rect }
+
+  // Only a range that runs to the end of the item gets a partial box, and that
+  // is the case worth having: "Daniella Shnider" as one heading, where the
+  // surname is the tail. Its right edge is the item's own, which is exact, so
+  // the only guess is where to start.
+  //
+  // A surname sitting in the middle of an item takes the whole item instead.
+  // Both of its edges would be guesses, and a guess at the far edge left the
+  // "r" of "Shnider" showing. Covering "Worked at Shnider & Co" entirely is a
+  // bigger box than strictly needed and costs nothing.
+  if (to < len) return { ...rect }
+
+  const unit = rect.w / len
+  // The guess is proportional to character count, which drifts further the
+  // more characters it has to step over, so the slack grows with the distance.
+  // It errs into the given name: clipping the tail of "Daniella" is nothing,
+  // and starting late would show the front of the surname.
+  const slack = 0.5 + 0.08 * from
+  const left = Math.max(rect.x, rect.x + unit * (from - slack))
+  // pdfjs reports a width the glyphs can slightly overrun — a bold 22pt
+  // heading drew a few pixels past it and left the tail of the last letter
+  // outside the box — so take an allowance rather than stop on the edge.
+  const right = rect.x + rect.w + rect.h * 0.15
+  return { x: left, y: rect.y, w: Math.max(right - left, 1), h: rect.h }
+}
+
+/**
  * Boxes covering every piece of contact info found in the page's text, and the
  * candidate's own name when one is known.
  */
 export function findRedactionBoxes(items: TextItem[], fullName?: string | null): Rect[] {
   const boxes: Rect[] = []
 
-  for (const line of groupIntoLines(items)) {
-    const { text, spans } = joinLine(line)
-
+  for (const { text, spans } of scanWindows(items)) {
     const lineBoxes: Rect[] = []
-    for (const [start, end] of [...contactRanges(text), ...nameRanges(text, fullName)]) {
+
+    // Contact details take the whole item they touch; a name takes only its
+    // own characters. See partOfItem.
+    for (const [start, end] of contactRanges(text)) {
       for (const span of spans) {
         if (span.end > start && span.start < end) lineBoxes.push({ ...span.item.rect })
       }
     }
+    for (const [start, end] of nameRanges(text, fullName)) {
+      for (const span of spans) {
+        if (span.end > start && span.start < end) lineBoxes.push(partOfItem(span, start, end))
+      }
+    }
 
-    // Merge touching boxes into one pill — but only within this line. The merge
-    // used to compare against the last box of the previous line too, which
-    // stretched a box across unrelated text.
+    // Merge touching boxes into one pill — but only across a shared baseline.
+    // The merge used to compare against the last box of the previous line too,
+    // which stretched a box across unrelated text.
     lineBoxes.sort((a, b) => a.x - b.x)
     const merged: Rect[] = []
     for (const b of lineBoxes) {
@@ -193,21 +281,12 @@ function covered(rect: Rect, boxes: Rect[]): boolean {
  * someone still read an address off this page?
  */
 export function unredactedContacts(items: TextItem[], boxes: Rect[]): string[] {
-  const lines = groupIntoLines(items)
   const missed = new Set<string>()
 
-  // Each line with the one after it, so a detail broken over a line break is
-  // still seen. Overlapping windows scan most lines twice; the set dedupes.
-  for (let i = 0; i < lines.length; i++) {
-    const window = [...lines[i], ...(lines[i + 1] ?? [])]
-
-    let text = ''
-    const spans: { start: number; end: number; item: TextItem }[] = []
-    for (const item of window) {
-      spans.push({ start: text.length, end: text.length + item.str.length, item })
-      text += item.str
-    }
-
+  // The same stretches the boxes were drawn from, so the two can't disagree
+  // about what is on the page. Overlapping windows scan most lines twice; the
+  // set dedupes.
+  for (const { text, spans } of scanWindows(items)) {
     for (const [start, end] of contactRanges(text)) {
       const touching = spans.filter(s => s.end > start && s.start < end)
       const uncovered = touching.filter(s => !covered(s.item.rect, boxes))
