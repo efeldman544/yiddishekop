@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { INDUSTRIES, EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 const CSV_COLUMNS = [
   'full_name', 'email', 'phone', 'whatsapp', 'location', 'current_job_title',
@@ -111,7 +113,7 @@ export default function AddCandidatesPanel({ onAdded }: { onAdded: () => void })
       setForm(EMPTY)
       close()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(humanError(e, 'Couldn\u2019t add that candidate.'))
     } finally {
       setSaving(false)
     }
@@ -184,7 +186,7 @@ export default function AddCandidatesPanel({ onAdded }: { onAdded: () => void })
 
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
               {error && (
-                <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
+                <ErrorNote>{error}</ErrorNote>
               )}
 
               {mode === 'manual' ? (

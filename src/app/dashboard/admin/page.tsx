@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import AddCandidatesPanel from './AddCandidatesPanel'
 import { INDUSTRIES as SHARED_INDUSTRIES } from '@/lib/candidateOptions'
 import { isProfileFilledIn } from '@/lib/profileFilledIn'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 type Candidate = {
   id: string
@@ -161,6 +163,10 @@ export default function AdminDashboard() {
   const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [togglingInterviewed, setTogglingInterviewed] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
+  // Approving and assigning used to fail into a browser alert, which is both
+  // the ugliest thing on the site and the one place the raw database text was
+  // quoted at you word for word.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const [jobs, setJobs] = useState<JobOption[]>([])
   // jobAssignments[candidateId] = array of assigned jobIds
@@ -232,6 +238,7 @@ export default function AdminDashboard() {
   // makes "every profile is checked by us before it appears" true.
   async function approveCandidate(candidateId: string) {
     setApproving(candidateId)
+    setActionError(null)
     const supabase = createClient()
     const { error } = await supabase
       .from('candidate_profiles').update({ status: 'active' }).eq('id', candidateId)
@@ -239,7 +246,7 @@ export default function AdminDashboard() {
     // a failed approval would look exactly like a successful one.
     if (error) {
       console.error('approval failed:', error.message)
-      window.alert(`Could not approve: ${error.message}`)
+      setActionError(humanError(error, 'Couldn\u2019t approve this candidate.'))
     } else {
       setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: 'active' } : c))
     }
@@ -353,6 +360,7 @@ export default function AdminDashboard() {
   async function toggleJobAssignment(candidateId: string, jobId: string) {
     const key = `${candidateId}-${jobId}`
     setTogglingAssign(key)
+    setActionError(null)
     const supabase = createClient()
     const isAssigned = (jobAssignments[candidateId] ?? []).includes(jobId)
 
@@ -363,7 +371,7 @@ export default function AdminDashboard() {
         .eq('candidate_id', candidateId)
         .eq('job_id', jobId)
       if (deleteErr) {
-        alert(`Couldn't remove assignment: ${deleteErr.message}`)
+        setActionError(humanError(deleteErr, 'Couldn’t remove the assignment.'))
         setTogglingAssign(null)
         return
       }
@@ -376,7 +384,7 @@ export default function AdminDashboard() {
         .from('candidate_job_assignments')
         .insert({ candidate_id: candidateId, job_id: jobId })
       if (insertErr) {
-        alert(`Couldn't save assignment: ${insertErr.message}`)
+        setActionError(humanError(insertErr, 'Couldn\u2019t assign this candidate.'))
         setTogglingAssign(null)
         return
       }
@@ -488,6 +496,8 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {actionError && <ErrorNote className="mb-4">{actionError}</ErrorNote>}
 
         {/* Results */}
         {loading ? (

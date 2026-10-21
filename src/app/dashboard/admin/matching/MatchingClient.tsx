@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { notifyAssigned } from '@/lib/notifyAssigned'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 export type MatchJob = {
   id: string
@@ -275,7 +277,7 @@ export default function MatchingClient({
         })
       )
     } catch (e) {
-      setAiError(`AI scoring failed: ${e instanceof Error ? e.message : 'Network error'}`)
+      setAiError(humanError(e, 'AI scoring didn\u2019t finish. Try again.'))
       analyzedJobs.current.delete(jobId)
     } finally {
       setAiRunning(false)
@@ -309,7 +311,7 @@ export default function MatchingClient({
       })
       setExpanded(candidateId)
     } catch (e) {
-      setAiError(`Deep analysis failed: ${e instanceof Error ? e.message : 'Network error'}`)
+      setAiError(humanError(e, 'Couldn\u2019t analyse this candidate. Try again.'))
     } finally {
       setAnalyzingId(null)
     }
@@ -330,21 +332,21 @@ export default function MatchingClient({
       const { error } = await supabase.from('candidate_job_assignments').delete()
         .eq('candidate_id', candidateId).eq('job_id', selectedJobId)
       if (error) {
-        setAiError(`Couldn't remove assignment: ${error.message}`)
+        setAiError(humanError(error, 'Couldn\u2019t remove the assignment.'))
       } else {
         setAssignments(prev => prev.filter(a => !(a.candidate_id === candidateId && a.job_id === selectedJobId)))
       }
     } else {
       const { error } = await supabase.from('candidate_job_assignments').insert({ candidate_id: candidateId, job_id: selectedJobId })
       if (error) {
-        setAiError(`Couldn't save assignment: ${error.message}`)
+        setAiError(humanError(error, 'Couldn\u2019t assign this candidate.'))
       } else {
         setAssignments(prev => [...prev, { candidate_id: candidateId, job_id: selectedJobId }])
         // Assigning here used to tell the employer nothing — the candidate
         // simply appeared in their portal with no prompt to look.
         notifyAssigned(
           { candidate_id: candidateId, job_id: selectedJobId },
-          msg => setAiError(`Assigned, but the employer wasn't notified: ${msg}`),
+          msg => setAiError(`Assigned. ${humanError(msg, 'The employer wasn\u2019t notified.')}`),
         )
       }
     }
@@ -422,7 +424,7 @@ export default function MatchingClient({
               </div>
             )}
             {aiError && !aiRunning && (
-              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</div>
+              <ErrorNote>{aiError}</ErrorNote>
             )}
 
             <div className="flex items-center justify-between">

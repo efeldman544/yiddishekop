@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { safeNextPath } from '@/lib/nextPath'
 import type { Role } from '@/types'
 import AuthShell from '@/components/AuthShell'
+import { humanError } from '@/lib/errorMessage'
 
 function LoginForm() {
   const router = useRouter()
@@ -28,7 +29,7 @@ function LoginForm() {
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (signInError) {
-      setError(signInError.message)
+      setError(humanError(signInError, 'Couldn\u2019t sign you in.'))
       setLoading(false)
       return
     }

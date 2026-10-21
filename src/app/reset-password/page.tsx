@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/types'
 import AuthShell from '@/components/AuthShell'
+import { humanError } from '@/lib/errorMessage'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -39,7 +40,7 @@ export default function ResetPasswordPage() {
     const supabase = createClient()
     const { error: err } = await supabase.auth.updateUser({ password })
     if (err) {
-      setError(err.message)
+      setError(humanError(err, 'Couldn\u2019t reset your password.'))
       setLoading(false)
       return
     }
