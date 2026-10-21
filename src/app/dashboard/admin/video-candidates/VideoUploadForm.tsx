@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent } from '@/components/ui/card'
 import { INDUSTRIES, EMPLOYMENT_TYPES } from '@/lib/candidateOptions'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 
 
@@ -90,7 +92,7 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
       onAdded(data as VideoCandidate)
       reset()
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong.')
+      setError(humanError(err, 'Couldn\u2019t upload that video.'))
     } finally {
       setSaving(false)
       setUploadProgress(null)
@@ -109,7 +111,7 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
         <form onSubmit={handleSubmit} className="space-y-4">
           <h3 className="text-sm font-semibold text-gray-900">New video candidate</h3>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <ErrorNote>{error}</ErrorNote>}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

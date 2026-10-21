@@ -8,6 +8,7 @@ import { safeNextPath } from '@/lib/nextPath'
 import { nameProblem } from '@/lib/nameCheck'
 import type { Role } from '@/types'
 import AuthShell from '@/components/AuthShell'
+import { humanError } from '@/lib/errorMessage'
 
 type Props = {
   defaultEmail?: string
@@ -51,7 +52,7 @@ export default function SignupForm({ defaultEmail = '', defaultName = '', defaul
     })
 
     if (signUpError) {
-      setError(signUpError.message)
+      setError(humanError(signUpError, 'Couldn\u2019t create your account.'))
       setLoading(false)
       return
     }

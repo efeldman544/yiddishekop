@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import ErrorNote from '@/components/ErrorNote'
 
 type Action = 'request_meeting' | 'pass' | null
 
@@ -156,7 +157,7 @@ export default function CandidateActions({
 
           {showForm && !meeting && (
             <div className="border-t border-border pt-3 space-y-3">
-              {error && <p className="text-xs text-destructive">{error}</p>}
+              {error && <ErrorNote>{error}</ErrorNote>}
               <p className="text-xs text-muted-foreground">Add up to 3 times you&apos;re available:</p>
               {slots.map((slot, i) => (
                 <div key={i} className="space-y-1">

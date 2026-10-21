@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 import { employerLabel, type EmployerOption } from './employerLabel'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 export type { EmployerOption }
 
@@ -190,7 +192,7 @@ export default function JobsClient({
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        setEmployerError(text || `Failed to create employer (${res.status})`)
+        setEmployerError(humanError(text, 'Couldn\u2019t create that employer.'))
         return
       }
       const data = await res.json()
@@ -426,9 +428,7 @@ export default function JobsClient({
 
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+                <ErrorNote>{error}</ErrorNote>
               )}
 
               <div className="space-y-1.5">
@@ -556,9 +556,7 @@ export default function JobsClient({
 
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
               {employerError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{employerError}</AlertDescription>
-                </Alert>
+                <ErrorNote>{employerError}</ErrorNote>
               )}
 
               {createdCredentials ? (

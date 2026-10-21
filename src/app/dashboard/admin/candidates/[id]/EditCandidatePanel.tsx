@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { INDUSTRIES, EMPLOYMENT_TYPES, EDUCATION_LEVELS, EXPERIENCE_LEVELS } from '@/lib/candidateOptions'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 export type EditableCandidate = {
   id: string
@@ -84,13 +85,13 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
         body: JSON.stringify(form),
       })
       if (!res.ok) {
-        setError(await res.text().catch(() => '') || `Save failed (${res.status})`)
+        setError(humanError(await res.text().catch(() => ''), 'Couldn\u2019t save those changes.'))
         return
       }
       setOpen(false)
       router.refresh()
     } catch {
-      setError('Network error — please try again.')
+      setError('Couldn\u2019t reach the server. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -101,14 +102,14 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
     try {
       const res = await fetch(`/api/admin/candidates/${candidate.id}`, { method: 'DELETE' })
       if (!res.ok) {
-        setError(await res.text().catch(() => '') || `Delete failed (${res.status})`)
+        setError(humanError(await res.text().catch(() => ''), 'Couldn\u2019t delete this candidate.'))
         setDeleting(false)
         return
       }
       router.push('/dashboard/admin')
       router.refresh()
     } catch {
-      setError('Network error — please try again.')
+      setError('Couldn\u2019t reach the server. Check your connection and try again.')
       setDeleting(false)
     }
   }
@@ -127,7 +128,7 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-              {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+              {error && <ErrorNote>{error}</ErrorNote>}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">

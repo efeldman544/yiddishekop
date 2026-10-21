@@ -4,8 +4,9 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { resumeHref } from '@/lib/resumeUrl'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 export default function ResumeSection({
   candidateId,
@@ -29,12 +30,12 @@ export default function ResumeSection({
       body.append('file', file)
       const res = await fetch(`/api/admin/candidates/${candidateId}/resume`, { method: 'POST', body })
       if (!res.ok) {
-        setError(await res.text().catch(() => '') || `Upload failed (${res.status})`)
+        setError(humanError(await res.text().catch(() => ''), 'Couldn\u2019t upload that resume.'))
         return
       }
       router.refresh()
     } catch {
-      setError('Network error — please try again.')
+      setError('Couldn\u2019t reach the server. Check your connection and try again.')
     } finally {
       setBusy(null)
       if (fileRef.current) fileRef.current.value = ''
@@ -46,13 +47,13 @@ export default function ResumeSection({
     try {
       const res = await fetch(`/api/admin/candidates/${candidateId}/resume`, { method: 'DELETE' })
       if (!res.ok) {
-        setError(await res.text().catch(() => '') || `Remove failed (${res.status})`)
+        setError(humanError(await res.text().catch(() => ''), 'Couldn\u2019t remove that resume.'))
         return
       }
       setConfirmRemove(false)
       router.refresh()
     } catch {
-      setError('Network error — please try again.')
+      setError('Couldn\u2019t reach the server. Check your connection and try again.')
     } finally {
       setBusy(null)
     }
@@ -69,7 +70,7 @@ export default function ResumeSection({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+        {error && <ErrorNote>{error}</ErrorNote>}
 
         <input
           ref={fileRef}

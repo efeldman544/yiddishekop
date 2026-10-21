@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import LpAuthButton from '@/components/LpAuthButton'
+import { humanError } from '@/lib/errorMessage'
 
 type FormState = {
   contact_name: string
@@ -43,12 +44,12 @@ export default function StartHiringForm() {
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        setError(text || `Something went wrong (${res.status}). Please try again.`)
+        setError(humanError(text, 'Couldn\u2019t send that. Please try again.'))
         return
       }
       setSubmitted(true)
     } catch {
-      setError('Network error. Please check your connection and try again.')
+      setError('Couldn\u2019t reach the server. Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -128,9 +129,7 @@ export default function StartHiringForm() {
           </div>
 
           {error && (
-            <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 4, padding: '12px 16px', fontSize: 14, color: '#fca5a5', marginBottom: 24 }}>
-              {error}
-            </div>
+            <div className="auth-error">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>

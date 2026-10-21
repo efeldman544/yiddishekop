@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
 
 // Industries, availability and experience come from the shared list. They were
 // copied here once, and the copy had already drifted: it still offered
@@ -104,7 +105,7 @@ export default function CandidateProfilePage() {
       const storagePath = `${user.id}/${resumeFile.name}`
       const { error: uploadError } = await supabase.storage.from('resumes')
         .upload(storagePath, arrayBuffer, { contentType: resumeFile.type || 'application/octet-stream', upsert: true })
-      if (uploadError) { setError('Resume upload failed: ' + uploadError.message); setSaving(false); return }
+      if (uploadError) { setError(humanError(uploadError, 'Couldn\u2019t upload that resume.')); setSaving(false); return }
       const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(storagePath)
       resume_url = urlData.publicUrl
     }
@@ -124,7 +125,7 @@ export default function CandidateProfilePage() {
     })
 
     if (upsertError) {
-      setError(upsertError.message)
+      setError(humanError(upsertError, 'Couldn\u2019t save your profile.'))
       setSaving(false)
     } else {
       // Tell the admins there's a profile worth looking at. The route ignores
@@ -150,11 +151,7 @@ export default function CandidateProfilePage() {
         <p className="text-sm text-muted-foreground mt-1">Add your details so we can match you with the right opportunities.</p>
       </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {error && <ErrorNote className="mb-6">{error}</ErrorNote>}
 
 
       <form onSubmit={handleSubmit} className="space-y-6">

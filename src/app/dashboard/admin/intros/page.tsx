@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { notifyAssigned } from '@/lib/notifyAssigned'
 import { introStatusForAdmin } from '@/lib/candidateStatus'
+import ErrorNote from '@/components/ErrorNote'
 
 type Request = {
   id: string
@@ -217,7 +218,7 @@ export default function IntroRequestsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <ErrorNote>{error}</ErrorNote>
       )}
 
       {meetings.length > 0 && (
@@ -329,9 +330,7 @@ export default function IntroRequestsPage() {
                 </p>
               )}
               {rowError[r.id] && (
-                <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {rowError[r.id]}
-                </p>
+                <ErrorNote className="mt-2">{rowError[r.id]}</ErrorNote>
               )}
             </div>
           ))}

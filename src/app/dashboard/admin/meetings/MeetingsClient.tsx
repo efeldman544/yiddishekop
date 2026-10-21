@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
+import ErrorNote from '@/components/ErrorNote'
 
 type PendingRequest = {
   assignmentId: string
@@ -192,7 +193,7 @@ export default function MeetingsClient() {
       }),
     })
     if (!res.ok) {
-      setError('Failed to schedule meeting. Please try again.')
+      setError('Couldn\u2019t schedule that meeting. Try again.')
       setSaving(false)
       return
     }
@@ -255,7 +256,7 @@ export default function MeetingsClient() {
 
                   {expandedId === req.assignmentId && (
                     <div className="border-t border-gray-100 pt-3 space-y-3">
-                      {error && <p className="text-xs text-red-500">{error}</p>}
+                      {error && <ErrorNote>{error}</ErrorNote>}
 
                       {req.proposedTimes.length > 0 && (
                         <div className="space-y-1.5">
