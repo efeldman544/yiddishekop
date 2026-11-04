@@ -43,6 +43,15 @@ type ScheduleForm = {
   notes: string
 }
 
+function GroupHeading({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-bold text-gray-900">{title}</h2>
+      <p className="text-[13px] text-gray-500 mt-0.5">{detail}</p>
+    </div>
+  )
+}
+
 export default function MeetingsClient() {
   const [pending, setPending] = useState<PendingRequest[]>([])
   const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
@@ -225,12 +234,57 @@ export default function MeetingsClient() {
   if (loading) return <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
 
   return (
-    <div className="space-y-8">
-      <BookingToggle />
+    <div className="space-y-10">
+      <div className="space-y-4">
+        <GroupHeading
+          title="Screening calls"
+          detail="Between us and a candidate, before any employer sees them."
+        />
+        <BookingToggle />
+        {screenings.length > 0 && (
+          <section>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              Booked ({screenings.length})
+            </h3>
+            <div className="space-y-2">
+              {screenings.map(s => (
+                <div key={s.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-900">{s.candidateName}</span>
+                    <span className="text-gray-400 ml-2">·</span>
+                    <span className="text-gray-500 ml-2">
+                      {new Date(s.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {s.meetingLink ? (
+                      <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4">
+                        Join link
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400">No link yet</span>
+                    )}
+                    <button onClick={() => handleDeleteScreening(s.id)} disabled={deleting === s.id}
+                      className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
+                      {deleting === s.id ? '…' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        <GroupHeading
+          title="Employer interviews"
+          detail="Between an employer and a candidate we put in front of them."
+        />
 
       <section>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
-          Pending ({pending.length})
+          Requested ({pending.length})
         </h3>
         {pending.length === 0 ? (
           <p className="text-sm text-gray-400">No pending meeting requests.</p>
@@ -351,40 +405,7 @@ export default function MeetingsClient() {
           </div>
         </section>
       )}
-
-      {screenings.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
-            Screening Calls ({screenings.length})
-          </h3>
-          <div className="space-y-2">
-            {screenings.map(s => (
-              <div key={s.id} className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-150 text-sm">
-                <div>
-                  <span className="font-medium text-gray-900">{s.candidateName}</span>
-                  <span className="text-gray-400 ml-2">·</span>
-                  <span className="text-gray-500 ml-2">
-                    {new Date(s.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {s.meetingLink ? (
-                    <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-4">
-                      Join link
-                    </a>
-                  ) : (
-                    <span className="text-xs text-gray-400">No link yet</span>
-                  )}
-                  <button onClick={() => handleDeleteScreening(s.id)} disabled={deleting === s.id}
-                    className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
-                    {deleting === s.id ? '…' : 'Delete'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+  </div>
     </div>
   )
 }

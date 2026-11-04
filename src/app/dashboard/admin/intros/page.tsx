@@ -237,7 +237,7 @@ export default function IntroRequestsPage() {
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 Asked from their portal, after the candidate was shared with them ·{' '}
-                <Link href="/dashboard/admin/matching?tab=meetings" className="text-indigo-700 hover:underline">
+                <Link href="/dashboard/admin/meetings" className="text-indigo-700 hover:underline">
                   Schedule it
                 </Link>
               </p>

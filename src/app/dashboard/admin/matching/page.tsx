@@ -1,15 +1,17 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import MatchingClient, { type MatchJob, type MatchCandidate } from './MatchingClient'
-import MeetingsClient from '../meetings/MeetingsClient'
-import PipelineTabs from './PipelineTabs'
 
+// Meetings moved out to its own section: half of what was on that tab --
+// screening calls between us and a candidate -- had nothing to do with
+// matching. An old ?tab=meetings link is sent there rather than 404ing.
 export default async function AdminMatchingPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
   const params = await searchParams
-  const tab = params?.tab === 'meetings' ? 'meetings' : 'pipeline'
+  if (params?.tab === 'meetings') redirect('/dashboard/admin/meetings')
 
   const supabase = await createClient()
 
@@ -95,19 +97,12 @@ export default async function AdminMatchingPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden">
-      <PipelineTabs activeTab={tab} />
-      {tab === 'meetings' ? (
-        <div className="flex-1 overflow-auto px-8 py-6">
-          <MeetingsClient />
-        </div>
-      ) : (
-        <MatchingClient
-          jobs={jobs}
-          candidates={[...regularCandidates, ...videoCandidates]}
-          initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
-          directAssignments={(directAssignmentData ?? []) as { employer_id: string; candidate_id: string }[]}
-        />
-      )}
+      <MatchingClient
+        jobs={jobs}
+        candidates={[...regularCandidates, ...videoCandidates]}
+        initialAssignments={(assignmentData ?? []) as { candidate_id: string; job_id: string }[]}
+        directAssignments={(directAssignmentData ?? []) as { employer_id: string; candidate_id: string }[]}
+      />
     </div>
   )
 }
