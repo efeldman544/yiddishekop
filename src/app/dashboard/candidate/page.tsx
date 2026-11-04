@@ -4,36 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import type { CandidateProfile } from '@/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import StatusToggle from './StatusToggle'
+import StepItem from './StepItem'
+import { screeningBookingEnabled } from '@/lib/siteSettings'
 
-function StepItem({
-  number, title, description, done, locked, href, linkLabel,
-}: {
-  number: number; title: string; description: string
-  done: boolean; locked: boolean; href: string; linkLabel: string
-}) {
-  return (
-    <div className={`flex items-center gap-4 px-4 py-3.5 rounded-lg border transition-colors ${
-      done ? 'bg-emerald-50/60 border-emerald-200' : locked ? 'bg-muted/50 border-border opacity-50' : 'bg-white border-gray-200'
-    }`}>
-      <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-        done ? 'bg-emerald-500 text-white' : locked ? 'bg-muted text-muted-foreground' : 'bg-indigo-600 text-white'
-      }`}>
-        {done ? '✓' : number}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-[13px] font-semibold ${done ? 'text-emerald-800' : 'text-foreground'}`}>{title}</p>
-        <p className={`text-[12px] mt-0.5 ${done ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-          {done ? 'Completed' : description}
-        </p>
-      </div>
-      {!locked && !done && (
-        <Link href={href} className="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700">
-          {linkLabel}
-        </Link>
-      )}
-    </div>
-  )
-}
 
 export default async function CandidateDashboard() {
   const supabase = await createClient()
@@ -46,6 +19,10 @@ export default async function CandidateDashboard() {
     supabase.from('meeting_requests').select('scheduled_at, meeting_link, notes').eq('candidate_id', user.id).eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(1).maybeSingle(),
     supabase.from('screening_bookings').select('scheduled_at, meeting_link').eq('candidate_id', user.id).order('scheduled_at', { ascending: false }).limit(1).maybeSingle(),
   ])
+
+  // An admin can close booking. Somebody who already has a call keeps it and
+  // keeps seeing it below — this only governs making a new one.
+  const bookingOpen = await screeningBookingEnabled(supabase)
 
   const step1Done = !!(cp?.full_name && cp?.phone && cp?.location && cp?.current_job_title && cp?.fields_worked_in?.length && cp?.employment_type?.length)
   const step2Done = !!cp?.screening_booked
@@ -75,9 +52,15 @@ export default async function CandidateDashboard() {
           <StepItem number={1} title="Complete your profile"
             description="Add your details so we can match you with the right opportunities."
             done={step1Done} locked={false} href="/dashboard/candidate/profile" linkLabel="Get started" />
-          <StepItem number={2} title="Book your screening call"
-            description="Schedule a short call with our team to discuss your job search."
-            done={step2Done} locked={!step1Done} href="/dashboard/candidate/booking" linkLabel="Book now" />
+          {bookingOpen ? (
+            <StepItem number={2} title="Book your screening call"
+              description="Schedule a short call with our team to discuss your job search."
+              done={step2Done} locked={!step1Done} href="/dashboard/candidate/booking" linkLabel="Book now" />
+          ) : (
+            <StepItem number={2} title="Your screening call"
+              description="We&rsquo;ll be in touch to arrange a time with you."
+              done={step2Done} locked={!step1Done} />
+          )}
         </CardContent>
       </Card>
 
