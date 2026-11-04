@@ -43,19 +43,11 @@ type ScheduleForm = {
   notes: string
 }
 
-function GroupHeading({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div>
-      <h2 className="text-base font-bold text-gray-900">{title}</h2>
-      <p className="text-[13px] text-gray-500 mt-0.5">{detail}</p>
-    </div>
-  )
-}
-
 export default function MeetingsClient() {
   const [pending, setPending] = useState<PendingRequest[]>([])
   const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
   const [screenings, setScreenings] = useState<ScreeningCall[]>([])
+  const [tab, setTab] = useState<'screening' | 'employer'>('screening')
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
@@ -234,12 +226,37 @@ export default function MeetingsClient() {
   if (loading) return <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-4">
-        <GroupHeading
-          title="Screening calls"
-          detail="Between us and a candidate, before any employer sees them."
-        />
+    <div>
+      {/* Tabs rather than one group above the other: with a few dozen bookings
+          in the first, the second was somewhere off the bottom of the page.
+          The counts are on the tabs so you can see what's in the other one
+          without going to look. */}
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-6">
+        {([
+          ['screening', 'Screening calls', screenings.length],
+          ['employer', 'Employer interviews', pending.length + scheduled.length],
+        ] as const).map(([key, label, count]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            aria-current={tab === key ? 'page' : undefined}
+            className={`-mb-px px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === key
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
+            }`}
+          >
+            {label}
+            <span className={`ml-1.5 ${tab === key ? 'text-indigo-400' : 'text-gray-400'}`}>({count})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className={tab === 'screening' ? 'space-y-4' : 'hidden'}>
+        <p className="text-[13px] text-gray-500">
+          Between us and a candidate, before any employer sees them.
+        </p>
         <BookingToggle />
         {screenings.length > 0 && (
           <section>
@@ -276,11 +293,10 @@ export default function MeetingsClient() {
         )}
       </div>
 
-      <div className="space-y-6">
-        <GroupHeading
-          title="Employer interviews"
-          detail="Between an employer and a candidate we put in front of them."
-        />
+      <div className={tab === 'employer' ? 'space-y-6' : 'hidden'}>
+        <p className="text-[13px] text-gray-500">
+          Between an employer and a candidate we put in front of them.
+        </p>
 
       <section>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
