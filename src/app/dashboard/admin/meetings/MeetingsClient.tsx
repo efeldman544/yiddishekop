@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import ErrorNote from '@/components/ErrorNote'
+import BookingToggle from './BookingToggle'
 
 type PendingRequest = {
   assignmentId: string
@@ -225,6 +226,8 @@ export default function MeetingsClient() {
 
   return (
     <div className="space-y-8">
+      <BookingToggle />
+
       <section>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
           Pending ({pending.length})
