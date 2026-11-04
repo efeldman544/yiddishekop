@@ -9,10 +9,9 @@ import MeetingsClient from './MeetingsClient'
 export default function AdminMeetingsPage() {
   return (
     <main className="px-8 py-6">
-      <h1 className="page-title mb-1">Meetings</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Screening calls between us and candidates, and interviews between employers and candidates.
-      </p>
+      {/* The tabs below name the two kinds, so repeating them here would be
+          saying the same thing twice in a row. */}
+      <h1 className="page-title mb-5">Meetings</h1>
       <MeetingsClient />
     </main>
   )
