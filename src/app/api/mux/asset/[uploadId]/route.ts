@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Mux from '@mux/mux-node'
+import { refuseUnlessAdmin } from '@/lib/requireAdmin'
 
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID!,
@@ -7,6 +8,9 @@ const mux = new Mux({
 })
 
 export async function GET(_: Request, { params }: { params: Promise<{ uploadId: string }> }) {
+  const refused = await refuseUnlessAdmin()
+  if (refused) return refused
+
   const { uploadId } = await params
   const upload = await mux.video.uploads.retrieve(uploadId)
 

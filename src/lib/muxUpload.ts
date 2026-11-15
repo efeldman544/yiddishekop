@@ -7,7 +7,7 @@
 export async function uploadVideoToMux(
   file: File,
   onProgress?: (label: string) => void,
-): Promise<{ assetId: string; playbackId: string }> {
+): Promise<{ assetId: string; playbackId: string; ready: boolean }> {
   onProgress?.('Requesting upload URL…')
   const res = await fetch('/api/mux/upload-url', { method: 'POST' })
   if (!res.ok) throw new Error(`Could not get an upload URL (HTTP ${res.status}) — check the Mux API keys`)
@@ -17,6 +17,10 @@ export async function uploadVideoToMux(
   await putWithProgress(url, file, pct => onProgress?.(`Uploading… ${pct}%`))
 
   onProgress?.('Processing…')
+  // Mux names the asset and its playback id within seconds of the upload
+  // finishing, long before the video is playable. Remember them as soon as
+  // they appear.
+  let known: { assetId: string; playbackId: string } | null = null
   // Poll until the asset is playable (~5 min budget for large files)
   for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 3000))
@@ -24,11 +28,17 @@ export async function uploadVideoToMux(
     if (!poll.ok) continue // transient poll failure — keep waiting
     const data = await poll.json()
     if (data.status === 'errored') throw new Error('Mux could not process this video')
-    if (data.status === 'ready' && data.playbackId) {
-      return { assetId: data.assetId, playbackId: data.playbackId }
-    }
+    if (data.assetId && data.playbackId) known = { assetId: data.assetId, playbackId: data.playbackId }
+    if (data.status === 'ready' && known) return { ...known, ready: true }
   }
-  throw new Error('Timed out waiting for video processing — it may still finish; refresh in a minute')
+  // Out of patience, but not out of luck: the file is safely with Mux and
+  // still being processed. This used to throw, and since the record is only
+  // saved after this returns, a long interview that took more than five
+  // minutes to process was uploaded in full and then thrown away — the admin
+  // saw an error and had to upload the whole thing again. Hand back what is
+  // known so the caller can save it; it plays once Mux finishes.
+  if (known) return { ...known, ready: false }
+  throw new Error('Mux did not accept the video. Try uploading it again.')
 }
 
 function putWithProgress(url: string, file: File, onPct: (pct: number) => void): Promise<void> {
