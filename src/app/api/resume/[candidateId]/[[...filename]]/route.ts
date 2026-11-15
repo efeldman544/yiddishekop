@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { resumeFileName } from '@/lib/resumeUrl'
 import { contactRanges, nameRanges, findRedactionBoxes, unredactedContacts, type Rect, type TextItem } from '@/lib/redact'
+import { sniffImage } from '@/lib/resumeContent'
 
 export const maxDuration = 60
 
@@ -236,6 +237,29 @@ export async function GET(
 
   if (!buffer.subarray(0, 1024).toString('latin1').includes('%PDF')) {
     const head = buffer.subarray(0, 512).toString('latin1')
+
+    // An admin gets a photographed resume exactly as it was uploaded.
+    //
+    // Everything below exists to hide contact details from an employer, and
+    // for a picture that means OCR, a canvas, and refusing when either falls
+    // short — so an admin, who can see the candidate's details on the page
+    // they clicked from, was being refused resumes for the sake of a redaction
+    // they don't need. Formats the canvas can't open (progressive JPEG, WebP,
+    // HEIC) never rendered for anybody. Employers still go through all of it.
+    if (isAdmin) {
+      const imageType = sniffImage(buffer)
+        ?? (/^[\s\S]{4}ftyp(heic|heix|mif1|hevc)/.test(head) ? 'image/heic' : null)
+      if (imageType) {
+        return new NextResponse(new Uint8Array(buffer), {
+          headers: {
+            'Content-Type': imageType,
+            'Content-Disposition': 'inline',
+            // Never cached anywhere shared: this is the unredacted original.
+            'Cache-Control': 'private, no-store',
+          },
+        })
+      }
+    }
     if (head.startsWith('PK')) {
       // Word document — convert to PDF, then redact it like any other PDF
       try {

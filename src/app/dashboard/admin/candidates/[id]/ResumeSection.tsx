@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { resumeHref } from '@/lib/resumeUrl'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
+import { refreshCandidateCard } from '@/lib/refreshCard'
 
 export default function ResumeSection({
   candidateId,
@@ -33,6 +34,7 @@ export default function ResumeSection({
         setError(humanError(await res.text().catch(() => ''), 'Couldn\u2019t upload that resume.'))
         return
       }
+      refreshCandidateCard(candidateId, { force: true })
       router.refresh()
     } catch {
       setError('Couldn\u2019t reach the server. Check your connection and try again.')
@@ -51,6 +53,7 @@ export default function ResumeSection({
         return
       }
       setConfirmRemove(false)
+      refreshCandidateCard(candidateId, { force: true })
       router.refresh()
     } catch {
       setError('Couldn\u2019t reach the server. Check your connection and try again.')

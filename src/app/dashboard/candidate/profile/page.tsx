@@ -136,6 +136,10 @@ export default function CandidateProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event: 'profile' }),
       }).catch(() => {})
+      // Have the resume and profile read again for matching. Not awaited: it
+      // runs after the response on the server, and the save has already
+      // succeeded whatever happens to it.
+      fetch('/api/candidate-card', { method: 'POST', keepalive: true }).catch(() => {})
       router.push('/dashboard/candidate')
     }
   }
