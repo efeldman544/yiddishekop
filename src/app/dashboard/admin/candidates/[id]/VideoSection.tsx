@@ -6,6 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadVideoToMux } from '@/lib/muxUpload'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { humanError } from '@/lib/errorMessage'
+import ErrorNote from '@/components/ErrorNote'
+
+// How many times to remount the player when it reports an error, and how long
+// to wait between tries.
+const PLAYER_RETRIES = 3
+const PLAYER_RETRY_MS = 2500
 
 export type Video = {
   id: string
@@ -28,24 +35,62 @@ export default function VideoSection({
   const [videoStatus, setVideoStatus] = useState<string | null>(null)
   const [videoUploadError, setVideoUploadError] = useState<string | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
-  const [muxToken, setMuxToken] = useState<string | null>(null)
-  const [tokenLoading, setTokenLoading] = useState(false)
+  const [videoNote, setVideoNote] = useState<string | null>(null)
+  // The token, and which video it is for. Playback here is signed, so the
+  // player must never be mounted without a token for the video it is showing.
+  // It used to be: the token was fetched in an effect, which runs after the
+  // first render, so every newly shown video was first handed to the player
+  // with no token (or, after Replace, with the previous video's), was refused,
+  // and put the player's own error on screen.
+  const [token, setToken] = useState<{ playbackId: string; value: string } | null>(null)
+  const [tokenFailedFor, setTokenFailedFor] = useState<string | null>(null)
+  const [tokenAttempt, setTokenAttempt] = useState(0)
+  const [playerTry, setPlayerTry] = useState<{ playbackId: string; n: number }>({ playbackId: '', n: 0 })
   const videoFileRef = useRef<HTMLInputElement>(null)
+  // Which video has got as far as loading, so a later error isn't treated as a failed start.
+  const loadedRef = useRef<string | null>(null)
+
+  const playbackId = video?.mux_playback_id ?? null
+  const tokenReady = !!playbackId && token?.playbackId === playbackId
+  const tokenFailed = !!playbackId && tokenFailedFor === playbackId
+  const tries = playerTry.playbackId === playbackId ? playerTry.n : 0
 
   useEffect(() => {
-    const playbackId = video?.mux_playback_id
-    if (!playbackId) { setMuxToken(null); return }
-    setTokenLoading(true)
+    if (!playbackId) return
+    let cancelled = false
     fetch(`/api/mux/token?playbackId=${playbackId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setMuxToken(d?.token ?? null))
-      .finally(() => setTokenLoading(false))
-  }, [video?.mux_playback_id])
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(d => {
+        if (cancelled) return
+        if (d?.token) setToken({ playbackId, value: d.token })
+        else setTokenFailedFor(playbackId)
+      })
+      .catch(() => { if (!cancelled) setTokenFailedFor(playbackId) })
+    return () => { cancelled = true }
+  }, [playbackId, tokenAttempt])
+
+  // A video that has only just finished processing can refuse its first
+  // request, and the player doesn't try again by itself: it shows an error
+  // that stays until the page is reloaded, by which time the video plays. So
+  // an error remounts the player a few times before it is allowed to stand.
+  //
+  // Only while it has never managed to load, though. Once a video has started,
+  // an error is a hiccup the player recovers from by itself, and remounting
+  // would throw the admin back to the beginning of an interview they were
+  // half-way through watching.
+  function handlePlayerError(event?: Event) {
+    if (!playbackId || tries >= PLAYER_RETRIES) return
+    if (loadedRef.current === playbackId) return
+    if ((event as CustomEvent<{ fatal?: boolean }> | undefined)?.detail?.fatal === false) return
+    const id = playbackId
+    const next = tries + 1
+    setTimeout(() => setPlayerTry({ playbackId: id, n: next }), PLAYER_RETRY_MS)
+  }
 
   async function handleVideoUpload(file: File) {
-    setUploadingVideo(true); setVideoUploadError(null); setVideoStatus('Starting…')
+    setUploadingVideo(true); setVideoUploadError(null); setVideoNote(null); setVideoStatus('Starting…')
     try {
-      const { assetId, playbackId } = await uploadVideoToMux(file, setVideoStatus)
+      const { assetId, playbackId, ready } = await uploadVideoToMux(file, setVideoStatus)
       setVideoStatus('Saving…')
       const supabase = createClient()
       if (video?.id) {
@@ -57,8 +102,11 @@ export default function VideoSection({
         if (error) throw new Error('DB insert failed: ' + error.message)
         setVideo({ id: data?.id ?? '', mux_playback_id: playbackId, mux_asset_id: assetId, url: null, transcript: null, created_at: new Date().toISOString() })
       }
+      if (!ready) {
+        setVideoNote('Saved. Mux is still processing this video, so it will start playing here in a few minutes.')
+      }
     } catch (e) {
-      setVideoUploadError(e instanceof Error ? e.message : 'Upload failed — please try again')
+      setVideoUploadError(humanError(e, 'Couldn’t upload that video. Try again.'))
     } finally {
       setUploadingVideo(false); setVideoStatus(null)
     }
@@ -81,12 +129,23 @@ export default function VideoSection({
           <>
             <div style={{ position: 'relative', paddingBottom: '56.25%' }}>
               <div style={{ position: 'absolute', inset: 0 }}>
-                {tokenLoading ? (
+                {tokenFailed ? (
+                  <div className="w-full h-full rounded-lg bg-muted flex flex-col items-center justify-center gap-2 text-center px-6">
+                    <p className="text-sm text-muted-foreground">The video is saved, but the player couldn&rsquo;t be authorised.</p>
+                    <Button variant="outline" size="sm"
+                      onClick={() => { setTokenFailedFor(null); setTokenAttempt(a => a + 1) }}>
+                      Try again
+                    </Button>
+                  </div>
+                ) : !tokenReady ? (
                   <div className="w-full h-full rounded-lg bg-muted animate-pulse" />
                 ) : (
                   <MuxPlayer
+                    key={`${video.mux_playback_id}-${tries}`}
                     playbackId={video.mux_playback_id}
-                    tokens={muxToken ? { playback: muxToken } : undefined}
+                    tokens={{ playback: token!.value }}
+                    onError={handlePlayerError}
+                    onLoadedData={() => { loadedRef.current = video.mux_playback_id }}
                     className="w-full h-full rounded-lg"
                   />
                 )}
@@ -130,10 +189,8 @@ export default function VideoSection({
             onClick={() => !uploadingVideo && videoFileRef.current?.click()}
             className={`border-2 border-dashed border-border rounded-lg px-6 py-10 text-center transition-colors ${uploadingVideo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-ring'}`}
           >
-            {videoStatus === 'uploading' ? (
-              <p className="text-sm text-muted-foreground">Uploading to Mux…</p>
-            ) : videoStatus === 'processing' ? (
-              <p className="text-sm text-muted-foreground">Processing video, this may take a minute…</p>
+            {uploadingVideo ? (
+              <p className="text-sm text-muted-foreground">{videoStatus ?? 'Working…'} Keep this page open.</p>
             ) : (
               <>
                 <p className="text-sm font-medium">Click to upload screening video</p>
@@ -142,7 +199,8 @@ export default function VideoSection({
             )}
           </div>
         )}
-        {videoUploadError && <p className="mt-2 text-xs text-destructive">{videoUploadError}</p>}
+        {videoNote && <p className="mt-2 text-xs text-muted-foreground">{videoNote}</p>}
+        {videoUploadError && <ErrorNote className="mt-2">{videoUploadError}</ErrorNote>}
         <input ref={videoFileRef} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" className="hidden"
           onChange={e => { const file = e.target.files?.[0]; if (file) handleVideoUpload(file); e.target.value = '' }} />
       </CardContent>
