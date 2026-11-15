@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { notifyAssigned } from '@/lib/notifyAssigned'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
+import CardsStatus from './CardsStatus'
 
 export type MatchJob = {
   id: string
@@ -45,7 +46,6 @@ type AiResult = {
 }
 
 type Badge = { label: string; style: string }
-type ScoredCandidate = MatchCandidate & { ruleScore: number; badges: Badge[] }
 
 const JOB_STATUS_BADGE: Record<string, string> = {
   'New':     'bg-amber-50 text-amber-700 border border-amber-200',
@@ -53,56 +53,62 @@ const JOB_STATUS_BADGE: Record<string, string> = {
   'On Hold': 'bg-amber-50 text-amber-700 border border-amber-200',
 }
 
-function ruleScore(candidate: MatchCandidate, job: MatchJob): { ruleScore: number; badges: Badge[] } {
-  let score = 0
+/**
+ * Plain facts about a candidate against a job, shown as chips.
+ *
+ * These used to be the output of a points system that also produced the
+ * ranking shown before any AI ran. The ranking is gone — every candidate is
+ * scored from their card now — and so are the chips that came from guessing:
+ * "Role match" fired on any shared word over three letters, and "US hours" on
+ * any description containing the letters "us", which is most of them. What is
+ * left is what can simply be read off the two records.
+ */
+function factBadges(candidate: MatchCandidate, job: MatchJob): Badge[] {
   const badges: Badge[] = []
-
   if (job.employment_type && candidate.employment_type?.includes(job.employment_type)) {
-    score += 30
     badges.push({ label: job.employment_type, style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' })
   }
   if (job.languages && candidate.languages) {
     const jobLangs = job.languages.toLowerCase().split(/[\s,;/]+/).filter(l => l.length > 1)
     const candLangs = candidate.languages.toLowerCase()
-    const matched = jobLangs.filter(l => candLangs.includes(l))
-    if (matched.length > 0) {
-      score += Math.min(matched.length * 15, 30)
+    if (jobLangs.some(l => candLangs.includes(l))) {
       badges.push({ label: 'Languages', style: 'bg-indigo-50 text-indigo-700 border border-indigo-200' })
     }
   }
-  const jobTitleWords = job.job_title.toLowerCase().split(/\s+/).filter(w => w.length > 3)
-  const rolesSeeking = (candidate.roles_seeking ?? '').toLowerCase()
-  const fieldsText = (candidate.fields_worked_in ?? []).join(' ').toLowerCase()
-  if (jobTitleWords.some(w => rolesSeeking.includes(w))) {
-    score += 25
-    badges.push({ label: 'Role match', style: 'bg-violet-50 text-violet-700 border border-violet-200' })
-  } else if (jobTitleWords.some(w => fieldsText.includes(w))) {
-    score += 15
-    badges.push({ label: 'Field match', style: 'bg-violet-50 text-violet-700 border border-violet-200' })
-  }
-  if (candidate.us_hours_comfortable && job.description?.toLowerCase().includes('us')) {
-    score += 10
-    badges.push({ label: 'US hours', style: 'bg-amber-50 text-amber-700 border border-amber-200' })
-  }
   if (candidate.interviewed) {
-    score += 10
     badges.push({ label: 'Interviewed', style: 'bg-emerald-50 text-emerald-700 border border-emerald-200' })
   }
-  return { ruleScore: score, badges }
+  return badges
 }
 
-function ScoreBar({ pct, ai }: { pct: number; ai: boolean }) {
+function ScoreBar({ pct }: { pct: number }) {
   const color = pct >= 70 ? 'bg-emerald-400' : pct >= 40 ? 'bg-amber-400' : 'bg-gray-300'
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[160px]">
         <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[11px] text-gray-400 tabular-nums">
-        {pct}% {ai ? 'AI match' : 'match'}
-      </span>
+      <span className="text-[11px] text-gray-400 tabular-nums">{pct}% match</span>
     </div>
   )
+}
+
+// One request scores this many candidates in a single model call.
+const CHUNK = 25
+// How many of those requests are in flight at once.
+const PARALLEL = 4
+const TOP_N = 10
+
+async function postJson(url: string, body: object): Promise<Response> {
+  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+}
+
+/** Run `work` over `items`, `width` at a time. */
+async function pooled<T>(items: T[], width: number, work: (item: T) => Promise<void>) {
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
+    while (next < items.length) await work(items[next++])
+  }))
 }
 
 export default function MatchingClient({
@@ -130,12 +136,14 @@ export default function MatchingClient({
   const [toggling, setToggling] = useState<string | null>(null)
   // AI scores keyed by job then candidate — scores from one job must not bleed into another
   const [aiScoresByJob, setAiScoresByJob] = useState<Record<string, Record<string, AiResult>>>({})
-  const [aiRunning, setAiRunning] = useState(false)
-  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  // Which job is being scored, and how far along it is.
+  const [scoring, setScoring] = useState<{ jobId: string; done: number; total: number } | null>(null)
+  const [analyzing, setAnalyzing] = useState<Set<string>>(new Set())
+  const [batch, setBatch] = useState<{ done: number; total: number } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
-  const analyzedJobs = useRef<Set<string>>(new Set())
-  // Frozen sort order — set after a full AI run so individual Analyze clicks don't reshuffle the list
+  const loadedJobs = useRef<Set<string>>(new Set())
+  // Frozen sort order — set after a scoring run so individual Analyze clicks don't reshuffle the list
   const [frozenOrder, setFrozenOrder] = useState<Record<string, string[]>>({})
 
   const selectedJob = jobs.find(j => j.id === selectedJobId) ?? null
@@ -143,54 +151,118 @@ export default function MatchingClient({
     () => (selectedJobId ? aiScoresByJob[selectedJobId] : null) ?? {},
     [selectedJobId, aiScoresByJob],
   )
+  const aiRunning = scoring !== null
   const [showAssignedOnly, setShowAssignedOnly] = useState(false)
 
   // Candidates directly assigned to the selected job's employer (via the admin
   // candidate page) — surfaced here so both assignment paths are visible
-  const directForEmployer = useMemo(() => {
-    if (!selectedJob?.employer_id) return new Set<string>()
-    return new Set(
-      directAssignments
-        .filter(d => d.employer_id === selectedJob.employer_id)
-        .map(d => d.candidate_id)
-    )
-  }, [selectedJob?.employer_id, directAssignments])
+  const employerId = selectedJob?.employer_id ?? null
+  const directForEmployer = new Set(
+    employerId ? directAssignments.filter(d => d.employer_id === employerId).map(d => d.candidate_id) : [],
+  )
 
   function mergeJobScores(jobId: string, scores: Record<string, AiResult>) {
     setAiScoresByJob(prev => ({ ...prev, [jobId]: { ...prev[jobId], ...scores } }))
   }
 
-  async function loadCachedOrRun(jobId: string) {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('candidate_ai_scores')
-      .select('candidate_id, score, summary, strengths, concerns, triage_only')
-      .eq('job_id', jobId)
-    if (data && data.length > 0) {
-      const map: Record<string, AiResult> = {}
-      for (const r of data) {
-        map[r.candidate_id] = {
-          score: r.score,
-          summary: r.summary ?? '',
-          strengths: Array.isArray(r.strengths) ? r.strengths : [],
-          concerns: Array.isArray(r.concerns) ? r.concerns : [],
-          triageOnly: r.triage_only || undefined,
+  function freezeOrder(jobId: string, scores: Record<string, AiResult>) {
+    const order = Object.entries(scores).sort((a, b) => b[1].score - a[1].score).map(([id]) => id)
+    setFrozenOrder(prev => ({ ...prev, [jobId]: order }))
+  }
+
+  /**
+   * Bring a job's scores up to date.
+   *
+   * Asks the server which stored scores are still current — made from this
+   * version of the job and this version of each candidate's card — and scores
+   * only the candidates left over. Opening a job nothing has changed on costs
+   * nothing; editing its description re-scores it; a candidate whose card was
+   * rebuilt is re-scored alone.
+   *
+   * `rescore` throws away the quick scores and makes them again. A full
+   * write-up that is still current is kept: it was made from more evidence
+   * than the quick pass sees, and replacing it with a bare number would be a
+   * step backwards.
+   */
+  async function loadAndScore(jobId: string, opts: { rescore?: boolean } = {}) {
+    if (scoring) return
+    setAiError(null)
+    setScoring({ jobId, done: 0, total: 0 })
+
+    let scores: Record<string, AiResult> = {}
+    try {
+      const res = await postJson('/api/admin/ai-match', { jobId, stage: 'load' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      const loaded: Record<string, AiResult> = (await res.json()).scores ?? {}
+      for (const [id, s] of Object.entries(loaded)) {
+        if (opts.rescore && s.triageOnly) continue
+        scores[id] = s
+      }
+      // Replace rather than merge: a score the server no longer vouches for
+      // must leave the screen, not linger beside the fresh ones.
+      setAiScoresByJob(prev => ({ ...prev, [jobId]: scores }))
+
+      const todo = candidates.filter(c => !scores[c.id]).map(c => ({ id: c.id, source: c.source }))
+      if (todo.length > 0) {
+        setScoring({ jobId, done: 0, total: todo.length })
+        const chunks: typeof todo[] = []
+        for (let i = 0; i < todo.length; i += CHUNK) chunks.push(todo.slice(i, i + CHUNK))
+
+        let failed = 0
+        let lastFailure: unknown = null
+        await pooled(chunks, PARALLEL, async chunk => {
+          try {
+            const r = await postJson('/api/admin/ai-match', { jobId, stage: 'score', candidates: chunk })
+            if (!r.ok) throw new Error(await r.text().catch(() => `HTTP ${r.status}`))
+            const json = await r.json()
+            const map: Record<string, AiResult> = {}
+            for (const x of json.results ?? []) {
+              map[x.candidateId] = { score: x.score, summary: '', strengths: [], concerns: [], triageOnly: true }
+            }
+            scores = { ...scores, ...map }
+            mergeJobScores(jobId, map)
+            failed += (json.unscored ?? []).length
+          } catch (e) {
+            // One failed batch costs those candidates, not the run. They stay
+            // unscored and are picked up by the next attempt.
+            failed += chunk.length
+            lastFailure = e
+          }
+          setScoring(prev => prev && prev.jobId === jobId ? { ...prev, done: Math.min(prev.done + chunk.length, prev.total) } : prev)
+        })
+
+        if (failed > 0) {
+          const why = lastFailure ? ` ${humanError(lastFailure, '')}`.trimEnd() : ''
+          setAiError(`${failed} candidate${failed === 1 ? '' : 's'} couldn’t be scored.${why} Use “Score remaining” to try them again.`)
         }
       }
-      mergeJobScores(jobId, map)
-      const order = data.slice().sort((a, b) => b.score - a.score).map(r => r.candidate_id)
-      setFrozenOrder(prev => ({ ...prev, [jobId]: order }))
-    } else {
-      runAiMatching()
+    } catch (e) {
+      // Not retried automatically: this effect runs again when scoring ends,
+      // so forgetting the job here would loop on a failure that persists. The
+      // button in the header is the retry.
+      setAiError(humanError(e, 'Couldn’t load the scores for this job.'))
+    } finally {
+      freezeOrder(jobId, scores)
+      setScoring(null)
     }
   }
 
-  // On job select: load cached scores; only run AI fresh if nothing is cached
+  // On job select: bring its scores up to date, once per visit.
   useEffect(() => {
-    if (!selectedJobId || analyzedJobs.current.has(selectedJobId) || aiRunning) return
-    analyzedJobs.current.add(selectedJobId)
-    loadCachedOrRun(selectedJobId)
-  }, [selectedJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedJobId || loadedJobs.current.has(selectedJobId) || scoring) return
+    loadedJobs.current.add(selectedJobId)
+    loadAndScore(selectedJobId)
+  }, [selectedJobId, scoring]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cards were rebuilt, so scores made from the old ones are out of date for
+  // every job, not only the one on screen.
+  function onCardsChanged() {
+    loadedJobs.current.clear()
+    if (selectedJobId) {
+      loadedJobs.current.add(selectedJobId)
+      loadAndScore(selectedJobId)
+    }
+  }
 
   // Keep ?job=<id> in the URL in sync with the selected job (via replaceState so
   // it doesn't add history entries or re-run the server fetch). Pressing Back
@@ -203,105 +275,46 @@ export default function MatchingClient({
     window.history.replaceState(null, '', `${window.location.pathname}?${sp.toString()}`)
   }, [selectedJobId])
 
-  const scoredCandidates = useMemo<ScoredCandidate[]>(() => {
-    if (!selectedJob) return []
-    return candidates.map(c => ({ ...c, ...ruleScore(c, selectedJob) }))
-  }, [selectedJob, candidates])
-
-  // Sort by frozen order when available (set after full run) so Analyze clicks don't reshuffle
+  // Scored candidates in the frozen order, then the ones without a score yet.
+  // Nothing is ranked on a guess: a candidate either has a score or is shown
+  // as waiting for one.
   const sortedCandidates = useMemo(() => {
     const order = selectedJobId ? frozenOrder[selectedJobId] : undefined
-    if (order && order.length > 0) {
-      const rank = new Map(order.map((id, i) => [id, i]))
-      return [...scoredCandidates].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
-    }
-    return [...scoredCandidates].sort((a, b) => {
-      const aScore = aiScores[a.id]?.score ?? a.ruleScore
-      const bScore = aiScores[b.id]?.score ?? b.ruleScore
-      return bScore - aScore
+    const rank = new Map((order ?? []).map((id, i) => [id, i]))
+    const scored = candidates.filter(c => aiScores[c.id])
+    const unscored = candidates.filter(c => !aiScores[c.id])
+    scored.sort((a, b) => {
+      const ra = rank.get(a.id), rb = rank.get(b.id)
+      if (ra !== undefined && rb !== undefined) return ra - rb
+      if (ra !== undefined) return -1
+      if (rb !== undefined) return 1
+      return aiScores[b.id].score - aiScores[a.id].score
     })
-  }, [scoredCandidates, aiScores, frozenOrder, selectedJobId])
+    return [...scored, ...unscored]
+  }, [candidates, aiScores, frozenOrder, selectedJobId])
 
-  const hasAiForJob = scoredCandidates.some(c => aiScores[c.id])
+  const scoredCount = candidates.filter(c => aiScores[c.id]).length
+  const unscoredCount = candidates.length - scoredCount
+  const hasAiForJob = scoredCount > 0
 
-  async function postAiMatch(body: object): Promise<Response> {
-    return fetch('/api/admin/ai-match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-  }
-
-  // Haiku batch — quick scores for all candidates from profile fields.
-  // Each request covers exactly 25 candidates (= 1 Haiku call, ~2s), well under any serverless limit.
-  // PARALLEL requests run concurrently so 500 candidates finish in ~25s total.
-  async function runAiMatching() {
-    if (!selectedJobId || aiRunning) return
-    setAiRunning(true)
-    setAiError(null)
-
-    const all = [
-      ...scoredCandidates.filter(c => c.source === 'profile').map(c => ({ id: c.id, source: 'profile' as const })),
-      ...scoredCandidates.filter(c => c.source === 'video').map(c => ({ id: c.id, source: 'video' as const })),
-    ]
-
-    // 25 per chunk = 1 Haiku call = ~2s per serverless request (safe on any plan)
-    const CHUNK = 25
-    const chunks: typeof all[] = []
-    for (let i = 0; i < all.length; i += CHUNK) chunks.push(all.slice(i, i + CHUNK))
-
-    const PARALLEL = 4  // fire this many requests at once from the browser
-    const jobId = selectedJobId
-
-    async function processChunk(chunk: typeof all) {
-      const profileIds = chunk.filter(c => c.source === 'profile').map(c => c.id)
-      const videoIds = chunk.filter(c => c.source === 'video').map(c => c.id)
-      const res = await postAiMatch({ jobId, candidateIds: profileIds, videoCandidateIds: videoIds, stage: 'triage' })
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
-      const json = await res.json()
-      const map: Record<string, AiResult> = {}
-      for (const r of json.results ?? []) {
-        map[r.candidateId] = { score: r.score, summary: '', strengths: [], concerns: [], triageOnly: true }
-      }
-      mergeJobScores(jobId, map)
-    }
-
-    try {
-      // Process all chunks using a PARALLEL-wide concurrency pool
-      let next = 0
-      await Promise.all(
-        Array.from({ length: Math.min(PARALLEL, chunks.length) }, async () => {
-          while (next < chunks.length) {
-            await processChunk(chunks[next++])
-          }
-        })
-      )
-    } catch (e) {
-      setAiError(humanError(e, 'AI scoring didn\u2019t finish. Try again.'))
-      analyzedJobs.current.delete(jobId)
-    } finally {
-      setAiRunning(false)
-      // Freeze sort order so Analyze clicks don't reshuffle the list
-      setAiScoresByJob(prev => {
-        const scores = prev[jobId] ?? {}
-        const order = Object.entries(scores)
-          .sort((a, b) => b[1].score - a[1].score)
-          .map(([id]) => id)
-        setFrozenOrder(p => ({ ...p, [jobId]: order }))
-        return prev
-      })
-    }
-  }
-
-  // Sonnet deep analysis — full resume + transcript for one candidate, on demand
-  async function analyzeSingle(candidateId: string, source: 'profile' | 'video') {
+  /**
+   * The full write-up for one candidate: whole resume, whole transcript.
+   *
+   * Their card is brought up to date first. That is what gets a photographed
+   * resume read at all, and it is skipped — two small queries, no model call —
+   * when the card is already current. If it can't be built the analysis still
+   * runs on what there is.
+   */
+  async function analyzeSingle(candidateId: string, source: 'profile' | 'video', opts: { quiet?: boolean } = {}) {
     if (!selectedJobId) return
-    setAnalyzingId(candidateId)
+    const jobId = selectedJobId
+    setAnalyzing(prev => new Set(prev).add(candidateId))
     try {
-      const res = await postAiMatch({ jobId: selectedJobId, candidateId, source, stage: 'deep_single' })
+      await postJson('/api/admin/candidate-cards', { stage: 'build', items: [{ id: candidateId, source }] }).catch(() => null)
+      const res = await postJson('/api/admin/ai-match', { jobId, candidateId, source, stage: 'deep_single' })
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
       const json = await res.json()
-      mergeJobScores(selectedJobId, {
+      mergeJobScores(jobId, {
         [candidateId]: {
           score: json.score,
           summary: json.summary ?? '',
@@ -309,12 +322,32 @@ export default function MatchingClient({
           concerns: Array.isArray(json.concerns) ? json.concerns : [],
         },
       })
-      setExpanded(candidateId)
+      if (!opts.quiet) setExpanded(candidateId)
+      return true
     } catch (e) {
-      setAiError(humanError(e, 'Couldn\u2019t analyse this candidate. Try again.'))
+      if (!opts.quiet) setAiError(humanError(e, 'Couldn’t analyse this candidate. Try again.'))
+      return false
     } finally {
-      setAnalyzingId(null)
+      setAnalyzing(prev => { const next = new Set(prev); next.delete(candidateId); return next })
     }
+  }
+
+  // The top of the list that hasn't had a full write-up yet.
+  const topToAnalyze = sortedCandidates.slice(0, TOP_N).filter(c => aiScores[c.id]?.triageOnly)
+
+  async function analyzeTop() {
+    if (batch || topToAnalyze.length === 0) return
+    const targets = topToAnalyze
+    setAiError(null)
+    setBatch({ done: 0, total: targets.length })
+    let failed = 0
+    await pooled(targets, 2, async c => {
+      const ok = await analyzeSingle(c.id, c.source, { quiet: true })
+      if (!ok) failed++
+      setBatch(prev => prev ? { ...prev, done: prev.done + 1 } : prev)
+    })
+    setBatch(null)
+    if (failed > 0) setAiError(`${failed} of ${targets.length} couldn’t be analysed. Try those again one at a time.`)
   }
 
   function isAssigned(candidateId: string) {
@@ -390,6 +423,8 @@ export default function MatchingClient({
         ) : (
           <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
 
+            <CardsStatus onChanged={onCardsChanged} />
+
             {/* Job header */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
               <div className="flex items-start justify-between gap-4">
@@ -407,8 +442,15 @@ export default function MatchingClient({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${JOB_STATUS_BADGE[selectedJob.status] ?? ''}`}>{selectedJob.status}</span>
-                  <Button size="sm" onClick={runAiMatching} disabled={aiRunning}>
-                    {aiRunning ? 'Analyzing…' : 'Re-run AI'}
+                  {topToAnalyze.length > 0 && !aiRunning && (
+                    <Button size="sm" variant="outline" onClick={analyzeTop} disabled={batch !== null}
+                      className="text-violet-600 border-violet-200 hover:bg-violet-50">
+                      {batch ? `Analyzing ${batch.done} of ${batch.total}…` : `Analyze top ${TOP_N}`}
+                    </Button>
+                  )}
+                  <Button size="sm" disabled={aiRunning || batch !== null}
+                    onClick={() => selectedJobId && loadAndScore(selectedJobId, { rescore: unscoredCount === 0 })}>
+                    {aiRunning ? 'Scoring…' : unscoredCount > 0 ? `Score remaining (${unscoredCount})` : 'Re-score'}
                   </Button>
                 </div>
               </div>
@@ -418,9 +460,10 @@ export default function MatchingClient({
             </div>
 
             {/* Progress bar / error */}
-            {aiRunning && (
+            {scoring && scoring.total > 0 && (
               <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-400 rounded-full animate-pulse w-full" />
+                <div className="h-full bg-violet-400 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((scoring.done / scoring.total) * 100)}%` }} />
               </div>
             )}
             {aiError && !aiRunning && (
@@ -430,7 +473,9 @@ export default function MatchingClient({
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                 {sortedCandidates.length} active candidate{sortedCandidates.length !== 1 ? 's' : ''}
-                {hasAiForJob ? ' · AI scored' : aiRunning ? ' · AI analyzing…' : ''}
+                {scoring && scoring.total > 0
+                  ? ` · scoring ${scoring.done} of ${scoring.total}`
+                  : unscoredCount > 0 && hasAiForJob ? ` · ${unscoredCount} not scored yet` : hasAiForJob ? ' · AI scored' : ''}
               </p>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => setShowAssignedOnly(false)}
@@ -445,13 +490,17 @@ export default function MatchingClient({
             </div>
 
             {(() => {
-              // Until AI scores exist for this job, showing the rule-scored list
-              // just flashes an order that reshuffles seconds later — hold on the
-              // analyzing state and go straight to the AI-ranked list instead
+              // Until scores exist for this job there is no order worth
+              // showing — hold on the scoring state and go straight to the
+              // ranked list instead of flashing an unranked one.
               if (aiRunning && !hasAiForJob) {
                 return (
                   <div className="py-16 text-center space-y-2">
-                    <p className="text-sm text-gray-500">AI is ranking {sortedCandidates.length} candidates…</p>
+                    <p className="text-sm text-gray-500">
+                      {scoring && scoring.total > 0
+                        ? `Ranking candidates… ${scoring.done} of ${scoring.total}`
+                        : 'Checking which scores are up to date…'}
+                    </p>
                     <p className="text-xs text-gray-400">Usually takes under a minute for large pools.</p>
                   </div>
                 )
@@ -469,7 +518,7 @@ export default function MatchingClient({
                   const assigned = isAssigned(c.id)
                   const key = `${c.id}-${selectedJobId}`
                   const ai = aiScores[c.id] ?? null
-                  const displayScore = ai ? ai.score : Math.min(Math.round((c.ruleScore / 85) * 100), 100)
+                  const badges = selectedJob ? factBadges(c, selectedJob) : []
                   const isExpanded = expanded === c.id
 
                   return (
@@ -499,10 +548,7 @@ export default function MatchingClient({
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-cyan-50 text-cyan-700 border-cyan-200">Assigned to employer</span>
                               )}
                               {ai && !ai.triageOnly && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">AI scored</span>
-                              )}
-                              {ai?.triageOnly && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-gray-50 text-gray-500 border-gray-200">AI screened</span>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">Analyzed</span>
                               )}
                               {c.admin_tags?.map(tag => (
                                 <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">{tag}</span>
@@ -510,10 +556,9 @@ export default function MatchingClient({
                             </div>
                             <p className="text-xs text-gray-500 mt-0.5">{[c.current_job_title, c.location].filter(Boolean).join(' · ')}</p>
 
-                            {/* Rule badges */}
-                            {c.badges.length > 0 && (
+                            {(badges.length > 0 || (c.fields_worked_in?.length ?? 0) > 0) && (
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {c.badges.map(b => (
+                                {badges.map(b => (
                                   <span key={b.label} className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${b.style}`}>{b.label}</span>
                                 ))}
                                 {c.fields_worked_in?.map(f => (
@@ -523,11 +568,13 @@ export default function MatchingClient({
                             )}
 
                             <div className="mt-3">
-                              <ScoreBar pct={displayScore} ai={!!ai} />
+                              {ai
+                                ? <ScoreBar pct={ai.score} />
+                                : <span className="text-[11px] text-gray-400">{aiRunning ? 'Scoring…' : 'Not scored yet'}</span>}
                             </div>
 
                             {/* AI summary */}
-                            {ai && (
+                            {ai && ai.summary && (
                               <div className="mt-2">
                                 <p className="text-xs text-gray-600 leading-relaxed">{ai.summary}</p>
                                 {(ai.strengths.length > 0 || ai.concerns.length > 0) && (
@@ -543,10 +590,10 @@ export default function MatchingClient({
                           <div className="flex flex-col gap-1.5 shrink-0">
                             {ai?.triageOnly && (
                               <Button size="sm" variant="outline"
-                                disabled={analyzingId === c.id}
+                                disabled={analyzing.has(c.id)}
                                 onClick={() => analyzeSingle(c.id, c.source)}
                                 className="text-violet-600 border-violet-200 hover:bg-violet-50">
-                                {analyzingId === c.id ? 'Analyzing…' : 'Analyze'}
+                                {analyzing.has(c.id) ? 'Analyzing…' : 'Analyze'}
                               </Button>
                             )}
                             <Button size="sm" variant={assigned ? 'default' : 'outline'}

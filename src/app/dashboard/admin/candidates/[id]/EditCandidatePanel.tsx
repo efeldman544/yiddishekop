@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { INDUSTRIES, EMPLOYMENT_TYPES, EDUCATION_LEVELS, EXPERIENCE_LEVELS } from '@/lib/candidateOptions'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
+import { refreshCandidateCard } from '@/lib/refreshCard'
 
 export type EditableCandidate = {
   id: string
@@ -89,6 +90,7 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
         return
       }
       setOpen(false)
+      refreshCandidateCard(candidate.id)
       router.refresh()
     } catch {
       setError('Couldn\u2019t reach the server. Check your connection and try again.')
