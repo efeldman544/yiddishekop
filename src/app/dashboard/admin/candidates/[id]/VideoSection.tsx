@@ -13,6 +13,9 @@ import ErrorNote from '@/components/ErrorNote'
 // to wait between tries.
 const PLAYER_RETRIES = 3
 const PLAYER_RETRY_MS = 2500
+// How often, and how many times, to look for a transcript Mux is still making.
+const TRANSCRIPT_CHECK_MS = 30_000
+const TRANSCRIPT_CHECKS = 20
 
 export type Video = {
   id: string
@@ -36,6 +39,7 @@ export default function VideoSection({
   const [videoUploadError, setVideoUploadError] = useState<string | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [videoNote, setVideoNote] = useState<string | null>(null)
+  const [transcriptNote, setTranscriptNote] = useState<string | null>(null)
   // The token, and which video it is for. Playback here is signed, so the
   // player must never be mounted without a token for the video it is showing.
   // It used to be: the token was fetched in an effect, which runs after the
@@ -68,6 +72,43 @@ export default function VideoSection({
       .catch(() => { if (!cancelled) setTokenFailedFor(playbackId) })
     return () => { cancelled = true }
   }, [playbackId, tokenAttempt])
+
+  // A video with no transcript gets one from Mux. Looking is what asks for it,
+  // if nobody has yet, and then this keeps checking while the page is open —
+  // Mux takes a few minutes — and shows the transcript when it lands.
+  const videoId = video?.id ?? null
+  const needsTranscript = !!videoId && !!video?.mux_asset_id && !video?.transcript
+  useEffect(() => {
+    if (!videoId || !needsTranscript) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let checks = 0
+    const check = () => {
+      fetch('/api/admin/transcripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'sync', request: true, items: [{ table: 'videos', id: videoId }] }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (cancelled) return
+          const result = d?.results?.[0] as { status?: string; transcript?: string; reason?: string } | undefined
+          if (result?.status === 'saved' && result.transcript) {
+            const text = result.transcript
+            setVideo(v => (v && v.id === videoId ? { ...v, transcript: text } : v))
+            setTranscriptNote(null)
+          } else if (result?.status === 'requested' || result?.status === 'pending') {
+            setTranscriptNote('Mux is transcribing this video. The transcript will appear here in a few minutes.')
+            if (++checks < TRANSCRIPT_CHECKS) timer = setTimeout(check, TRANSCRIPT_CHECK_MS)
+          } else if (result?.status === 'failed') {
+            setTranscriptNote(`No transcript: ${result.reason ?? 'Mux could not make one'}.`)
+          }
+        })
+        .catch(() => { /* the transcript is picked up on a later visit */ })
+    }
+    check()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
+  }, [videoId, needsTranscript])
 
   // A video that has only just finished processing can refuse its first
   // request, and the player doesn't try again by itself: it shows an error
@@ -200,6 +241,7 @@ export default function VideoSection({
           </div>
         )}
         {videoNote && <p className="mt-2 text-xs text-muted-foreground">{videoNote}</p>}
+        {transcriptNote && needsTranscript && <p className="mt-2 text-xs text-muted-foreground">{transcriptNote}</p>}
         {videoUploadError && <ErrorNote className="mt-2">{videoUploadError}</ErrorNote>}
         <input ref={videoFileRef} type="file" accept="video/mp4,video/quicktime,video/webm,video/*" className="hidden"
           onChange={e => { const file = e.target.files?.[0]; if (file) handleVideoUpload(file); e.target.value = '' }} />

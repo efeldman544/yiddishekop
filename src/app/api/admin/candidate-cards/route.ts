@@ -3,6 +3,7 @@ import { createClient as adminSupabase } from '@supabase/supabase-js'
 import { costUsd, describeAiFailure } from '@/lib/ai/models'
 import { buildCard, estimateCard, type Source } from '@/lib/candidateCard'
 import { fetchAll, isMissingSchema, listPool } from '@/lib/matchPool'
+import { collectTranscriptFor } from '@/lib/muxTranscripts'
 
 export const maxDuration = 60
 
@@ -125,6 +126,10 @@ async function handle(req: Request) {
     const force = body.force === true
     const results = await Promise.all(items.map(async item => {
       try {
+        // If Mux has a transcript waiting for this candidate's video, save it
+        // first, so the card is built from it instead of being out of date
+        // the moment the transcript is collected. Never fatal to the build.
+        await collectTranscriptFor(db, item.id, item.source).catch(() => {})
         return { ...item, ...(await buildCard(db, item.id, item.source, { force })) }
       } catch (e) {
         console.error(`card build failed for ${item.id}:`, e)
