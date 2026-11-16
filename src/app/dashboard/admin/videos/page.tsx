@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import TranscriptsStatus from './TranscriptsStatus'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -676,6 +677,8 @@ export default function VideosPage() {
           {bulkOpen ? 'Close bulk import' : 'Bulk import'}
         </Button>
       </div>
+
+      <TranscriptsStatus onSaved={load} />
 
       {/* Bulk Import */}
       {bulkOpen && (

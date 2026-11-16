@@ -161,14 +161,14 @@ export default function CardsStatus({ onChanged }: { onChanged: () => void }) {
             <p className="text-[13px] font-semibold text-gray-900">
               {pending === status.total
                 ? `No resumes have been read yet (${status.total} candidates)`
-                : `${pending} candidate${pending === 1 ? '' : 's'} need${pending === 1 ? 's' : ''} their resume read`}
+                : `${pending} candidate${pending === 1 ? ' has' : 's have'} a resume or interview that hasn’t been read`}
             </p>
             <p className="text-[12px] text-gray-500 mt-0.5">
               {progress
-                ? `${progress.kind === 'build' ? 'Reading resumes' : 'Counting'}… ${progress.done} of ${progress.total}. Keep this tab open.`
+                ? `${progress.kind === 'build' ? 'Reading' : 'Counting'}… ${progress.done} of ${progress.total}. Keep this tab open.`
                 : estimate
                   ? `About ${dollars(estimate.usd)} to read ${pending - estimate.failed}${estimate.visual ? `, ${estimate.visual} of them photos or scans` : ''}. The reading is counted exactly; the writing is an allowance.`
-                  : 'Until then they are ranked on their profile fields alone.'}
+                  : 'Until then they are ranked on what was read before, or on their profile fields.'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -202,7 +202,7 @@ export default function CardsStatus({ onChanged }: { onChanged: () => void }) {
 
       {report && (
         <p className="text-[12px] text-gray-600">
-          Read {report.built} resume{report.built === 1 ? '' : 's'} for {dollars(report.usd)}.
+          Read {report.built} candidate{report.built === 1 ? '' : 's'} for {dollars(report.usd)}.
           {report.failed > 0 && ` ${report.failed} failed${report.firstFailure ? `: ${report.firstFailure}` : '.'}`}
           {' '}All cards so far have cost {dollars(status.spentUsd)}.
         </p>
