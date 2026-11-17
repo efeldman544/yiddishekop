@@ -92,7 +92,7 @@ export default function VideoUploadForm({ onAdded }: { onAdded: (c: VideoCandida
       onAdded(data as VideoCandidate)
       reset()
     } catch (err: any) {
-      setError(humanError(err, 'Couldn\u2019t upload that video.'))
+      setError(err?.name === 'UploadError' ? err.message : humanError(err, 'Couldn\u2019t upload that video.'))
     } finally {
       setSaving(false)
       setUploadProgress(null)

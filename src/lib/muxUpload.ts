@@ -4,13 +4,33 @@
 // VideoSection) no try/catch — a network/CORS failure during the PUT threw an
 // unhandled rejection and the UI sat on "Uploading…" forever with no message.
 
+/**
+ * A failure whose message was written to be shown as it is. The screens that
+ * call this run other errors through a filter that hides anything looking like
+ * raw database output; a message from Mux can trip that filter and be replaced
+ * by a generic line, which is the opposite of what's wanted here.
+ */
+export class UploadError extends Error {
+  name = 'UploadError'
+}
+
 export async function uploadVideoToMux(
   file: File,
   onProgress?: (label: string) => void,
 ): Promise<{ assetId: string; playbackId: string; ready: boolean }> {
   onProgress?.('Requesting upload URL…')
   const res = await fetch('/api/mux/upload-url', { method: 'POST' })
-  if (!res.ok) throw new Error(`Could not get an upload URL (HTTP ${res.status}) — check the Mux API keys`)
+  if (!res.ok) {
+    // Pass on what the server said. This used to tell the admin to check the
+    // Mux API keys whatever the cause, which sent them looking in the wrong
+    // place when the keys were fine.
+    const detail = (await res.text().catch(() => '')).trim()
+    throw new UploadError(
+      res.status === 401 || res.status === 403
+        ? 'Only an admin can upload video. Sign in again and retry.'
+        : `Couldn’t start the upload. ${detail || `The server returned ${res.status}.`}`,
+    )
+  }
   const { uploadId, url } = await res.json()
   if (!url) throw new Error('Mux did not return an upload URL')
 

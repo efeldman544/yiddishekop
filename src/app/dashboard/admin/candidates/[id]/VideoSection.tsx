@@ -147,7 +147,7 @@ export default function VideoSection({
         setVideoNote('Saved. Mux is still processing this video, so it will start playing here in a few minutes.')
       }
     } catch (e) {
-      setVideoUploadError(humanError(e, 'Couldn’t upload that video. Try again.'))
+      setVideoUploadError(e instanceof Error && e.name === 'UploadError' ? e.message : humanError(e, 'Couldn’t upload that video. Try again.'))
     } finally {
       setUploadingVideo(false); setVideoStatus(null)
     }
