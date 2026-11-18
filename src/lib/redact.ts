@@ -12,7 +12,12 @@ export type TextItem = { str: string; rect: Rect }
 export function emailRanges(text: string): [number, number][] {
   // Built fresh per call: a /g regex shared between calls carries `lastIndex`
   // from one to the next.
-  const re = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
+  //
+  // A space either side of the @ is allowed. OCR reads "name@gmail.com" as two
+  // words, "name @gmail.com", about as often as it reads it right, and the
+  // pattern without it found nothing at all in the split form — so the
+  // address was served on an image resume and nothing noticed.
+  const re = /[a-zA-Z0-9._%+\-]+ ?@ ?[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
   const ranges: [number, number][] = []
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) ranges.push([m.index, m.index + m[0].length])
@@ -96,6 +101,115 @@ export function phoneRanges(text: string): [number, number][] {
   return ranges
 }
 
+/** The contact details already on file for a candidate, as typed into their profile. */
+export type KnownContacts = { emails: string[]; phones: string[] }
+
+// Characters OCR mistakes for one another, folded together so a misread
+// still matches: "Estherrodal1" read as "Estherrodall", "0" read as "o".
+function fold(ch: string): string {
+  const c = ch.toLowerCase()
+  if ('1il|!'.includes(c)) return 'l'
+  if (c === '0') return 'o'
+  return c
+}
+
+/** `text` folded and with whitespace removed, and where each kept character came from. */
+function squeeze(text: string): { flat: string; at: number[] } {
+  let flat = ''
+  const at: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    if (/\s/.test(text[i])) continue
+    flat += fold(text[i])
+    at.push(i)
+  }
+  return { flat, at }
+}
+
+/**
+ * Where a candidate's own email and phone number appear, however they were
+ * written.
+ *
+ * The patterns find things that look like contact details. This finds the
+ * ones we know are this candidate's — from their profile — so a number in a
+ * format the patterns don't know, or an address the OCR garbled, is still
+ * found as long as enough of it survives. It is matched loosely: case,
+ * spaces, and the characters OCR confuses (1/l/I, 0/o) are ignored, and a
+ * phone is matched on its digits, ignoring the country code.
+ */
+export function knownRanges(text: string, known: KnownContacts | null | undefined): [number, number][] {
+  if (!known) return []
+  const ranges: [number, number][] = []
+
+  const { flat, at } = squeeze(text)
+  for (const raw of known.emails) {
+    const email = raw.trim()
+    if (!email.includes('@')) continue
+    const whole = squeeze(email).flat
+    for (let i = flat.indexOf(whole); i !== -1; i = flat.indexOf(whole, i + 1)) {
+      ranges.push([at[i], at[i + whole.length - 1] + 1])
+    }
+    // The part before the @ on its own, as a whole word — for when the rest
+    // was misread or sits on another line. Only when it is distinctive
+    // enough not to be somebody's ordinary name: with a digit, a dot or an
+    // underscore in it.
+    const local = email.slice(0, email.indexOf('@'))
+    if (local.length >= 6 && /[\d._]/.test(local)) {
+      const want = squeeze(local).flat
+      const word = /[^\s,;:()<>]+/g
+      let m: RegExpExecArray | null
+      while ((m = word.exec(text)) !== null) {
+        const token = m[0].replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+        if (token && squeeze(token).flat === want) ranges.push([m.index, m.index + m[0].length])
+      }
+    }
+  }
+
+  const keys = known.phones
+    .map(p => p.replace(/\D/g, ''))
+    .filter(d => d.length >= 7)
+    // The last nine digits: a number is written with and without its
+    // country code, and with or without a leading 0, but ends the same.
+    .map(d => d.slice(-9))
+  if (keys.length) {
+    const run = /\d[\d\s.()\-\u2010-\u2015\u2212+]*\d/g
+    let m: RegExpExecArray | null
+    while ((m = run.exec(text)) !== null) {
+      let digits = ''
+      const pos: number[] = []
+      for (let i = 0; i < m[0].length; i++) {
+        if (/\d/.test(m[0][i])) { digits += m[0][i]; pos.push(m.index + i) }
+      }
+      for (const key of keys) {
+        for (let i = digits.indexOf(key); i !== -1; i = digits.indexOf(key, i + 1)) {
+          // Take in up to four more digits in front — a country code or a
+          // leading area digit — but no further, so a date written just
+          // before the number isn't swallowed with it.
+          // Back to the start of the digit group the match begins in.
+          let start = pos[i]
+          while (start > 0 && /\d/.test(text[start - 1])) start--
+          // Then over short groups in front — a country code or leading
+          // digit, at most four digits in all. A four-digit group is a year
+          // as often as not, so it stops there.
+          let extra = 0
+          for (;;) {
+            let j = start
+            while (j > 0 && /[\s.()\-\u2010-\u2015\u2212+]/.test(text[j - 1])) j--
+            let k = j
+            while (k > 0 && /\d/.test(text[k - 1])) k--
+            const group = j - k
+            if (group === 0 || group > 3 || extra + group > 4) break
+            extra += group
+            start = k
+          }
+          while (start > 0 && /[+(]/.test(text[start - 1])) start--
+          ranges.push([start, pos[i + key.length - 1] + 1])
+        }
+      }
+    }
+  }
+  return ranges
+}
+
 /** Character ranges of contact info within a line of text: emails and phone numbers. */
 export function contactRanges(line: string): [number, number][] {
   return [...emailRanges(line), ...phoneRanges(line)]
@@ -168,6 +282,21 @@ export function nameRanges(line: string, fullName: string | null | undefined): [
     }
   }
   return ranges
+}
+
+/**
+ * Whether any part of the candidate's name appears in some text, letter-spaced
+ * or not. Used to tell a text layer that says what the page shows from one
+ * that doesn't.
+ */
+export function nameMentioned(text: string, fullName: string | null | undefined): boolean {
+  const parts = String(fullName ?? '').trim().split(/\s+/)
+    .map(p => p.replace(/[^\p{L}'\-]/gu, ''))
+    .filter(p => p.length >= 3)
+  return parts.some(part => {
+    const spaced = [...part].map(escapeRe).join('\\s{0,2}')
+    return new RegExp(`(?<![\\p{L}\\p{N}])${spaced}(?![\\p{L}\\p{N}])`, 'iu').test(text)
+  })
 }
 
 /**
@@ -311,7 +440,7 @@ function partOfItem(span: Span, start: number, end: number): Rect {
  * Boxes covering every piece of contact info found in the page's text, and the
  * candidate's own name when one is known.
  */
-export function findRedactionBoxes(items: TextItem[], fullName?: string | null): Rect[] {
+export function findRedactionBoxes(items: TextItem[], fullName?: string | null, known?: KnownContacts | null): Rect[] {
   const boxes: Rect[] = []
 
   for (const { text, spans, ranges, single } of scanWindows(items)) {
@@ -319,7 +448,7 @@ export function findRedactionBoxes(items: TextItem[], fullName?: string | null):
 
     // Contact details take the whole item they touch; a name takes only its
     // own characters. See partOfItem.
-    for (const [start, end] of ranges) {
+    for (const [start, end] of [...ranges, ...(single ? knownRanges(text, known) : [])]) {
       for (const span of spans) {
         if (span.end > start && span.start < end) lineBoxes.push({ ...span.item.rect })
       }
