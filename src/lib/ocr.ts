@@ -51,28 +51,34 @@ async function inverted(image: Buffer): Promise<Buffer> {
 }
 
 /**
- * Run `fn` with a reader that OCRs a page image in both colour schemes.
+ * An OCR reader whose engine only starts on the first page it reads.
  *
- * One OCR engine for the whole call: starting one loads its model, which is
- * the slow part, so a caller reading several pages shouldn't pay it per page.
+ * Starting one loads its model, which is the slow part, so a caller reading
+ * several pages shares one engine, and a caller that may read nothing at all
+ * pays nothing. `close` must be called either way.
  */
-export async function withOcr<T>(fn: (read: ReadPage) => Promise<T>): Promise<T> {
-  const { createWorker, PSM } = await import('tesseract.js')
-  // OEM 1 = LSTM only. /tmp keeps the downloaded model across warm
-  // invocations. TESSERACT_LANG_PATH is only for running this where the
-  // usual download address can't be reached.
-  const worker = await createWorker('eng', 1, {
-    cachePath: '/tmp',
-    logger: () => {},
-    ...(process.env.TESSERACT_LANG_PATH ? { langPath: process.env.TESSERACT_LANG_PATH } : {}),
-  })
-  // Sparse-text mode: find as much text as possible, in no particular order.
-  // The default assumes a page of running text, and on a designed resume it
-  // skipped the big name heading entirely — so the surname in it was left
-  // showing — while reading the small print fine.
-  await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT })
-  try {
-    return await fn(async image => {
+export function openOcr(): { read: ReadPage; close: () => Promise<void> } {
+  let started: Promise<Awaited<ReturnType<typeof import('tesseract.js')['createWorker']>>> | null = null
+  const start = async () => {
+    const { createWorker, PSM } = await import('tesseract.js')
+    // OEM 1 = LSTM only. /tmp keeps the downloaded model across warm
+    // invocations. TESSERACT_LANG_PATH is only for running this where the
+    // usual download address can't be reached.
+    const worker = await createWorker('eng', 1, {
+      cachePath: '/tmp',
+      logger: () => {},
+      ...(process.env.TESSERACT_LANG_PATH ? { langPath: process.env.TESSERACT_LANG_PATH } : {}),
+    })
+    // Sparse-text mode: find as much text as possible, in no particular order.
+    // The default assumes a page of running text, and on a designed resume it
+    // skipped the big name heading entirely — so the surname in it was left
+    // showing — while reading the small print fine.
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT })
+    return worker
+  }
+  return {
+    async read(image) {
+      const worker = await (started ??= start())
       const out: OcrLine[] = []
       for (const pass of [image, await inverted(image)]) {
         const { data } = await worker.recognize(pass, {}, { blocks: true })
@@ -81,8 +87,21 @@ export async function withOcr<T>(fn: (read: ReadPage) => Promise<T>): Promise<T>
         out.push(...toLines(words))
       }
       return out
-    })
+    },
+    async close() {
+      if (!started) return
+      const worker = await started.catch(() => null)
+      await worker?.terminate()
+    },
+  }
+}
+
+/** Run `fn` with a reader that OCRs a page image in both colour schemes. */
+export async function withOcr<T>(fn: (read: ReadPage) => Promise<T>): Promise<T> {
+  const ocr = openOcr()
+  try {
+    return await fn(ocr.read)
   } finally {
-    await worker.terminate()
+    await ocr.close()
   }
 }
