@@ -8,27 +8,97 @@
 export type Rect = { x: number; y: number; w: number; h: number }
 export type TextItem = { str: string; rect: Rect }
 
-// Built fresh per call. These are stateful with /g — sharing one instance across
-// calls leaks `lastIndex` between them and makes matching depend on what was
-// scanned previously.
-function contactPatterns(): RegExp[] {
-  return [
-    /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g,
-    /(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/g,
-    /\+[\d\s\-().]{7,20}/g,
-  ]
+/** Character ranges of email addresses within a stretch of text. */
+export function emailRanges(text: string): [number, number][] {
+  // Built fresh per call: a /g regex shared between calls carries `lastIndex`
+  // from one to the next.
+  const re = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
+  const ranges: [number, number][] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) ranges.push([m.index, m.index + m[0].length])
+  return ranges
 }
 
-/** Character ranges of contact info within a line of text. */
-export function contactRanges(line: string): [number, number][] {
+// What may sit between the digit groups of a phone number: spaces, dots,
+// hyphens, brackets round an area code — and every dash a word processor
+// substitutes for a hyphen. The pattern this replaced accepted one plain
+// hyphen, dot or space and nothing else, so "053 – 540 – 2523" with en-dashes,
+// as Word types it, went out on a resume uncovered and unnoticed.
+const PHONE_GLUE = '\\s.()\\-\\u2010-\\u2015\\u2212'
+const MAX_GLUE = 4
+const YEAR = /^(19|20)\d\d$/
+
+/**
+ * Character ranges of phone numbers within a stretch of text.
+ *
+ * Any format, by counting digits rather than matching a layout: groups of
+ * digits joined by short runs of the characters above, 9 to 15 digits in all
+ * (8 after a +), which is every national and international number in use.
+ * Where a run of digits holds more than that — a date range sitting next to a
+ * number — the best number inside it is taken, preferring the stretch with
+ * fewest year-like groups, so "2018 – 2021 053 540 2523" gives up the phone and
+ * not the dates.
+ *
+ * Two guards against dates: a stretch with two year-like groups is never a
+ * phone ("05.2020 – 06.2021"), and nor is one ending in a group of fewer than
+ * three digits ("2018 – 2021, 2 years").
+ */
+export function phoneRanges(text: string): [number, number][] {
+  const run = new RegExp(`\\d[\\d${PHONE_GLUE}]*\\d|\\d`, 'g')
+  const glue = new RegExp(`^[${PHONE_GLUE}]{1,${MAX_GLUE}}$`)
   const ranges: [number, number][] = []
-  for (const re of contactPatterns()) {
-    let m: RegExpExecArray | null
-    while ((m = re.exec(line)) !== null) {
-      if (m[0].length > 0) ranges.push([m.index, m.index + m[0].length])
+
+  let m: RegExpExecArray | null
+  while ((m = run.exec(text)) !== null) {
+    // The digit groups in this run, broken wherever the glue between two
+    // groups is too long to be part of one number.
+    const pieces: { start: number; end: number; digits: string }[][] = [[]]
+    const group = /\d+/g
+    let g: RegExpExecArray | null
+    let prevEnd = -1
+    while ((g = group.exec(m[0])) !== null) {
+      const start = m.index + g.index
+      const between = prevEnd < 0 ? '' : text.slice(prevEnd, start)
+      if (prevEnd >= 0 && !glue.test(between)) pieces.push([])
+      pieces[pieces.length - 1].push({ start, end: start + g[0].length, digits: g[0] })
+      prevEnd = start + g[0].length
+    }
+
+    for (const groups of pieces) {
+      const used = new Set<number>()
+      for (;;) {
+        let best: { i: number; j: number; years: number; digits: number } | null = null
+        for (let i = 0; i < groups.length; i++) {
+          if (used.has(i)) continue
+          let digits = 0
+          let years = 0
+          for (let j = i; j < groups.length && !used.has(j); j++) {
+            digits += groups[j].digits.length
+            if (YEAR.test(groups[j].digits)) years++
+            if (digits > 15) break
+            const plus = text[groups[i].start - 1] === '+'
+            if (digits < (plus ? 8 : 9) || years >= 2 || groups[j].digits.length < 3) continue
+            const better = !best
+              || years < best.years
+              || (years === best.years && digits > best.digits)
+            if (better) best = { i, j, years, digits }
+          }
+        }
+        if (!best) break
+        for (let k = best.i; k <= best.j; k++) used.add(k)
+        // Take in a + or opening bracket written directly before the number.
+        let start = groups[best.i].start
+        while (start > 0 && /[+(]/.test(text[start - 1])) start--
+        ranges.push([start, groups[best.j].end])
+      }
     }
   }
   return ranges
+}
+
+/** Character ranges of contact info within a line of text: emails and phone numbers. */
+export function contactRanges(line: string): [number, number][] {
+  return [...emailRanges(line), ...phoneRanges(line)]
 }
 
 function escapeRe(s: string): string {
@@ -65,8 +135,13 @@ export function nameRanges(line: string, fullName: string | null | undefined): [
     .filter(p => p.length >= 2)
   if (parts.length < 2) return []
 
-  const given = escapeRe(parts[0])
-  const rest = parts.slice(1).map(escapeRe)
+  // Headings are often letter-spaced, and the PDF then holds the name as
+  // "S A MU I L L" rather than "SAMUILL". A name matched only as written never
+  // saw the surname in that heading, so it was left showing. Each part is
+  // matched with up to two spaces allowed between its letters.
+  const spaced = (part: string) => [...part].map(escapeRe).join('\\s{0,2}')
+  const given = spaced(parts[0])
+  const rest = parts.slice(1).map(spaced)
   // What may sit between two parts of a name as it's written on a page:
   // nothing at all, a space, a comma, a full stop, a hyphen.
   const GAP = "[\\s.,'\\-]*"
@@ -142,24 +217,47 @@ function join(items: TextItem[]): { text: string; spans: Span[] } {
   return { text, spans }
 }
 
+type Window = { text: string; spans: Span[]; ranges: [number, number][]; single: boolean }
+
 /**
- * Every stretch of the page the patterns should be run over: each line, and
- * each line with the one after it.
+ * Every stretch of the page to look for contact details in, with what was
+ * found in each: each line, and each line with the one after it.
  *
- * The pairs matter. A narrow column wraps an address across a line break, so
- * "Daniellashnider@y" sits on one line and "ahoo.com" on the next, and neither
- * half matches anything on its own — the first has no dot after the @, the
- * second has no @ at all. Scanning a line at a time, as the boxes used to,
- * covered neither, and the address was served in full.
+ * The pairs are there for one thing. A narrow column wraps an address across
+ * a line break, so "Daniellashnider@y" sits on one line and "ahoo.com" on the
+ * next, and neither half is an address on its own.
  *
- * Boxes and the safety net below both read these, so anything the net can see
- * is something the boxes have already had a chance to cover.
+ * They are joined without a space, because a space would split the address.
+ * That also glued an address at the end of one line straight onto the first
+ * word of the next — "oroli.samuill@gmail.comHighly" — and the address pattern
+ * swallowed the word, so the whole first line of a summary went under a box.
+ * So a pair now contributes only what single lines can't see: an email that
+ * actually crosses the break and that isn't simply an address already
+ * complete on one line with a word stuck to it. Phone numbers are not looked
+ * for across lines at all; a number split over two lines is rare, and a date
+ * range at the end of one line beside the dates on the next is not.
+ *
+ * Boxes and the safety net both read these, so anything the net can see is
+ * something the boxes have already had a chance to cover.
  */
-function scanWindows(items: TextItem[]): { text: string; spans: Span[] }[] {
+function scanWindows(items: TextItem[]): Window[] {
   const lines = groupIntoLines(items)
-  const windows = lines.map(line => join(line))
+  const windows: Window[] = lines.map(line => {
+    const { text, spans } = join(line)
+    return { text, spans, ranges: contactRanges(text), single: true }
+  })
   for (let i = 0; i + 1 < lines.length; i++) {
-    windows.push(join([...lines[i], ...lines[i + 1]]))
+    const a = join(lines[i]).text
+    const { text, spans } = join([...lines[i], ...lines[i + 1]])
+    const breakAt = a.length
+    const whole = [
+      ...emailRanges(a),
+      ...emailRanges(text.slice(breakAt)).map(([s0, e0]) => [s0 + breakAt, e0 + breakAt] as [number, number]),
+    ]
+    const ranges = emailRanges(text).filter(([s0, e0]) =>
+      s0 < breakAt && e0 > breakAt
+      && !whole.some(([ws, we]) => ws >= s0 && we <= e0))
+    windows.push({ text, spans, ranges, single: false })
   }
   return windows
 }
@@ -216,17 +314,19 @@ function partOfItem(span: Span, start: number, end: number): Rect {
 export function findRedactionBoxes(items: TextItem[], fullName?: string | null): Rect[] {
   const boxes: Rect[] = []
 
-  for (const { text, spans } of scanWindows(items)) {
+  for (const { text, spans, ranges, single } of scanWindows(items)) {
     const lineBoxes: Rect[] = []
 
     // Contact details take the whole item they touch; a name takes only its
     // own characters. See partOfItem.
-    for (const [start, end] of contactRanges(text)) {
+    for (const [start, end] of ranges) {
       for (const span of spans) {
         if (span.end > start && span.start < end) lineBoxes.push({ ...span.item.rect })
       }
     }
-    for (const [start, end] of nameRanges(text, fullName)) {
+    // A name is looked for one line at a time: the surname on its own is
+    // matched wherever it appears, so a pair would only add ways to be wrong.
+    for (const [start, end] of single ? nameRanges(text, fullName) : []) {
       for (const span of spans) {
         if (span.end > start && span.start < end) lineBoxes.push(partOfItem(span, start, end))
       }
@@ -286,8 +386,8 @@ export function unredactedContacts(items: TextItem[], boxes: Rect[]): string[] {
   // The same stretches the boxes were drawn from, so the two can't disagree
   // about what is on the page. Overlapping windows scan most lines twice; the
   // set dedupes.
-  for (const { text, spans } of scanWindows(items)) {
-    for (const [start, end] of contactRanges(text)) {
+  for (const { spans, ranges } of scanWindows(items)) {
+    for (const [start, end] of ranges) {
       const touching = spans.filter(s => s.end > start && s.start < end)
       const uncovered = touching.filter(s => !covered(s.item.rect, boxes))
       if (uncovered.length === 0) continue
