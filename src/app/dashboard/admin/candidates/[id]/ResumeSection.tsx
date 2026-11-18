@@ -89,6 +89,12 @@ export default function ResumeSection({
               className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4 font-medium">
               View resume →
             </a>
+            {/* Admins get photographed resumes as uploaded; this is the
+                redacted copy employers are handed, or the refusal they see. */}
+            <a href={`${resumeHref(candidateId, candidateName)}?as=employer`} target="_blank" rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
+              As employers see it
+            </a>
             {confirmRemove ? (
               <span className="flex items-center gap-2">
                 <Button variant="destructive" size="sm" onClick={handleRemove} disabled={busy !== null}>
