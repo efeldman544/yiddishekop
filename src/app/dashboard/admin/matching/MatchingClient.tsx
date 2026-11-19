@@ -47,6 +47,41 @@ type AiResult = {
 
 type Badge = { label: string; style: string }
 
+// The last ranking seen for each job, kept in this browser so opening a job
+// shows it at once. The scores themselves are stored on the server and only
+// re-made when the job or a candidate changes; what used to make every visit
+// slow was the page hiding the list until the server had confirmed that
+// nothing had. Now the saved ranking is shown straight away and that check
+// happens quietly behind it, changing the list only if something did change.
+const SCORE_CACHE_PREFIX = 'match-scores:v1:'
+const SCORE_CACHE_MAX_JOBS = 20
+type CachedRanking = { scores: Record<string, AiResult>; order: string[]; savedAt: number }
+
+function readRanking(jobId: string): CachedRanking | null {
+  try {
+    const raw = localStorage.getItem(SCORE_CACHE_PREFIX + jobId)
+    return raw ? (JSON.parse(raw) as CachedRanking) : null
+  } catch {
+    return null
+  }
+}
+
+function writeRanking(jobId: string, scores: Record<string, AiResult>, order: string[]) {
+  try {
+    localStorage.setItem(SCORE_CACHE_PREFIX + jobId, JSON.stringify({ scores, order, savedAt: Date.now() }))
+    // Keep only the most recently viewed jobs.
+    const saved: { key: string; at: number }[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(SCORE_CACHE_PREFIX)) continue
+      try { saved.push({ key, at: (JSON.parse(localStorage.getItem(key) ?? '{}') as CachedRanking).savedAt ?? 0 }) } catch { saved.push({ key, at: 0 }) }
+    }
+    saved.sort((a, b) => b.at - a.at).slice(SCORE_CACHE_MAX_JOBS).forEach(x => localStorage.removeItem(x.key))
+  } catch {
+    // Full or blocked: the page still works, it just checks before showing.
+  }
+}
+
 const JOB_STATUS_BADGE: Record<string, string> = {
   'New':     'bg-amber-50 text-amber-700 border border-amber-200',
   'Open':    'bg-emerald-50 text-emerald-700 border border-emerald-200',
@@ -138,6 +173,8 @@ export default function MatchingClient({
   const [aiScoresByJob, setAiScoresByJob] = useState<Record<string, Record<string, AiResult>>>({})
   // Which job is being scored, and how far along it is.
   const [scoring, setScoring] = useState<{ jobId: string; done: number; total: number } | null>(null)
+  // A job whose saved ranking is on screen while the server confirms it.
+  const [checking, setChecking] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set())
   const [batch, setBatch] = useState<{ done: number; total: number } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -185,9 +222,21 @@ export default function MatchingClient({
    * step backwards.
    */
   async function loadAndScore(jobId: string, opts: { rescore?: boolean } = {}) {
-    if (scoring) return
+    if (scoring || checking) return
     setAiError(null)
-    setScoring({ jobId, done: 0, total: 0 })
+
+    // Show the last ranking for this job at once, if there is one, and check
+    // it in the background. Only a re-score, or a job never seen in this
+    // browser, waits on the server before showing anything.
+    const saved = opts.rescore ? null : readRanking(jobId)
+    const background = !!saved && Object.keys(saved.scores).length > 0
+    if (background) {
+      setAiScoresByJob(prev => ({ ...prev, [jobId]: saved!.scores }))
+      setFrozenOrder(prev => ({ ...prev, [jobId]: saved!.order }))
+      setChecking(jobId)
+    } else {
+      setScoring({ jobId, done: 0, total: 0 })
+    }
 
     let scores: Record<string, AiResult> = {}
     try {
@@ -203,6 +252,7 @@ export default function MatchingClient({
       setAiScoresByJob(prev => ({ ...prev, [jobId]: scores }))
 
       const todo = candidates.filter(c => !scores[c.id]).map(c => ({ id: c.id, source: c.source }))
+      setChecking(null)
       if (todo.length > 0) {
         setScoring({ jobId, done: 0, total: todo.length })
         const chunks: typeof todo[] = []
@@ -242,17 +292,28 @@ export default function MatchingClient({
       // button in the header is the retry.
       setAiError(humanError(e, 'Couldn’t load the scores for this job.'))
     } finally {
-      freezeOrder(jobId, scores)
+      setChecking(null)
+      // A failed check leaves the saved ranking on screen rather than wiping it.
+      if (!(background && Object.keys(scores).length === 0)) freezeOrder(jobId, scores)
       setScoring(null)
     }
   }
 
+  // Whatever ranking is on screen is what the next visit shows first —
+  // including full write-ups added one at a time with Analyze.
+  useEffect(() => {
+    if (!selectedJobId || scoring || checking) return
+    const scores = aiScoresByJob[selectedJobId]
+    if (!scores || Object.keys(scores).length === 0) return
+    writeRanking(selectedJobId, scores, frozenOrder[selectedJobId] ?? [])
+  }, [selectedJobId, aiScoresByJob, frozenOrder, scoring, checking])
+
   // On job select: bring its scores up to date, once per visit.
   useEffect(() => {
-    if (!selectedJobId || loadedJobs.current.has(selectedJobId) || scoring) return
+    if (!selectedJobId || loadedJobs.current.has(selectedJobId) || scoring || checking) return
     loadedJobs.current.add(selectedJobId)
     loadAndScore(selectedJobId)
-  }, [selectedJobId, scoring]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedJobId, scoring, checking]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cards were rebuilt, so scores made from the old ones are out of date for
   // every job, not only the one on screen.
@@ -448,7 +509,7 @@ export default function MatchingClient({
                       {batch ? `Analyzing ${batch.done} of ${batch.total}…` : `Analyze top ${TOP_N}`}
                     </Button>
                   )}
-                  <Button size="sm" disabled={aiRunning || batch !== null}
+                  <Button size="sm" disabled={aiRunning || checking !== null || batch !== null}
                     onClick={() => selectedJobId && loadAndScore(selectedJobId, { rescore: unscoredCount === 0 })}>
                     {aiRunning ? 'Scoring…' : unscoredCount > 0 ? `Score remaining (${unscoredCount})` : 'Re-score'}
                   </Button>
@@ -475,6 +536,7 @@ export default function MatchingClient({
                 {sortedCandidates.length} active candidate{sortedCandidates.length !== 1 ? 's' : ''}
                 {scoring && scoring.total > 0
                   ? ` · scoring ${scoring.done} of ${scoring.total}`
+                  : checking === selectedJobId ? ' · checking for changes…'
                   : unscoredCount > 0 && hasAiForJob ? ` · ${unscoredCount} not scored yet` : hasAiForJob ? ' · AI scored' : ''}
               </p>
               <div className="flex items-center gap-1">
@@ -501,7 +563,11 @@ export default function MatchingClient({
                         ? `Ranking candidates… ${scoring.done} of ${scoring.total}`
                         : 'Checking which scores are up to date…'}
                     </p>
-                    <p className="text-xs text-gray-400">Usually takes under a minute for large pools.</p>
+                    <p className="text-xs text-gray-400">
+                      {scoring && scoring.total > 0
+                        ? 'Only new or changed candidates are scored; the rest come from the last run.'
+                        : 'A few seconds. After this, the ranking shows instantly on later visits.'}
+                    </p>
                   </div>
                 )
               }
