@@ -18,6 +18,11 @@ export const DEEP_MODEL = 'claude-sonnet-5-5'
  * every later match is made from — so these go to the stronger one.
  */
 export const IMAGE_MODEL = 'claude-sonnet-5-5'
+/**
+ * The admin's assistant: answers questions about candidates by looking them up.
+ * The strongest model, because a wrong answer here is taken as fact.
+ */
+export const ASSISTANT_MODEL = 'claude-opus-5-5'
 
 /** US dollars per million tokens: [input, output]. */
 const PRICES: Record<string, [number, number]> = {
@@ -25,6 +30,22 @@ const PRICES: Record<string, [number, number]> = {
   // sends. Longer prompts are billed on a higher card.
   'claude-haiku-5-5': [0.1, 0.5],
   'claude-sonnet-5-5': [2, 10],
+  'claude-opus-5-5': [4, 20],
+}
+
+/** Cached-prompt prices, dollars per million tokens: [cache write, cache read]. */
+const CACHE_PRICES: Record<string, [number, number]> = {
+  'claude-opus-5-5': [5, 0.2],
+}
+
+/** What a call cost including prompt caching, in dollars. */
+export function costWithCacheUsd(model: string, usage: {
+  input_tokens: number; output_tokens: number
+  cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null
+}): number {
+  const [write, read] = CACHE_PRICES[model] ?? [0, 0]
+  return costUsd(model, usage.input_tokens, usage.output_tokens)
+    + ((usage.cache_creation_input_tokens ?? 0) * write + (usage.cache_read_input_tokens ?? 0) * read) / 1_000_000
 }
 
 /** What a call cost, in dollars. Unknown models count as zero rather than a guess. */
