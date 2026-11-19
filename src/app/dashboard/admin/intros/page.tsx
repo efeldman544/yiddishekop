@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { notifyAssigned } from '@/lib/notifyAssigned'
 import { introStatusForAdmin } from '@/lib/candidateStatus'
 import ErrorNote from '@/components/ErrorNote'
+import { useUndoableRemove } from '@/components/Toaster'
 
 type Request = {
   id: string
@@ -30,7 +31,10 @@ type MeetingRequest = {
 }
 
 export default function IntroRequestsPage() {
-  const [requests, setRequests] = useState<Request[]>([])
+  const [allRequests, setRequests] = useState<Request[]>([])
+  const { hidden, remove: removeWithUndo } = useUndoableRemove()
+  // Ones deleted on screen but still inside their Undo window are left out.
+  const requests = allRequests.filter(r => !hidden.has(r.id))
   const [employers, setEmployers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -151,17 +155,18 @@ export default function IntroRequestsPage() {
     setBusy(null)
   }
 
-  async function remove(id: string) {
-    if (!confirm('Delete this introduction request? This cannot be undone.')) return
-    setBusy(id)
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('introduction_requests').delete().eq('id', id)
-    // Only drop it from the list once the database agrees it's gone —
-    // removing it optimistically would hide a failure.
-    if (err) noteError(id, `Couldn't delete: ${err.message}`)
-    else setRequests(prev => prev.filter(r => r.id !== id))
-    setBusy(null)
+  // Gone from the list at once, deleted after the Undo window; put back with a
+  // message if the database refuses.
+  function remove(id: string) {
+    removeWithUndo(id, {
+      message: 'Request deleted',
+      failure: 'Couldn’t delete that request, so it has been put back.',
+      commit: async () => {
+        const { error: err } = await createClient().from('introduction_requests').delete().eq('id', id)
+        if (err) throw new Error(err.message)
+      },
+      onRemoved: () => setRequests(prev => prev.filter(r => r.id !== id)),
+    })
   }
 
   // The whole point of the queue is to put this candidate in front of this

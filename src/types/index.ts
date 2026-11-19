@@ -34,5 +34,7 @@ export interface CandidateProfile {
   screening_booked_at: string | null
   status: CandidateStatus
   admin_tags: string[]
+  interviewed?: boolean | null
+  interviewed_at?: string | null
   updated_at: string
 }

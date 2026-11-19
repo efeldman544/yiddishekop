@@ -11,6 +11,7 @@ import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
 import { refreshCandidateCard } from '@/lib/refreshCard'
 import { hasInAppHistory } from '@/lib/navHistory'
+import { useToast } from '@/components/Toaster'
 
 export type EditableCandidate = {
   id: string
@@ -54,6 +55,7 @@ function toForm(c: EditableCandidate): FormState {
 
 export default function EditCandidatePanel({ candidate }: { candidate: EditableCandidate }) {
   const router = useRouter()
+  const toast = useToast()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(() => toForm(candidate))
   const [saving, setSaving] = useState(false)
@@ -91,6 +93,7 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
         return
       }
       setOpen(false)
+      toast.show('Profile saved')
       refreshCandidateCard(candidate.id)
       router.refresh()
     } catch {
@@ -124,7 +127,8 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
       <Button variant="outline" size="sm" onClick={openPanel}>Edit profile</Button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex">
+        // data-modal: keeps the page's ← → shortcuts from firing behind it.
+        <div className="fixed inset-0 z-50 flex" data-modal>
           <div className="flex-1 bg-black/30" onClick={() => !deleting && setOpen(false)} />
           <div className="w-full max-w-lg bg-background shadow-2xl flex flex-col overflow-hidden border-l border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
