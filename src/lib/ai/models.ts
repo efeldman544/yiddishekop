@@ -96,6 +96,12 @@ export function readJson<T>(message: Anthropic.Message): T {
   }
 }
 
+/** The message inside an API error's body, falling back to the SDK's summary. */
+function apiMessage(err: InstanceType<typeof Anthropic.APIError>): string {
+  const body = err.error as { error?: { message?: unknown } } | undefined
+  return typeof body?.error?.message === 'string' ? body.error.message : err.message
+}
+
 /** A sentence for whatever the SDK threw, most specific first. */
 export function describeAiFailure(err: unknown): string {
   if (err instanceof AiError) return err.message
@@ -103,7 +109,8 @@ export function describeAiFailure(err: unknown): string {
   if (err instanceof Anthropic.PermissionDeniedError) return 'This Anthropic account does not have access to the model.'
   if (err instanceof Anthropic.NotFoundError) return 'The AI model was not found for this Anthropic account.'
   if (err instanceof Anthropic.RateLimitError) return 'The AI is rate limited right now. Wait a minute and try again.'
-  if (err instanceof Anthropic.BadRequestError) return `The AI rejected the request: ${err.message}`
+  // The API's own sentence, not the status line and JSON around it.
+  if (err instanceof Anthropic.BadRequestError) return `The AI rejected the request: ${apiMessage(err)}`
   if (err instanceof Anthropic.APIConnectionError) return 'Could not reach the AI service.'
   if (err instanceof Anthropic.APIError) return `The AI service returned an error (${err.status}).`
   return err instanceof Error ? err.message : 'Something went wrong calling the AI.'

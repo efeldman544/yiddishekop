@@ -33,10 +33,12 @@ export const TOOLS: Tool[] = [
       additionalProperties: false,
       required: ['keyword', 'industry', 'employment_type', 'status', 'kind', 'limit'],
       properties: {
-        keyword: { type: ['string', 'null'], description: 'Text to look for, or null to list by filters only.' },
-        industry: { type: ['string', 'null'], description: 'An industry such as "Accounting & Finance", or null.' },
-        employment_type: { type: ['string', 'null'], enum: ['Full Time', 'Part Time', null], description: 'Or null.' },
-        status: { type: ['string', 'null'], enum: ['pending', 'active', 'inactive', 'placed', null], description: 'Profile status, or null for any.' },
+        // Plain strings with an explicit "none" value rather than nullable
+        // types: strict tool schemas don't take a list of types.
+        keyword: { type: 'string', description: 'Text to look for, or "" to list by the filters only.' },
+        industry: { type: 'string', description: 'An industry such as "Accounting & Finance", or "" for any.' },
+        employment_type: { type: 'string', enum: ['any', 'Full Time', 'Part Time'] },
+        status: { type: 'string', enum: ['any', 'pending', 'active', 'inactive', 'placed'], description: 'Profile status.' },
         kind: { type: 'string', enum: ['any', 'profile', 'video'], description: '"video" means people known only from a video interview.' },
         limit: { type: 'integer', description: `How many to return, 1-${MAX_RESULTS}.` },
       },
@@ -93,7 +95,7 @@ export const TOOLS: Tool[] = [
       additionalProperties: false,
       required: ['status'],
       properties: {
-        status: { type: ['string', 'null'], enum: ['New', 'Open', 'On Hold', 'Filled', 'Closed', null], description: 'Or null for all.' },
+        status: { type: 'string', enum: ['any', 'New', 'Open', 'On Hold', 'Filled', 'Closed'] },
       },
     },
   },
@@ -115,7 +117,8 @@ export const TOOLS: Tool[] = [
 const ok = (id: string, content: string | ToolResult['content']): ToolResult => ({ type: 'tool_result', tool_use_id: id, content })
 const fail = (id: string, message: string): ToolResult => ({ type: 'tool_result', tool_use_id: id, content: message, is_error: true })
 
-const str = (v: unknown) => (typeof v === 'string' ? v : null)
+// A string argument, with "" and "any" meaning "not given".
+const str = (v: unknown) => (typeof v === 'string' && v.trim() && v !== 'any' ? v.trim() : null)
 const cut = (text: string) => (text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n\n[Cut here: the rest (${text.length - MAX_TEXT} characters) was left out.]` : text)
 // % and _ are wildcards in a LIKE pattern; a keyword means them literally.
 const like = (keyword: string) => `%${keyword.replace(/[\\%_]/g, m => `\\${m}`)}%`
