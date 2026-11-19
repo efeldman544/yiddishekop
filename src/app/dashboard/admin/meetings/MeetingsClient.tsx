@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import ErrorNote from '@/components/ErrorNote'
 import BookingToggle from './BookingToggle'
 import { replaceQuery } from '@/lib/useQueryParams'
+import { useUndoableRemove } from '@/components/Toaster'
 
 type PendingRequest = {
   assignmentId: string
@@ -46,8 +47,12 @@ type ScheduleForm = {
 
 export default function MeetingsClient({ initialTab = 'screening' }: { initialTab?: 'screening' | 'employer' }) {
   const [pending, setPending] = useState<PendingRequest[]>([])
-  const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
-  const [screenings, setScreenings] = useState<ScreeningCall[]>([])
+  const [allScheduled, setScheduled] = useState<ScheduledMeeting[]>([])
+  const [allScreenings, setScreenings] = useState<ScreeningCall[]>([])
+  const { hidden, remove: removeWithUndo } = useUndoableRemove()
+  // Deleted ones stay off screen during their Undo window.
+  const scheduled = allScheduled.filter(m => !hidden.has(m.id))
+  const screenings = allScreenings.filter(s => !hidden.has(s.id))
   const [tab, setTabState] = useState<'screening' | 'employer'>(initialTab)
   // Kept in the address so Back from a candidate returns to the same tab.
   function setTab(next: 'screening' | 'employer') {
@@ -59,7 +64,6 @@ export default function MeetingsClient({ initialTab = 'screening' }: { initialTa
   const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -211,22 +215,28 @@ export default function MeetingsClient({ initialTab = 'screening' }: { initialTa
     setSaving(false)
   }
 
-  async function handleDeleteMeeting(id: string) {
-    if (!confirm('Delete this scheduled meeting?')) return
-    setDeleting(id)
-    const supabase = createClient()
-    await supabase.from('meeting_requests').delete().eq('id', id)
-    setScheduled(prev => prev.filter(m => m.id !== id))
-    setDeleting(null)
+  function handleDeleteMeeting(id: string) {
+    removeWithUndo(id, {
+      message: 'Meeting deleted',
+      failure: 'Couldn’t delete that meeting, so it has been put back.',
+      commit: async () => {
+        const { error: err } = await createClient().from('meeting_requests').delete().eq('id', id)
+        if (err) throw new Error(err.message)
+      },
+      onRemoved: () => setScheduled(prev => prev.filter(m => m.id !== id)),
+    })
   }
 
-  async function handleDeleteScreening(id: string) {
-    if (!confirm('Delete this screening call booking?')) return
-    setDeleting(id)
-    const supabase = createClient()
-    await supabase.from('screening_bookings').delete().eq('id', id)
-    setScreenings(prev => prev.filter(s => s.id !== id))
-    setDeleting(null)
+  function handleDeleteScreening(id: string) {
+    removeWithUndo(id, {
+      message: 'Screening call deleted',
+      failure: 'Couldn’t delete that booking, so it has been put back.',
+      commit: async () => {
+        const { error: err } = await createClient().from('screening_bookings').delete().eq('id', id)
+        if (err) throw new Error(err.message)
+      },
+      onRemoved: () => setScreenings(prev => prev.filter(s => s.id !== id)),
+    })
   }
 
   if (loading) return <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
@@ -287,9 +297,9 @@ export default function MeetingsClient({ initialTab = 'screening' }: { initialTa
                     ) : (
                       <span className="text-xs text-gray-400">No link yet</span>
                     )}
-                    <button onClick={() => handleDeleteScreening(s.id)} disabled={deleting === s.id}
+                    <button onClick={() => handleDeleteScreening(s.id)}
                       className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
-                      {deleting === s.id ? '…' : 'Delete'}
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -417,9 +427,9 @@ export default function MeetingsClient({ initialTab = 'screening' }: { initialTa
                       Join link
                     </a>
                   )}
-                  <button onClick={() => handleDeleteMeeting(m.id)} disabled={deleting === m.id}
+                  <button onClick={() => handleDeleteMeeting(m.id)}
                     className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50">
-                    {deleting === m.id ? '…' : 'Delete'}
+                    Delete
                   </button>
                 </div>
               </div>

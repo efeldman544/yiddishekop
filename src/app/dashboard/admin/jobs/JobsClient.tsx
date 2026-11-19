@@ -13,6 +13,7 @@ import { employerLabel, type EmployerOption } from './employerLabel'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
 import { replaceQuery } from '@/lib/useQueryParams'
+import { useToast, useUndoableRemove } from '@/components/Toaster'
 
 export type { EmployerOption }
 
@@ -71,7 +72,11 @@ export default function JobsClient({
   /** An employer whose candidates start open, picked out in the list. */
   initialEmployerId?: string | null
 }) {
-  const [jobs, setJobs] = useState<Job[]>(initialJobs)
+  const [allJobs, setJobs] = useState<Job[]>(initialJobs)
+  const toast = useToast()
+  const { hidden, remove: removeWithUndo } = useUndoableRemove()
+  // A deleted job stays off the list during its Undo window.
+  const jobs = allJobs.filter(j => !hidden.has(j.id))
   const [employers, setEmployers] = useState<EmployerOption[]>(initialEmployers)
   const [panelOpen, setPanelOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -270,19 +275,28 @@ export default function JobsClient({
       const { data, error: err } = await supabase.from('job_requirements').update(payload).eq('id', editingId).select('*').single()
       if (err) { setError(err.message); setSaving(false); return }
       setJobs(prev => prev.map(j => j.id === editingId ? data as Job : j))
+      toast.show('Job saved')
     } else {
       const { data, error: err } = await supabase.from('job_requirements').insert(payload).select('*').single()
       if (err) { setError(err.message); setSaving(false); return }
       setJobs(prev => [data as Job, ...prev])
+      toast.show('Job added')
     }
     setSaving(false); closePanel()
   }
 
-  async function handleDelete() {
-    if (!editingId || !confirm('Delete this job?')) return
-    const supabase = createClient()
-    await supabase.from('job_requirements').delete().eq('id', editingId)
-    setJobs(prev => prev.filter(j => j.id !== editingId))
+  function handleDelete() {
+    if (!editingId) return
+    const id = editingId
+    removeWithUndo(id, {
+      message: 'Job deleted',
+      failure: 'Couldn’t delete that job, so it has been put back.',
+      commit: async () => {
+        const { error: err } = await createClient().from('job_requirements').delete().eq('id', id)
+        if (err) throw new Error(err.message)
+      },
+      onRemoved: () => setJobs(prev => prev.filter(j => j.id !== id)),
+    })
     closePanel()
   }
 

@@ -13,6 +13,7 @@ import { isProfileFilledIn } from '@/lib/profileFilledIn'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
 import { useQueryParams } from '@/lib/useQueryParams'
+import { LAST_OPENED_KEY, saveSequence } from '@/lib/candidateSequence'
 import { CandidateListSkeleton, CandidateRowsSkeleton } from '@/components/PageSkeleton'
 
 type Candidate = {
@@ -168,9 +169,6 @@ const listCache = new Map<string, Snapshot>()
 let jobsCache: JobOption[] | null = null
 let aliasCache: Record<string, string[]> | null = null
 
-// The candidate last opened from this list, picked out briefly on the way back
-// so it's obvious where you were.
-const LAST_OPENED_KEY = 'admin:last-candidate'
 
 // useSearchParams needs a Suspense boundary above it, or the build refuses to
 // prerender the page.
@@ -414,8 +412,18 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (!lastOpened) return
-    const t = setTimeout(() => setLastOpened(null), 2500)
-    return () => clearTimeout(t)
+    // Previous / Next on the candidate page can leave you somewhere else in
+    // the list than where you opened it; bring that one into view, once the
+    // scroll memory has put the list back.
+    const show = setTimeout(() => {
+      const row = document.getElementById(`candidate-${lastOpened}`)
+      const box = document.getElementById('admin-scroll')
+      if (!row || !box) return
+      const r = row.getBoundingClientRect(), b = box.getBoundingClientRect()
+      if (r.top < b.top || r.bottom > b.bottom) row.scrollIntoView({ block: 'center' })
+    }, 150)
+    const fade = setTimeout(() => setLastOpened(null), 2500)
+    return () => { clearTimeout(show); clearTimeout(fade) }
   }, [lastOpened])
 
   // Keep assignment actions in sync with DB changes made by employers
@@ -604,12 +612,12 @@ function AdminDashboard() {
               const isExpanded = expandedAssign === c.id
 
               return (
-                <div key={c.id} className={`w-full bg-white rounded-xl border shadow-sm overflow-hidden transition-[box-shadow,border-color] duration-700 ${
+                <div key={c.id} id={`candidate-${c.id}`} className={`w-full bg-white rounded-xl border shadow-sm overflow-hidden transition-[box-shadow,border-color] duration-700 ${
                   lastOpened === c.id ? 'border-indigo-300 ring-2 ring-indigo-200' : 'border-gray-100'
                 }`}>
                   {/* Candidate info — links to detail */}
                   <Link href={`/dashboard/admin/candidates/${c.id}`}
-                    onClick={() => { try { sessionStorage.setItem(LAST_OPENED_KEY, c.id) } catch {} }}
+                    onClick={() => saveSequence(candidates.map(x => x.id), c.id)}
                     className="block px-5 py-4 group hover:bg-gray-50/60 transition-colors">
                     <div className="flex items-center justify-between gap-4">
                       <div className="shrink-0 w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-sm select-none">

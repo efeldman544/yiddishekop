@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoSection, { type Video } from './VideoSection'
 import AdminControls, { type Employer } from './AdminControls'
-import BackButton from '@/components/BackButton'
+import CandidateTopBar from './CandidateTopBar'
 import EditCandidatePanel from './EditCandidatePanel'
 import ResumeSection from './ResumeSection'
 
@@ -39,31 +39,22 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
   const initialEmployerActions = Object.fromEntries(asgn.map(a => [a.employer_id, a.action]))
 
   return (
-    <main className="px-8 py-8 space-y-6">
+    // No top padding: the bar sits flush with the top so it can stay pinned there.
+    <main className="px-8 pb-8 space-y-6">
 
-      <BackButton fallback="/dashboard/admin" label="Back to candidates" />
-
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <h2 className="page-title">{cp.full_name ?? 'Unnamed'}</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {[cp.current_job_title, cp.location].filter(Boolean).join(' · ')}
-              </p>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {cp.fields_worked_in?.map(f => (
-                  <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <Badge variant="outline" className="capitalize">{cp.status ?? 'active'}</Badge>
-              <EditCandidatePanel candidate={cp} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Keyed so an approval or edit that refreshes the page resets it to
+          what was saved. */}
+      <CandidateTopBar
+        key={`${cp.status}-${cp.interviewed}`}
+        candidateId={id}
+        name={cp.full_name}
+        subtitle={[cp.current_job_title, cp.location].filter(Boolean).join(' · ')}
+        status={cp.status ?? 'active'}
+        interviewed={!!cp.interviewed}
+        hasResume={!!cp.resume_url}
+      >
+        <EditCandidatePanel candidate={cp} />
+      </CandidateTopBar>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
@@ -84,6 +75,11 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
             <CardHeader><CardTitle className="text-sm">Background</CardTitle></CardHeader>
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <Field label="Industries" value={cp.fields_worked_in?.length ? (
+                  <span className="flex flex-wrap gap-1">
+                    {cp.fields_worked_in.map(f => <Badge key={f} variant="secondary" className="text-xs">{f}</Badge>)}
+                  </span>
+                ) : null} />
                 <Field label="Education" value={cp.education_level} />
                 <Field label="Experience" value={cp.years_experience} />
                 <Field label="Languages" value={cp.languages} />
@@ -122,6 +118,7 @@ export default async function CandidateDetailPage({ params }: { params: Promise<
         </div>
 
         <AdminControls
+          key={cp.status ?? ''}
           candidateId={id}
           initialStatus={cp.status ?? 'active'}
           initialTags={cp.admin_tags ?? []}

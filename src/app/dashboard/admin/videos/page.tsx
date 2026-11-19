@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TranscriptsStatus from './TranscriptsStatus'
+import { useToast, useUndoableRemove } from '@/components/Toaster'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -251,13 +252,17 @@ type NameSuggestion = { match: CandidateOption; confidence: 'high' | 'medium' | 
 export default function VideosPage() {
   const [unassigned, setUnassigned] = useState<UnassignedVideo[]>([])
   const [videoCandidates, setVideoCandidates] = useState<VideoCandidate[]>([])
+  const toast = useToast()
+  const { hidden, remove: removeWithUndo } = useUndoableRemove()
+  // What's on screen: anything deleted but still inside its Undo window is left out.
+  const shownUnassigned = unassigned.filter(v => !hidden.has(v.id))
+  const shownVideoCandidates = videoCandidates.filter(v => !hidden.has(v.id))
   const [candidateOptions, setCandidateOptions] = useState<CandidateOption[]>([])
   const [loading, setLoading] = useState(true)
 
   // per-row assignment selection
   const [assignSelect, setAssignSelect] = useState<Record<string, string>>({})
   const [assigning, setAssigning] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState<string | null>(null)
 
   // create-card form for unassigned videos
@@ -454,26 +459,42 @@ export default function VideosPage() {
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────
-  async function handleDelete(id: string, table: 'videos' | 'video_candidates') {
-    if (!confirm('Delete this video and its transcript? This cannot be undone.')) return
-    setDeleting(id)
-    await fetch('/api/admin/delete-video', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, table }),
+  function handleDelete(id: string, table: 'videos' | 'video_candidates') {
+    removeWithUndo(id, {
+      message: 'Video deleted',
+      failure: 'Couldn’t delete that video, so it has been put back.',
+      commit: async () => {
+        const res = await fetch('/api/admin/delete-video', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, table }),
+        })
+        if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      },
+      onRemoved: () => {
+        if (table === 'videos') setUnassigned(prev => prev.filter(v => v.id !== id))
+        else setVideoCandidates(prev => prev.filter(v => v.id !== id))
+      },
     })
-    if (table === 'videos') setUnassigned(prev => prev.filter(v => v.id !== id))
-    else setVideoCandidates(prev => prev.filter(v => v.id !== id))
-    setDeleting(null)
   }
 
   // ── Delete transcript only ───────────────────────────────────────────────
-  async function handleDeleteTranscript(id: string, table: 'videos' | 'video_candidates') {
-    if (!confirm('Remove transcript from this entry?')) return
-    const supabase = createClient()
-    await supabase.from(table).update({ transcript: null }).eq('id', id)
-    if (table === 'videos') setUnassigned(prev => prev.map(v => v.id === id ? { ...v, transcript: null } : v))
-    else setVideoCandidates(prev => prev.map(v => v.id === id ? { ...v, transcript: null } : v))
+  function handleDeleteTranscript(id: string, table: 'videos' | 'video_candidates') {
+    const previous = (table === 'videos' ? unassigned : videoCandidates).find(v => v.id === id)?.transcript ?? null
+    const setTranscript = (transcript: string | null) => {
+      if (table === 'videos') setUnassigned(prev => prev.map(v => v.id === id ? { ...v, transcript } : v))
+      else setVideoCandidates(prev => prev.map(v => v.id === id ? { ...v, transcript } : v))
+    }
+    setTranscript(null)
+    toast.undoable({
+      message: 'Transcript removed',
+      failure: 'Couldn’t remove that transcript, so it has been put back.',
+      commit: async () => {
+        const { error } = await createClient().from(table).update({ transcript: null }).eq('id', id)
+        if (error) throw new Error(error.message)
+      },
+      restore: () => setTranscript(previous),
+    })
   }
 
   // ── Bulk upload ──────────────────────────────────────────────────────────
@@ -758,11 +779,11 @@ export default function VideosPage() {
       {/* Unassigned recordings */}
       <section className="space-y-3">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-          Unassigned recordings ({unassigned.length})
+          Unassigned recordings ({shownUnassigned.length})
         </h3>
-        {unassigned.length === 0 ? (
+        {shownUnassigned.length === 0 ? (
           <p className="text-sm text-gray-400">None.</p>
-        ) : unassigned.map(v => (
+        ) : shownUnassigned.map(v => (
           <div key={v.id} className="bg-white border border-gray-100 rounded-xl px-5 py-4 space-y-3 shadow-sm">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="space-y-0.5">
@@ -771,9 +792,9 @@ export default function VideosPage() {
                 </p>
                 {v.zoom_meeting_id && <p className="text-xs text-gray-400">Zoom ID: {v.zoom_meeting_id}</p>}
               </div>
-              <button onClick={() => handleDelete(v.id, 'videos')} disabled={deleting === v.id}
+              <button onClick={() => handleDelete(v.id, 'videos')}
                 className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50 shrink-0">
-                {deleting === v.id ? 'Deleting…' : 'Delete'}
+                Delete
               </button>
             </div>
 
@@ -835,7 +856,7 @@ export default function VideosPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-            Video-only candidates ({videoCandidates.length})
+            Video-only candidates ({shownVideoCandidates.length})
           </h3>
           {videoCandidates.length > 0 && (
             <div className="flex items-center gap-3">
@@ -846,9 +867,9 @@ export default function VideosPage() {
             </div>
           )}
         </div>
-        {videoCandidates.length === 0 ? (
+        {shownVideoCandidates.length === 0 ? (
           <p className="text-sm text-gray-400">None.</p>
-        ) : videoCandidates.map(vc => (
+        ) : shownVideoCandidates.map(vc => (
           <div key={vc.id} className="bg-white border border-gray-100 rounded-xl px-5 py-4 space-y-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -885,9 +906,9 @@ export default function VideosPage() {
                   View full profile →
                 </Link>
               </div>
-              <button onClick={() => handleDelete(vc.id, 'video_candidates')} disabled={deleting === vc.id}
+              <button onClick={() => handleDelete(vc.id, 'video_candidates')}
                 className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50 shrink-0">
-                {deleting === vc.id ? 'Deleting…' : 'Delete'}
+                Delete
               </button>
             </div>
 

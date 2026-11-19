@@ -10,10 +10,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { INDUSTRIES as ALL_INDUSTRIES } from '@/lib/candidateOptions'
 import { notifyAssigned } from '@/lib/notifyAssigned'
+import { useToast } from '@/components/Toaster'
+import { humanError } from '@/lib/errorMessage'
 
 
 
-const STATUS_OPTIONS = ['active', 'inactive', 'placed']
+// Pending is where every new profile starts; without it here a pending
+// candidate showed no status selected at all.
+const STATUS_OPTIONS = ['pending', 'active', 'inactive', 'placed']
 
 export type Employer = {
   id: string
@@ -36,6 +40,7 @@ export default function AdminControls({
   initialAssignedIds: string[]
   initialEmployerActions: Record<string, string | null>
 }) {
+  const toast = useToast()
   const [status, setStatus] = useState(initialStatus)
   const [adminTags, setAdminTags] = useState<string[]>(initialTags)
   const [savingMeta, setSavingMeta] = useState(false)
@@ -48,8 +53,12 @@ export default function AdminControls({
   async function saveMeta() {
     setSavingMeta(true); setMetaSaved(false)
     const supabase = createClient()
-    await supabase.from('candidate_profiles').update({ admin_tags: adminTags, status }).eq('id', candidateId)
-    setSavingMeta(false); setMetaSaved(true)
+    // This used to report "Saved" whatever happened.
+    const { error } = await supabase.from('candidate_profiles').update({ admin_tags: adminTags, status }).eq('id', candidateId)
+    setSavingMeta(false)
+    if (error) { toast.show(humanError(error, 'Couldn’t save those changes.'), 'error'); return }
+    setMetaSaved(true)
+    toast.show('Saved')
     setTimeout(() => setMetaSaved(false), 2500)
   }
 
@@ -120,7 +129,8 @@ export default function AdminControls({
         {savingMeta ? 'Saving...' : metaSaved ? 'Saved ✓' : 'Save changes'}
       </Button>
 
-      <Card>
+      {/* The top bar's Assign button scrolls here. */}
+      <Card id="assign" className="scroll-mt-40 transition-shadow">
         <CardHeader><CardTitle className="text-sm">Assign to employers</CardTitle></CardHeader>
         <CardContent>
           {assignError && (
