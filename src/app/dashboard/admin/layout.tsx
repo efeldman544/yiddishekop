@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AdminSidebar />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="dash-dark h-16 border-b px-6 flex items-center justify-end shrink-0 gap-3">
-          <NotificationBell />
+          <NotificationBell admin />
           <SignOutButton />
         </header>
         {/* The scrolling element is this <main>, not the document, so it needs

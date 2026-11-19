@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type Notification = {
   id: string
+  type: string | null
   message: string
   candidate_id: string | null
   /** Where this one opens, when it isn't about a candidate. Older rows have
@@ -15,10 +16,25 @@ type Notification = {
   created_at: string
 }
 
+// Where each kind of admin notification is dealt with. Most rows carry no link
+// of their own, and opening the candidate's profile was the wrong place for
+// half of them: an intro request is answered on Intros, a meeting request on
+// Meetings, a hiring inquiry is a new job. Keyed by type, so rows that already
+// exist go to the right place too.
+const ADMIN_DESTINATIONS: Record<string, string> = {
+  intro_request: '/dashboard/admin/intros',
+  meeting_request: '/dashboard/admin/meetings?tab=employer',
+  meeting_scheduled: '/dashboard/admin/meetings?tab=employer',
+  new_lead: '/dashboard/admin/jobs',
+}
+
 export default function NotificationBell({
   candidatePath = '/dashboard/admin/candidates',
   fallbackPath,
+  admin = false,
 }: {
+  /** Send each notification to the admin page that handles its kind. */
+  admin?: boolean
   candidatePath?: string
   /** Where to go when a notification names no candidate, or this role has no
       per-candidate page. Without it, clicking marked the item read and sat
@@ -81,6 +97,7 @@ export default function NotificationBell({
     // A row that names its own destination wins: an employer signup has no
     // candidate page to open and used to go nowhere at all.
     if (n.link) router.push(n.link)
+    else if (admin && n.type && ADMIN_DESTINATIONS[n.type]) router.push(ADMIN_DESTINATIONS[n.type])
     else if (candidatePath && n.candidate_id) router.push(`${candidatePath}/${n.candidate_id}`)
     else if (fallbackPath) router.push(fallbackPath)
   }

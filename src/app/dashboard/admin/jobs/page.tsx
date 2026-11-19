@@ -2,7 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import JobsClient, { type Job } from './JobsClient'
 import { employerLabel, type EmployerOption } from './employerLabel'
 
-export default async function AdminJobsPage() {
+export default async function AdminJobsPage({
+  searchParams,
+}: {
+  // ?tab=employers&employer=<id>: which tab, and which employer's candidates
+  // are open — so Back, and a notification, land on the right place.
+  searchParams: Promise<{ tab?: string; employer?: string }>
+}) {
+  const { tab, employer } = await searchParams
   const supabase = await createClient()
 
   const [{ data: jobData }, { data: empData }, { data: profileData }] = await Promise.all([
@@ -21,5 +28,12 @@ export default async function AdminJobsPage() {
   const initialEmployers = Object.values(empMap).sort((a, b) => employerLabel(a).localeCompare(employerLabel(b)))
   const initialJobs = (jobData as Job[]) ?? []
 
-  return <JobsClient initialJobs={initialJobs} initialEmployers={initialEmployers} />
+  return (
+    <JobsClient
+      initialJobs={initialJobs}
+      initialEmployers={initialEmployers}
+      initialTab={tab === 'employers' || employer ? 'employers' : 'jobs'}
+      initialEmployerId={employer ?? null}
+    />
+  )
 }

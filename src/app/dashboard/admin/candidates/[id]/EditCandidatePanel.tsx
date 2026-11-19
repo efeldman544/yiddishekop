@@ -10,6 +10,7 @@ import { INDUSTRIES, EMPLOYMENT_TYPES, EDUCATION_LEVELS, EXPERIENCE_LEVELS } fro
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
 import { refreshCandidateCard } from '@/lib/refreshCard'
+import { hasInAppHistory } from '@/lib/navHistory'
 
 export type EditableCandidate = {
   id: string
@@ -108,8 +109,10 @@ export default function EditCandidatePanel({ candidate }: { candidate: EditableC
         setDeleting(false)
         return
       }
-      router.push('/dashboard/admin')
-      router.refresh()
+      // Back to the list they came from, filters and all; it refreshes itself
+      // on arrival, so the deleted row drops out.
+      if (hasInAppHistory()) router.back()
+      else router.push('/dashboard/admin')
     } catch {
       setError('Couldn\u2019t reach the server. Check your connection and try again.')
       setDeleting(false)

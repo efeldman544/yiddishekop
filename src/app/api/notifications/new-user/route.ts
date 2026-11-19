@@ -68,9 +68,9 @@ export async function POST(req: Request) {
     // /candidates/<employer id> would land on a missing record.
     candidate_id: role === 'candidate' ? user.id : null,
     // Which left an employer signup with nothing to open, so clicking it did
-    // nothing at all. There is no page for one employer, but the list is a
-    // great deal better than sitting still.
-    link: role === 'candidate' ? null : '/dashboard/admin/employers',
+    // nothing at all. It opens the Employers tab instead, with this employer
+    // picked out and opened.
+    link: role === 'candidate' ? null : `/dashboard/admin/jobs?tab=employers&employer=${user.id}`,
     message,
   })))
 

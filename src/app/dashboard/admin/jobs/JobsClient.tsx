@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { employerLabel, type EmployerOption } from './employerLabel'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
+import { replaceQuery } from '@/lib/useQueryParams'
 
 export type { EmployerOption }
 
@@ -61,9 +62,14 @@ const STATUS_BADGE: Record<string, string> = {
 export default function JobsClient({
   initialJobs,
   initialEmployers,
+  initialTab = 'jobs',
+  initialEmployerId = null,
 }: {
   initialJobs: Job[]
   initialEmployers: EmployerOption[]
+  initialTab?: 'jobs' | 'employers'
+  /** An employer whose candidates start open, picked out in the list. */
+  initialEmployerId?: string | null
 }) {
   const [jobs, setJobs] = useState<Job[]>(initialJobs)
   const [employers, setEmployers] = useState<EmployerOption[]>(initialEmployers)
@@ -72,7 +78,7 @@ export default function JobsClient({
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'jobs' | 'employers'>('jobs')
+  const [activeTab, setActiveTabState] = useState<'jobs' | 'employers'>(initialTab)
   const [employerAccounts, setEmployerAccounts] = useState<{id: string; full_name: string | null; email: string | null; created_at: string}[] | null>(null)
   const [loadingEmployers, setLoadingEmployers] = useState(false)
   const [employerPanelOpen, setEmployerPanelOpen] = useState(false)
@@ -83,6 +89,28 @@ export default function JobsClient({
   const [employerError, setEmployerError] = useState<string | null>(null)
   const [creatingEmployer, setCreatingEmployer] = useState(false)
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null)
+
+  // The tab and the open employer are kept in the address (see
+  // useQueryParams), so Back from a candidate returns here, not to Jobs.
+  function setActiveTab(tab: 'jobs' | 'employers') {
+    setActiveTabState(tab)
+    replaceQuery({ tab: tab === 'employers' ? 'employers' : null, employer: null })
+    if (tab === 'employers') loadEmployerAccounts()
+  }
+
+  // Arriving on Employers — from Back, a bookmark or a notification — loads the
+  // list, opens the named employer and brings it into view.
+  const [arrivedAt, setArrivedAt] = useState<string | null>(initialEmployerId)
+  useEffect(() => {
+    if (initialTab === 'employers') loadEmployerAccounts()
+    if (initialEmployerId) toggleEmployerAssigned(initialEmployerId)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!arrivedAt || !employerAccounts) return
+    document.getElementById(`employer-${arrivedAt}`)?.scrollIntoView({ block: 'center' })
+    const t = setTimeout(() => setArrivedAt(null), 2500)
+    return () => clearTimeout(t)
+  }, [arrivedAt, employerAccounts])
 
   function openNew() { setEditingId(null); setForm(EMPTY_FORM); setError(null); setPanelOpen(true) }
 
@@ -118,8 +146,9 @@ export default function JobsClient({
   // Everyone assigned to this employer: directly (employer_candidate_assignments)
   // and via their jobs (candidate_job_assignments → job_requirements)
   async function toggleEmployerAssigned(empId: string) {
-    if (expandedEmployer === empId) { setExpandedEmployer(null); return }
+    if (expandedEmployer === empId) { setExpandedEmployer(null); replaceQuery({ employer: null }); return }
     setExpandedEmployer(empId)
+    replaceQuery({ tab: 'employers', employer: empId })
     if (employerAssigned[empId]) return
     setLoadingAssigned(empId)
     const supabase = createClient()
@@ -280,7 +309,7 @@ export default function JobsClient({
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('employers'); loadEmployerAccounts() }}
+            onClick={() => setActiveTab('employers')}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               activeTab === 'employers'
                 ? 'border-indigo-600 text-indigo-700'
@@ -368,7 +397,7 @@ export default function JobsClient({
                   <tbody className="divide-y divide-gray-100">
                     {(employerAccounts ?? []).map(emp => (
                       <React.Fragment key={emp.id}>
-                        <tr className="hover:bg-gray-50/60 transition-colors">
+                        <tr id={`employer-${emp.id}`} className={`transition-colors ${arrivedAt === emp.id ? 'bg-indigo-50' : 'hover:bg-gray-50/60'}`}>
                           <td className="px-5 py-3.5 font-semibold text-gray-950 text-[13px]">{emp.full_name ?? '—'}</td>
                           <td className="px-5 py-3.5 text-gray-500 text-[13px]">{emp.email ?? '—'}</td>
                           <td className="px-5 py-3.5 text-gray-400 text-[12px] tabular-nums">
