@@ -181,8 +181,61 @@ type Snapshot = {
   jobAssignments: Record<string, string[]>
   jobActions: Record<string, Record<string, string | null>>
   assignmentIds: Record<string, Record<string, string>>
+  /** How many rows were drawn, so Back returns to a list as long as it was. */
+  shown: number
 }
 const listCache = new Map<string, Snapshot>()
+
+// The list is drawn PAGE rows at a time, the next lot as you scroll near the
+// bottom. Everyone is still fetched — the count, the filters and Previous /
+// Next need the whole list, and a row is a few hundred bytes — but drawing
+// hundreds of cards at once, and asking for every one's job assignments in a
+// single request, got slower with every candidate added. That request named
+// every candidate in its address, which has a length limit; now it asks
+// ASSIGNMENT_CHUNK at a time, only for rows on screen.
+const PAGE = 50
+const ASSIGNMENT_CHUNK = 50
+// The database hands back at most this many rows per request.
+const DB_PAGE = 1000
+
+type AssignmentRow = { id: string; candidate_id: string; job_id: string; action: string | null }
+
+/** Every row of a query, a database page at a time. */
+async function fetchEvery<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
+  const rows: T[] = []
+  for (let from = 0; ; from += DB_PAGE) {
+    const { data, error } = await page(from, from + DB_PAGE - 1)
+    if (error) throw new Error(error.message)
+    const got = (data as T[] | null) ?? []
+    rows.push(...got)
+    if (got.length < DB_PAGE) return rows
+  }
+}
+
+async function fetchAssignments(ids: string[]): Promise<AssignmentRow[]> {
+  if (ids.length === 0) return []
+  const supabase = createClient()
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += ASSIGNMENT_CHUNK) chunks.push(ids.slice(i, i + ASSIGNMENT_CHUNK))
+  const results = await Promise.all(chunks.map(chunk =>
+    supabase.from('candidate_job_assignments').select('id, candidate_id, job_id, action').in('candidate_id', chunk)))
+  return results.flatMap(r => (r.data as AssignmentRow[] | null) ?? [])
+}
+
+/** Assignments keyed by candidate, the three ways the rows use them. */
+function assignmentMaps(rows: AssignmentRow[], ids: string[]) {
+  const map: Record<string, string[]> = {}
+  const actMap: Record<string, Record<string, string | null>> = {}
+  const idMap: Record<string, Record<string, string>> = {}
+  // Candidates with none get an entry too, so a merge clears anything stale.
+  for (const id of ids) { map[id] = []; actMap[id] = {}; idMap[id] = {} }
+  for (const row of rows) {
+    ;(map[row.candidate_id] ??= []).push(row.job_id)
+    ;(actMap[row.candidate_id] ??= {})[row.job_id] = row.action
+    ;(idMap[row.candidate_id] ??= {})[row.job_id] = row.id
+  }
+  return { map, actMap, idMap }
+}
 let jobsCache: JobOption[] | null = null
 let aliasCache: Record<string, string[]> | null = null
 
@@ -235,6 +288,20 @@ function AdminDashboard() {
       return id
     } catch { return null }
   })
+  // How many rows are drawn. Coming back, as many as before — and at least
+  // enough to include whoever you last looked at, so the list can show them.
+  const [shown, setShown] = useState(() => {
+    const base = cached?.shown ?? PAGE
+    const at = lastOpened && cached ? cached.candidates.findIndex(c => c.id === lastOpened) : -1
+    return at >= base ? Math.ceil((at + 1) / PAGE) * PAGE : base
+  })
+  const shownRef = useRef(shown)
+  useEffect(() => { shownRef.current = shown }, [shown])
+  // Which list `shown` and the loaded assignments belong to, and whose
+  // assignments have been asked for.
+  const listKeyRef = useRef(listKey)
+  const listGen = useRef(0)
+  const assignmentsAskedFor = useRef(new Set<string>(cached ? cached.candidates.slice(0, shown).map(c => c.id) : []))
   const [togglingInterviewed, setTogglingInterviewed] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
   // Approving and assigning used to fail into a browser alert, which is both
@@ -350,10 +417,13 @@ function AdminDashboard() {
     try {
       const supabase = createClient()
 
+    // Rebuilt for each database page; id breaks ties so paging is stable.
+    const profileQuery = (from: number, to: number) => {
       let query = supabase
         .from('candidate_profiles')
         .select('id, full_name, email, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
         .order('full_name', { ascending: true })
+        .order('id', { ascending: true })
 
     if (term) {
       query = query.or(
@@ -365,58 +435,57 @@ function AdminDashboard() {
     if (employment) query = query.overlaps('employment_type', [employment])
     if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
     if (interviewedFilter === 'no') query = query.or('interviewed.is.null,interviewed.eq.false')
+      return query.range(from, to)
+    }
 
     // Video-interview candidates: interviewed by definition, and with no
     // status, so a status filter or "not interviewed" leaves them out.
     const wantProfiles = sourceFilter !== 'video'
     const wantVideos = sourceFilter !== 'profile' && !status && interviewedFilter !== 'no'
-    let videoQuery = supabase
-      .from('video_candidates')
-      .select('id, name, location, current_job_title, fields_worked_in, employment_type')
-    if (term) videoQuery = videoQuery.or(`name.ilike.%${term}%,location.ilike.%${term}%,current_job_title.ilike.%${term}%`)
-    if (industries.length > 0) videoQuery = videoQuery.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
-    if (employment) videoQuery = videoQuery.overlaps('employment_type', [employment])
+    const videoQuery = (from: number, to: number) => {
+      let vq = supabase
+        .from('video_candidates')
+        .select('id, name, location, current_job_title, fields_worked_in, employment_type')
+        .order('id', { ascending: true })
+      if (term) vq = vq.or(`name.ilike.%${term}%,location.ilike.%${term}%,current_job_title.ilike.%${term}%`)
+      if (industries.length > 0) vq = vq.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
+      if (employment) vq = vq.overlaps('employment_type', [employment])
+      return vq.range(from, to)
+    }
 
-    const [profileRes, videoRes] = await Promise.all([
-      wantProfiles ? query : Promise.resolve({ data: [], error: null }),
-      wantVideos ? videoQuery : Promise.resolve({ data: [], error: null }),
+    const [profiles, videos] = await Promise.all([
+      wantProfiles ? fetchEvery<Candidate>(profileQuery) : Promise.resolve([] as Candidate[]),
+      // A video list that won't load shouldn't take the profiles down with it.
+      wantVideos
+        ? fetchEvery<VideoRow>(videoQuery).catch(e => { console.error('video candidates failed to load:', e); return [] as VideoRow[] })
+        : Promise.resolve([] as VideoRow[]),
     ])
-    if (profileRes.error) throw new Error(profileRes.error.message)
-    // A video list that won't load shouldn't take the profiles down with it.
-    if (videoRes.error) console.error('video candidates failed to load:', videoRes.error.message)
     if (seq !== requestSeq.current) return
     const list: Candidate[] = [
-      ...((profileRes.data as Candidate[]) ?? []).map(c => ({ ...c, source: 'profile' as const })),
-      ...((videoRes.error ? [] : (videoRes.data as VideoRow[]) ?? [])).map(fromVideo),
+      ...profiles.map(c => ({ ...c, source: 'profile' as const })),
+      ...videos.map(fromVideo),
     ]
     // Sort ignoring leading non-letter characters (e.g. "(evelyn ...)"),
     // so names in parentheses don't jump to the top of the list
     const sortKey = (name: string | null) => (name ?? '').replace(/^[^a-zA-Z֐-׿]+/, '').toLowerCase()
     list.sort((a, b) => sortKey(a.full_name).localeCompare(sortKey(b.full_name)))
 
-    let asgn: { id: string; candidate_id: string; job_id: string; action: string | null }[] = []
-    if (list.length > 0) {
-      const { data: rows } = await supabase
-        .from('candidate_job_assignments')
-        .select('id, candidate_id, job_id, action')
-        .in('candidate_id', list.map(c => c.id))
-      asgn = rows ?? []
-    }
+    // A refresh of the same list keeps as many rows as are drawn; a new
+    // filter starts at the top, or wherever it was left last time.
+    const target = listKeyRef.current === listKey
+      ? Math.max(PAGE, shownRef.current)
+      : (listCache.get(listKey)?.shown ?? PAGE)
+    const firstIds = list.slice(0, target).map(c => c.id)
+    const rows = await fetchAssignments(firstIds)
     if (seq !== requestSeq.current) return
     {
-      const map: Record<string, string[]> = {}
-      const actMap: Record<string, Record<string, string | null>> = {}
-      const idMap: Record<string, Record<string, string>> = {}
-      for (const row of asgn) {
-        if (!map[row.candidate_id]) map[row.candidate_id] = []
-        map[row.candidate_id].push(row.job_id)
-        if (!actMap[row.candidate_id]) actMap[row.candidate_id] = {}
-        actMap[row.candidate_id][row.job_id] = row.action
-        if (!idMap[row.candidate_id]) idMap[row.candidate_id] = {}
-        idMap[row.candidate_id][row.job_id] = row.id
-      }
+      const { map, actMap, idMap } = assignmentMaps(rows, firstIds)
       // Set together, so a row never shows another list's assignments.
+      listGen.current++
+      listKeyRef.current = listKey
+      assignmentsAskedFor.current = new Set(firstIds)
       setCandidates(list)
+      setShown(target)
       setJobAssignments(map)
       setJobActions(actMap)
       setAssignmentIds(idMap)
@@ -429,7 +498,7 @@ function AdminDashboard() {
         setRefreshing(false)
       }
     }
-  }, [q, industries, status, employment, interviewedFilter, sourceFilter, legacyIndustryAliases])
+  }, [q, industries, status, employment, interviewedFilter, sourceFilter, legacyIndustryAliases, listKey])
 
   // On the next tick, so a burst of filter changes makes one request.
   useEffect(() => {
@@ -447,9 +516,41 @@ function AdminDashboard() {
   // Whatever is on screen — including approvals and assignments made here —
   // is what Back will show next time.
   useEffect(() => {
-    if (loading) return
-    listCache.set(listKey, { candidates, jobAssignments, jobActions, assignmentIds })
-  }, [listKey, loading, candidates, jobAssignments, jobActions, assignmentIds])
+    if (loading || listKeyRef.current !== listKey) return
+    listCache.set(listKey, { candidates, jobAssignments, jobActions, assignmentIds, shown })
+  }, [listKey, loading, candidates, jobAssignments, jobActions, assignmentIds, shown])
+
+  // Rows drawn after the first lot fetch their own assignments.
+  useEffect(() => {
+    const missing = candidates.slice(0, shown).map(c => c.id).filter(id => !assignmentsAskedFor.current.has(id))
+    if (missing.length === 0) return
+    missing.forEach(id => assignmentsAskedFor.current.add(id))
+    const gen = listGen.current
+    fetchAssignments(missing).then(rows => {
+      // The list was replaced meanwhile; its own fetch covers these.
+      if (gen !== listGen.current) return
+      const { map, actMap, idMap } = assignmentMaps(rows, missing)
+      setJobAssignments(prev => ({ ...prev, ...map }))
+      setJobActions(prev => ({ ...prev, ...actMap }))
+      setAssignmentIds(prev => ({ ...prev, ...idMap }))
+    }).catch(() => {
+      // Asked for again next time these rows are drawn.
+      missing.forEach(id => assignmentsAskedFor.current.delete(id))
+    })
+  }, [candidates, shown])
+
+  // Draw the next lot as the bottom of the list comes near.
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moreRef.current
+    if (!el || shown >= candidates.length) return
+    const observer = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) setShown(n => Math.min(n + PAGE, candidates.length)) },
+      { root: document.getElementById('admin-scroll'), rootMargin: '800px 0px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [shown, candidates.length])
 
   useEffect(() => {
     if (!lastOpened) return
@@ -669,7 +770,7 @@ function AdminDashboard() {
           // Dimmed while the next set loads, so a click visibly did something
           // without the list vanishing from under you.
           <div className={`space-y-3 transition-opacity ${refreshing ? 'opacity-60' : ''}`}>
-            {candidates.map(c => {
+            {candidates.slice(0, shown).map(c => {
               const assignedJobIds = jobAssignments[c.id] ?? []
               const actions = jobActions[c.id] ?? {}
               const isExpanded = expandedAssign === c.id
@@ -843,6 +944,16 @@ function AdminDashboard() {
                 </div>
               )
             })}
+            {/* The next lot is drawn as this comes near; the button is for
+                anyone who'd rather not wait for the scroll. */}
+            {shown < candidates.length && (
+              <div ref={moreRef} className="py-4 text-center">
+                <button type="button" onClick={() => setShown(n => Math.min(n + PAGE, candidates.length))}
+                  className="text-sm text-gray-500 hover:text-gray-900">
+                  Showing {shown} of {candidates.length} · Show more
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
