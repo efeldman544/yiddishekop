@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { refuseUnlessAdmin } from '@/lib/requireAdmin'
 import { ASSISTANT_MODEL, costWithCacheUsd, describeAiFailure, getAnthropic } from '@/lib/ai/models'
 import { TOOLS, runTool } from '@/lib/assistant/tools'
+import { ACTION_TOOLS, isAction, previewAction, runAction, type Effects } from '@/lib/assistant/actions'
 
 export const maxDuration = 60
 
@@ -12,7 +13,10 @@ export const maxDuration = 60
 //
 //   think   the model reads the conversation so far and either answers or asks
 //           for lookups
-//   tools   the lookups it asked for are run against the database
+//   preview the changes it asked for, described from the records, for the
+//           admin to confirm or cancel
+//   tools   the lookups it asked for are run against the database, and the
+//           changes the admin confirmed are made
 //
 // Nothing is stored here. The conversation lives in the admin's browser and is
 // sent back each round.
@@ -25,11 +29,17 @@ When asked to find people, search with more than one keyword (synonyms, related 
 
 Link every candidate you name, so the admin can open them: [Full Name](/dashboard/admin/candidates/ID) for a profile, [Full Name](/dashboard/admin/video-candidates/ID) for a video-only candidate. Jobs: [Job title](/dashboard/admin/matching?job=ID).
 
+You can also make changes: change a candidate's status, mark them interviewed, set industry tags, assign or unassign them to a job, share them with an employer, add a job, add a candidate (usually from an attached résumé) and put an attached résumé on a candidate. Each change is shown to the admin to confirm before it happens, so when they ask for one, call the tool rather than asking "shall I?" in text — the confirmation card is the question. Only make changes the admin asked for. Look up ids first; never guess one. When adding a candidate from a résumé, read it, fill in what it says, and ask the admin for a required detail it doesn't have (an email address) instead of making one up. If the admin cancels, accept that and don't try again unless asked. After a change, say in a sentence what was done.
+
 Keep answers short and easy to scan. Lead with the answer. Use short "- " bullet lists for several people or points and **bold** sparingly; no headings and no tables. The admin may see candidates' contact details — give them when asked.`
 
+type Call = { id: string; name: string; input: unknown }
 type Body =
   | { stage: 'think'; messages: Anthropic.Beta.BetaMessageParam[] }
-  | { stage: 'tools'; calls: { id: string; name: string; input: unknown }[] }
+  | { stage: 'preview'; calls: Call[] }
+  // approvals: the admin's answer for each change, by tool call id. A change
+  // without an explicit true is never made.
+  | { stage: 'tools'; calls: Call[]; approvals?: Record<string, boolean> }
 
 // A conversation larger than this is not something this page produces.
 const MAX_BODY_CHARS = 3_000_000
@@ -43,14 +53,30 @@ export async function POST(req: Request) {
   let body: Body
   try { body = JSON.parse(raw) as Body } catch { return new Response('Bad request', { status: 400 }) }
 
-  if (body.stage === 'tools') {
+  if (body.stage === 'preview' || body.stage === 'tools') {
     if (!Array.isArray(body.calls) || body.calls.length === 0 || body.calls.length > 10) {
       return new Response('Bad request', { status: 400 })
     }
-    // The admin's own session: the lookups see what the admin may see.
+    // The admin's own session: lookups and changes see and do what the admin may.
     const db = await createClient()
-    const results = await Promise.all(body.calls.map(call => runTool(db, call)))
-    return Response.json({ results })
+
+    if (body.stage === 'preview') {
+      const previews = await Promise.all(body.calls.filter(c => isAction(c.name)).map(async c => ({ id: c.id, ...(await previewAction({ db }, c)) })))
+      return Response.json({ previews })
+    }
+
+    const approvals = body.approvals ?? {}
+    const effects: Effects[] = []
+    const results = await Promise.all(body.calls.map(async call => {
+      if (!isAction(call.name)) return runTool(db, call)
+      if (approvals[call.id] !== true) {
+        return { type: 'tool_result' as const, tool_use_id: call.id, content: 'The admin cancelled this change. It was not made.' }
+      }
+      const { result, effects: e } = await runAction({ db }, call)
+      effects.push(e)
+      return result
+    }))
+    return Response.json({ results, effects })
   }
 
   if (body.stage !== 'think' || !Array.isArray(body.messages) || body.messages.length === 0) {
@@ -78,7 +104,7 @@ async function think(messages: Anthropic.Beta.BetaMessageParam[]): Promise<Anthr
     model: ASSISTANT_MODEL,
     max_tokens: 16_000,
     system: `${SYSTEM}\n\nToday is ${new Date().toISOString().slice(0, 10)}.`,
-    tools: TOOLS,
+    tools: [...TOOLS, ...ACTION_TOOLS],
     messages,
     // Thinking is always on for this model; effort sets how hard it works.
     // Looking things up and reporting them doesn't need the deepest setting.
@@ -96,12 +122,15 @@ async function think(messages: Anthropic.Beta.BetaMessageParam[]): Promise<Anthr
       fallbacks: 'default',
     } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming)
   } catch (err) {
-    // Rejected outright: ask once more without the fallback option, in case
-    // that is what this account doesn't accept. Anything else in the request
-    // that's wrong fails the same way again and is reported.
+    // Rejected outright: ask once more in the plainest form — no fallback
+    // option, no strict tool schemas — in case one of those is what this
+    // account doesn't accept. Anything else wrong fails again and is reported.
     if (err instanceof Anthropic.BadRequestError) {
-      console.error('assistant request rejected, retrying without fallbacks:', err.message)
-      return getAnthropic().beta.messages.create(params)
+      console.error('assistant request rejected, retrying in the plainest form:', err.message)
+      return getAnthropic().beta.messages.create({
+        ...params,
+        tools: params.tools?.map(t => ('strict' in t ? { ...t, strict: undefined } : t)),
+      })
     }
     throw err
   }
