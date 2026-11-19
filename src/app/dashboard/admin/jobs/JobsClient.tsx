@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,14 +64,10 @@ const STATUS_BADGE: Record<string, string> = {
 export default function JobsClient({
   initialJobs,
   initialEmployers,
-  initialTab = 'jobs',
-  initialEmployerId = null,
+
 }: {
   initialJobs: Job[]
   initialEmployers: EmployerOption[]
-  initialTab?: 'jobs' | 'employers'
-  /** An employer whose candidates start open, picked out in the list. */
-  initialEmployerId?: string | null
 }) {
   const [allJobs, setJobs] = useState<Job[]>(initialJobs)
   const toast = useToast()
@@ -83,7 +80,13 @@ export default function JobsClient({
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTabState] = useState<'jobs' | 'employers'>(initialTab)
+  // Jobs and Employers are two sidebar items on this one page, told apart by
+  // ?tab=. The page follows the address rather than remembering which it
+  // opened on: it used to decide once, so clicking the other sidebar item
+  // changed the address and the highlight but left the page where it was.
+  const searchParams = useSearchParams()
+  const openEmployer = searchParams.get('employer')
+  const activeTab: 'jobs' | 'employers' = searchParams.get('tab') === 'employers' || openEmployer ? 'employers' : 'jobs'
   const [employerAccounts, setEmployerAccounts] = useState<{id: string; full_name: string | null; email: string | null; created_at: string}[] | null>(null)
   const [loadingEmployers, setLoadingEmployers] = useState(false)
   const [employerPanelOpen, setEmployerPanelOpen] = useState(false)
@@ -95,21 +98,21 @@ export default function JobsClient({
   const [creatingEmployer, setCreatingEmployer] = useState(false)
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null)
 
-  // The tab and the open employer are kept in the address (see
-  // useQueryParams), so Back from a candidate returns here, not to Jobs.
-  function setActiveTab(tab: 'jobs' | 'employers') {
-    setActiveTabState(tab)
-    replaceQuery({ tab: tab === 'employers' ? 'employers' : null, employer: null })
-    if (tab === 'employers') loadEmployerAccounts()
-  }
-
-  // Arriving on Employers — from Back, a bookmark or a notification — loads the
-  // list, opens the named employer and brings it into view.
-  const [arrivedAt, setArrivedAt] = useState<string | null>(initialEmployerId)
+  // Employers are loaded the first time that view is shown.
   useEffect(() => {
-    if (initialTab === 'employers') loadEmployerAccounts()
-    if (initialEmployerId) toggleEmployerAssigned(initialEmployerId)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (activeTab !== 'employers' || employerAccounts !== null) return
+    const t = setTimeout(loadEmployerAccounts, 0)
+    return () => clearTimeout(t)
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Arriving with ?employer= — from Back, quick search or a notification —
+  // opens that employer and brings it into view.
+  const [arrivedAt, setArrivedAt] = useState<string | null>(null)
+  useEffect(() => {
+    if (!openEmployer || openEmployer === expandedEmployer) return
+    const t = setTimeout(() => { setArrivedAt(openEmployer); toggleEmployerAssigned(openEmployer) }, 0)
+    return () => clearTimeout(t)
+  }, [openEmployer]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!arrivedAt || !employerAccounts) return
     document.getElementById(`employer-${arrivedAt}`)?.scrollIntoView({ block: 'center' })
@@ -309,31 +312,8 @@ export default function JobsClient({
   return (
     <>
       <main className="px-8 py-8 space-y-5 overflow-auto flex-1">
-        <div className="flex items-center gap-1 border-b border-gray-100 mb-6 -mx-8 px-8">
-          <button
-            type="button"
-            onClick={() => setActiveTab('jobs')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              activeTab === 'jobs'
-                ? 'border-indigo-600 text-indigo-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
-            }`}
-          >
-            Jobs
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('employers')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              activeTab === 'employers'
-                ? 'border-indigo-600 text-indigo-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
-            }`}
-          >
-            Employers
-          </button>
-        </div>
-
+        {/* Jobs and Employers are chosen in the sidebar; a second set of tabs
+            here only gave two ways to do one thing. */}
         {activeTab === 'jobs' ? (
           <>
             <div className="flex items-center justify-between">
