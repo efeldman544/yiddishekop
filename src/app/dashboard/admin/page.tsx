@@ -424,7 +424,6 @@ export default function AdminDashboard() {
           <h1 className="page-title">Candidates</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-400">{candidates.length} total</span>
-            <Link href="/dashboard/admin/redaction-check" className="text-sm text-gray-500 hover:text-gray-800">Redaction check</Link>
             <AddCandidatesPanel onAdded={fetchCandidates} />
           </div>
         </div>

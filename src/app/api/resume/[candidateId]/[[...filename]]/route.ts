@@ -5,8 +5,7 @@ import { serveResume } from '@/lib/resumeServe'
 export const maxDuration = 60
 
 // A candidate's resume, redacted for whoever is asking. The work is in
-// src/lib/resumeServe.ts, shared with the admin's redaction check so that the
-// check tests exactly what employers receive.
+// src/lib/resumeServe.ts.
 export async function GET(
   request: NextRequest,
   // `filename` is a decorative trailing segment so browsers name the saved
