@@ -12,9 +12,7 @@ import { openOcr, withOcr, type OcrLine } from '@/lib/ocr'
 // SERVER ONLY.
 //
 // Everything between "this candidate's resume" and the file an employer is
-// handed. Lives here rather than in the route so the redaction check on the
-// admin side runs exactly this code — checking a copy of it would prove
-// nothing about what employers actually receive.
+// handed.
 
 export type Viewer = 'admin' | 'employer'
 
@@ -407,35 +405,6 @@ async function hasPictures(
     // Couldn't list what the page draws: read it, to be safe.
     return true
   }
-}
-
-/** Each page of a PDF as a PNG, at twice its size — what the admin check reads back. */
-export async function renderPdfPages(pdf: Uint8Array): Promise<Buffer[]> {
-  // The canvas stand-ins have to exist before pdfjs loads, or it draws nothing.
-  const { createCanvas, Path2D, DOMMatrix, ImageData } = await import('@napi-rs/canvas')
-  const g = globalThis as Record<string, unknown>
-  g.Path2D ??= Path2D
-  g.DOMMatrix ??= DOMMatrix
-  g.ImageData ??= ImageData
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf) }).promise
-  const pages: Buffer[] = []
-  try {
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n)
-      const viewport = page.getViewport({ scale: 2 })
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      const ctx = canvas.getContext('2d')
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      // @ts-expect-error — @napi-rs/canvas context is API-compatible with pdfjs's expectations
-      await page.render({ canvasContext: ctx, viewport }).promise
-      pages.push(canvas.toBuffer('image/png'))
-    }
-  } finally {
-    await doc.loadingTask.destroy()
-  }
-  return pages
 }
 
 function pdfResponse(bytes: Uint8Array, fullName: string | null): NextResponse {
