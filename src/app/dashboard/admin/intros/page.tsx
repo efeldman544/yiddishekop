@@ -218,7 +218,8 @@ export default function IntroRequestsPage() {
   return (
     <main className="dash-page">
       <div className="flex items-center justify-between">
-        <h1 className="page-title">Requests</h1>
+        {/* Named as in the sidebar, so you know you landed where you clicked. */}
+        <h1 className="page-title">Intros</h1>
         <span className="text-sm text-gray-400">{open.length + meetings.length} awaiting action</span>
       </div>
 

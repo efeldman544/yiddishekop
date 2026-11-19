@@ -4,14 +4,19 @@ import ScrollMemory from '@/components/ScrollMemory'
 import NotificationBell from '@/components/NotificationBell'
 import SignOutButton from '@/components/SignOutButton'
 import { ToastProvider } from '@/components/Toaster'
+import QuickSearch from '@/components/QuickSearch'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar />
+      {/* The sidebar reads ?tab= to tell Jobs from Employers. */}
+      <Suspense fallback={<aside className="dash-dark w-[220px] shrink-0 h-screen border-r" />}>
+        <AdminSidebar />
+      </Suspense>
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="dash-dark h-16 border-b px-6 flex items-center justify-end shrink-0 gap-3">
+          <div className="mr-auto"><QuickSearch /></div>
           <NotificationBell admin />
           <SignOutButton />
         </header>

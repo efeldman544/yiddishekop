@@ -13,7 +13,7 @@ import { isProfileFilledIn } from '@/lib/profileFilledIn'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
 import { useQueryParams } from '@/lib/useQueryParams'
-import { LAST_OPENED_KEY, saveSequence } from '@/lib/candidateSequence'
+import { LAST_OPENED_KEY, candidateHref, saveSequence } from '@/lib/candidateSequence'
 import { CandidateListSkeleton, CandidateRowsSkeleton } from '@/components/PageSkeleton'
 
 type Candidate = {
@@ -31,6 +31,23 @@ type Candidate = {
   admin_tags: string[]
   interviewed: boolean | null
   interviewed_at: string | null
+  /** 'video' for someone known only from a video interview (video_candidates). */
+  source?: 'profile' | 'video'
+}
+
+type VideoRow = {
+  id: string; name: string | null; location: string | null; current_job_title: string | null
+  fields_worked_in: string[] | null; employment_type: string[] | null
+}
+
+/** A video-interview candidate, in the shape the list shows. They have no
+    account, profile or status — the interview is all there is. */
+function fromVideo(v: VideoRow): Candidate {
+  return {
+    id: v.id, full_name: v.name, email: null, location: v.location, current_job_title: v.current_job_title,
+    roles_seeking: null, fields_worked_in: v.fields_worked_in ?? [], employment_type: v.employment_type ?? [],
+    years_experience: null, status: null, admin_tags: [], interviewed: true, interviewed_at: null, source: 'video',
+  }
 }
 
 type JobOption = {
@@ -194,7 +211,11 @@ function AdminDashboard() {
   const employment = params.get('type') ?? ''
   const interviewedParam = params.get('interviewed')
   const interviewedFilter: 'all' | 'yes' | 'no' = interviewedParam === 'yes' || interviewedParam === 'no' ? interviewedParam : 'all'
-  const listKey = [q.trim(), industriesKey, status, employment, interviewedFilter].join('\u0000')
+  // Profiles and video-interview candidates used to live on separate pages;
+  // both are here now, and this narrows to one kind.
+  const sourceParam = params.get('source')
+  const sourceFilter: 'all' | 'profile' | 'video' = sourceParam === 'profile' || sourceParam === 'video' ? sourceParam : 'all'
+  const listKey = [q.trim(), industriesKey, status, employment, interviewedFilter, sourceFilter].join('\u0000')
 
   const cached = listCache.get(listKey)
   const [candidates, setCandidates] = useState<Candidate[]>(cached?.candidates ?? [])
@@ -323,7 +344,8 @@ function AdminDashboard() {
   const requestSeq = useRef(0)
   const fetchCandidates = useCallback(async () => {
     const seq = ++requestSeq.current
-    const term = q.trim()
+    // Characters that would break the filter syntax are dropped from the search.
+    const term = q.trim().replace(/[,()%*\\]/g, ' ').trim()
     setRefreshing(true)
     try {
       const supabase = createClient()
@@ -344,10 +366,29 @@ function AdminDashboard() {
     if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
     if (interviewedFilter === 'no') query = query.or('interviewed.is.null,interviewed.eq.false')
 
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
+    // Video-interview candidates: interviewed by definition, and with no
+    // status, so a status filter or "not interviewed" leaves them out.
+    const wantProfiles = sourceFilter !== 'video'
+    const wantVideos = sourceFilter !== 'profile' && !status && interviewedFilter !== 'no'
+    let videoQuery = supabase
+      .from('video_candidates')
+      .select('id, name, location, current_job_title, fields_worked_in, employment_type')
+    if (term) videoQuery = videoQuery.or(`name.ilike.%${term}%,location.ilike.%${term}%,current_job_title.ilike.%${term}%`)
+    if (industries.length > 0) videoQuery = videoQuery.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
+    if (employment) videoQuery = videoQuery.overlaps('employment_type', [employment])
+
+    const [profileRes, videoRes] = await Promise.all([
+      wantProfiles ? query : Promise.resolve({ data: [], error: null }),
+      wantVideos ? videoQuery : Promise.resolve({ data: [], error: null }),
+    ])
+    if (profileRes.error) throw new Error(profileRes.error.message)
+    // A video list that won't load shouldn't take the profiles down with it.
+    if (videoRes.error) console.error('video candidates failed to load:', videoRes.error.message)
     if (seq !== requestSeq.current) return
-    const list = (data as Candidate[]) ?? []
+    const list: Candidate[] = [
+      ...((profileRes.data as Candidate[]) ?? []).map(c => ({ ...c, source: 'profile' as const })),
+      ...((videoRes.error ? [] : (videoRes.data as VideoRow[]) ?? [])).map(fromVideo),
+    ]
     // Sort ignoring leading non-letter characters (e.g. "(evelyn ...)"),
     // so names in parentheses don't jump to the top of the list
     const sortKey = (name: string | null) => (name ?? '').replace(/^[^a-zA-Z֐-׿]+/, '').toLowerCase()
@@ -388,7 +429,7 @@ function AdminDashboard() {
         setRefreshing(false)
       }
     }
-  }, [q, industries, status, employment, interviewedFilter, legacyIndustryAliases])
+  }, [q, industries, status, employment, interviewedFilter, sourceFilter, legacyIndustryAliases])
 
   // On the next tick, so a burst of filter changes makes one request.
   useEffect(() => {
@@ -521,7 +562,13 @@ function AdminDashboard() {
         <div className="flex items-center justify-between">
           <h1 className="page-title">Candidates</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{loading ? '' : `${candidates.length} total`}</span>
+            <span className="text-sm text-gray-400">
+              {loading ? '' : (() => {
+                const videos = candidates.filter(c => c.source === 'video').length
+                const profiles = candidates.length - videos
+                return videos === 0 ? `${profiles} total` : profiles === 0 ? `${videos} video` : `${profiles} profiles · ${videos} video`
+              })()}
+            </span>
             <AddCandidatesPanel onAdded={fetchCandidates} />
           </div>
         </div>
@@ -581,6 +628,22 @@ function AdminDashboard() {
           <div className="w-px h-4 bg-gray-200 hidden sm:block" />
 
           <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium text-gray-400 mr-0.5">Kind</span>
+            {([['all', 'All'], ['profile', 'Profiles'], ['video', 'Video only']] as const).map(([v, label]) => (
+              <button key={v} type="button" onClick={() => setParams({ source: v === 'all' ? null : v })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  sourceFilter === v
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-4 bg-gray-200 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-gray-400 mr-0.5">Interviewed</span>
             {(['all', 'yes', 'no'] as const).map(v => (
               <button key={v} type="button" onClick={() => setParams({ interviewed: v === 'all' ? null : v })}
@@ -616,11 +679,13 @@ function AdminDashboard() {
                   lastOpened === c.id ? 'border-indigo-300 ring-2 ring-indigo-200' : 'border-gray-100'
                 }`}>
                   {/* Candidate info — links to detail */}
-                  <Link href={`/dashboard/admin/candidates/${c.id}`}
-                    onClick={() => saveSequence(candidates.map(x => x.id), c.id)}
+                  <Link href={candidateHref(c)}
+                    onClick={() => saveSequence(candidates, c.id)}
                     className="block px-5 py-4 group hover:bg-gray-50/60 transition-colors">
                     <div className="flex items-center justify-between gap-4">
-                      <div className="shrink-0 w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-sm select-none">
+                      <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm select-none ${
+                        c.source === 'video' ? 'bg-violet-50 text-violet-600' : 'bg-indigo-50 text-indigo-600'
+                      }`}>
                         {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -631,12 +696,17 @@ function AdminDashboard() {
                               {c.status}
                             </span>
                           )}
-                          {!isProfileFilledIn(c) && (
+                          {c.source === 'video' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+                              Video interview only
+                            </span>
+                          )}
+                          {c.source !== 'video' && !isProfileFilledIn(c) && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
                               Signed up · profile empty
                             </span>
                           )}
-                          {c.interviewed && (
+                          {c.interviewed && c.source !== 'video' && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Interviewed ✓</span>
                           )}
                           {c.admin_tags?.map(tag => (
@@ -716,7 +786,7 @@ function AdminDashboard() {
                           {approving === c.id ? 'Approving…' : 'Approve for browse'}
                         </button>
                       )}
-                      <button
+                      {c.source !== 'video' && <button
                         type="button"
                         disabled={togglingInterviewed === c.id}
                         onClick={() => toggleInterviewed(c.id, c.interviewed)}
@@ -727,7 +797,7 @@ function AdminDashboard() {
                         }`}
                       >
                         {c.interviewed ? 'Interviewed ✓' : 'Mark interviewed'}
-                      </button>
+                      </button>}
                       <Button
                         type="button"
                         size="sm"

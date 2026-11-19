@@ -9,7 +9,7 @@ import BackButton from '@/components/BackButton'
 import { useToast } from '@/components/Toaster'
 import { humanError } from '@/lib/errorMessage'
 import { resumeHref } from '@/lib/resumeUrl'
-import { noteOpened, parseSequence, readSequenceRaw } from '@/lib/candidateSequence'
+import { candidateHref, noteOpened, parseSequence, readSequenceRaw, type SequenceItem } from '@/lib/candidateSequence'
 
 // The top of a candidate's page, pinned while you scroll: who they are, the
 // things you do to a candidate, and Previous / Next through the list you
@@ -30,19 +30,23 @@ const noSubscribe = () => () => {}
 
 export default function CandidateTopBar({
   candidateId,
+  source = 'profile',
   name,
   subtitle,
-  status: initialStatus,
-  interviewed: initialInterviewed,
-  hasResume,
+  status: initialStatus = 'active',
+  interviewed: initialInterviewed = false,
+  hasResume = false,
   children,
 }: {
   candidateId: string
+  /** A video-interview candidate has no account, status or résumé — only the
+      name, Previous / Next and whatever actions are passed in. */
+  source?: 'profile' | 'video'
   name: string | null
   subtitle: string
-  status: string
-  interviewed: boolean
-  hasResume: boolean
+  status?: string
+  interviewed?: boolean
+  hasResume?: boolean
   /** The Edit profile button, which brings its own panel. */
   children?: React.ReactNode
 }) {
@@ -56,21 +60,23 @@ export default function CandidateTopBar({
   // (nothing) as on first paint, then fills in.
   const raw = useSyncExternalStore(noSubscribe, readSequenceRaw, () => null)
   const sequence = useMemo(() => parseSequence(raw), [raw])
-  const index = sequence.indexOf(candidateId)
+  const index = sequence.findIndex(item => item.id === candidateId)
   const prev = index > 0 ? sequence[index - 1] : null
   const next = index >= 0 && index < sequence.length - 1 ? sequence[index + 1] : null
 
-  function go(id: string | null) {
-    if (!id) return
-    noteOpened(id)
-    router.replace(`/dashboard/admin/candidates/${id}`)
+  function go(item: SequenceItem | null) {
+    if (!item) return
+    noteOpened(item.id)
+    router.replace(candidateHref(item))
   }
 
   // Have the neighbours ready, so Previous / Next feel immediate.
+  const prevHref = prev ? candidateHref(prev) : null
+  const nextHref = next ? candidateHref(next) : null
   useEffect(() => {
-    if (prev) router.prefetch(`/dashboard/admin/candidates/${prev}`)
-    if (next) router.prefetch(`/dashboard/admin/candidates/${next}`)
-  }, [prev, next, router])
+    if (prevHref) router.prefetch(prevHref)
+    if (nextHref) router.prefetch(nextHref)
+  }, [prevHref, nextHref, router])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -119,7 +125,7 @@ export default function CandidateTopBar({
   return (
     <div className="sticky top-0 z-20 -mx-8 px-8 pt-5 pb-4 bg-background border-b border-gray-100">
       <div className="flex items-center justify-between gap-4">
-        <BackButton fallback="/dashboard/admin" label="Back to candidates" />
+        <BackButton fallback="/dashboard/admin" label="Back" />
         {index >= 0 && sequence.length > 1 && (
           <div className="flex items-center gap-1 text-sm">
             <Button variant="ghost" size="sm" disabled={!prev} onClick={() => go(prev)} title="Previous (←)">
@@ -137,28 +143,32 @@ export default function CandidateTopBar({
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap">
             <h2 className="page-title truncate">{name ?? 'Unnamed'}</h2>
-            <Badge variant="outline" className={`capitalize ${STATUS_STYLE[status] ?? ''}`}>{status}</Badge>
+            {source === 'video'
+              ? <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">Video interview only</Badge>
+              : <Badge variant="outline" className={`capitalize ${STATUS_STYLE[status] ?? ''}`}>{status}</Badge>}
           </div>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {status === 'pending' && (
+          {source === 'profile' && status === 'pending' && (
             <Button size="sm" onClick={approve} disabled={busy !== null}>
               {busy === 'approve' ? 'Approving…' : 'Approve for browse'}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={toggleInterviewed} disabled={busy !== null}
-            className={interviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : ''}>
-            {interviewed ? 'Interviewed ✓' : 'Mark interviewed'}
-          </Button>
-          {hasResume && (
+          {source === 'profile' && (
+            <Button variant="outline" size="sm" onClick={toggleInterviewed} disabled={busy !== null}
+              className={interviewed ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : ''}>
+              {interviewed ? 'Interviewed ✓' : 'Mark interviewed'}
+            </Button>
+          )}
+          {source === 'profile' && hasResume && (
             <a href={resumeHref(candidateId, name)} target="_blank" rel="noopener noreferrer"
               className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem] font-medium hover:bg-muted">
               Résumé
             </a>
           )}
-          <Button variant="outline" size="sm" onClick={showAssign}>Assign</Button>
+          {source === 'profile' && <Button variant="outline" size="sm" onClick={showAssign}>Assign</Button>}
           {children}
         </div>
       </div>
