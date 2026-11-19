@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,8 @@ import { INDUSTRIES as SHARED_INDUSTRIES } from '@/lib/candidateOptions'
 import { isProfileFilledIn } from '@/lib/profileFilledIn'
 import { humanError } from '@/lib/errorMessage'
 import ErrorNote from '@/components/ErrorNote'
+import { useQueryParams } from '@/lib/useQueryParams'
+import { CandidateListSkeleton, CandidateRowsSkeleton } from '@/components/PageSkeleton'
 
 type Candidate = {
   id: string
@@ -151,16 +153,69 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   'Closed':  'text-gray-400',
 }
 
-export default function AdminDashboard() {
-  const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [industries, setIndustries] = useState<string[]>([])
-  const [legacyIndustryAliases, setLegacyIndustryAliases] = useState<Record<string, string[]>>({})
+// What the list last showed for each set of filters, so coming Back from a
+// candidate redraws it at once — at the same length, which is what lets the
+// scroll memory put you on the same row — and then refreshes it quietly.
+// Module scope: it lasts while the admin moves around the site, and a
+// refresh starts clean.
+type Snapshot = {
+  candidates: Candidate[]
+  jobAssignments: Record<string, string[]>
+  jobActions: Record<string, Record<string, string | null>>
+  assignmentIds: Record<string, Record<string, string>>
+}
+const listCache = new Map<string, Snapshot>()
+let jobsCache: JobOption[] | null = null
+let aliasCache: Record<string, string[]> | null = null
 
-  const [status, setStatus] = useState('')
-  const [employment, setEmployment] = useState('')
-  const [interviewedFilter, setInterviewedFilter] = useState<'all' | 'yes' | 'no'>('all')
+// The candidate last opened from this list, picked out briefly on the way back
+// so it's obvious where you were.
+const LAST_OPENED_KEY = 'admin:last-candidate'
+
+// useSearchParams needs a Suspense boundary above it, or the build refuses to
+// prerender the page.
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<CandidateListSkeleton />}>
+      <AdminDashboard />
+    </Suspense>
+  )
+}
+
+function AdminDashboard() {
+  // Filters live in the address (see useQueryParams). The search box keeps its
+  // own copy so typing isn't held up by the address; it is written there a
+  // moment after typing stops.
+  const [params, setParams] = useQueryParams()
+  const q = params.get('q') ?? ''
+  const industriesParam = params.getAll('industry')
+  const industriesKey = industriesParam.join('|')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const industries = useMemo(() => industriesParam, [industriesKey])
+  const status = params.get('status') ?? ''
+  const employment = params.get('type') ?? ''
+  const interviewedParam = params.get('interviewed')
+  const interviewedFilter: 'all' | 'yes' | 'no' = interviewedParam === 'yes' || interviewedParam === 'no' ? interviewedParam : 'all'
+  const listKey = [q.trim(), industriesKey, status, employment, interviewedFilter].join('\u0000')
+
+  const cached = listCache.get(listKey)
+  const [candidates, setCandidates] = useState<Candidate[]>(cached?.candidates ?? [])
+  // `loading` is only for having nothing to show yet. A list on screen stays
+  // on screen while the next one loads, so the page doesn't blank and jump on
+  // every keystroke or filter click.
+  const [loading, setLoading] = useState(!cached)
+  const [refreshing, setRefreshing] = useState(false)
+  const [search, setSearch] = useState(q)
+  const [legacyIndustryAliases, setLegacyIndustryAliases] = useState<Record<string, string[]>>(aliasCache ?? {})
+  // The candidate you just came back from, picked out until it fades.
+  const [lastOpened, setLastOpened] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const id = sessionStorage.getItem(LAST_OPENED_KEY)
+      sessionStorage.removeItem(LAST_OPENED_KEY)
+      return id
+    } catch { return null }
+  })
   const [togglingInterviewed, setTogglingInterviewed] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
   // Approving and assigning used to fail into a browser alert, which is both
@@ -168,11 +223,11 @@ export default function AdminDashboard() {
   // quoted at you word for word.
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const [jobs, setJobs] = useState<JobOption[]>([])
+  const [jobs, setJobs] = useState<JobOption[]>(jobsCache ?? [])
   // jobAssignments[candidateId] = array of assigned jobIds
-  const [jobAssignments, setJobAssignments] = useState<Record<string, string[]>>({})
-  const [jobActions, setJobActions] = useState<Record<string, Record<string, string | null>>>({})
-  const [assignmentIds, setAssignmentIds] = useState<Record<string, Record<string, string>>>({})
+  const [jobAssignments, setJobAssignments] = useState<Record<string, string[]>>(cached?.jobAssignments ?? {})
+  const [jobActions, setJobActions] = useState<Record<string, Record<string, string | null>>>(cached?.jobActions ?? {})
+  const [assignmentIds, setAssignmentIds] = useState<Record<string, Record<string, string>>>(cached?.assignmentIds ?? {})
   const [expandedAssign, setExpandedAssign] = useState<string | null>(null)
   const [togglingAssign, setTogglingAssign] = useState<string | null>(null)
   const [savingAdminAction, setSavingAdminAction] = useState<string | null>(null)
@@ -201,7 +256,7 @@ export default function AdminDashboard() {
         for (const p of profiles ?? []) profileMap[p.id] = p.full_name ?? ''
       }
 
-      setJobs((data ?? []).map((j: any) => ({
+      setJobs(jobsCache = (data ?? []).map((j: any) => ({
         id: j.id,
         job_title: j.job_title,
         status: j.status,
@@ -225,7 +280,7 @@ export default function AdminDashboard() {
           if (!current) continue
           ;(reverse[current] ??= []).push(legacyValue)
         }
-        setLegacyIndustryAliases(reverse)
+        setLegacyIndustryAliases(aliasCache = reverse)
       } catch {
         // Non-critical — filtering just falls back to exact matches only.
       }
@@ -265,8 +320,13 @@ export default function AdminDashboard() {
     setTogglingInterviewed(null)
   }
 
+  // Responses can come back out of order when filters change quickly; only
+  // the latest request is allowed to update the list.
+  const requestSeq = useRef(0)
   const fetchCandidates = useCallback(async () => {
-    setLoading(true)
+    const seq = ++requestSeq.current
+    const term = q.trim()
+    setRefreshing(true)
     try {
       const supabase = createClient()
 
@@ -275,9 +335,9 @@ export default function AdminDashboard() {
         .select('id, full_name, email, location, current_job_title, roles_seeking, fields_worked_in, employment_type, years_experience, status, admin_tags, interviewed, interviewed_at')
         .order('full_name', { ascending: true })
 
-    if (search.trim()) {
+    if (term) {
       query = query.or(
-        `full_name.ilike.%${search}%,location.ilike.%${search}%,current_job_title.ilike.%${search}%`
+        `full_name.ilike.%${term}%,location.ilike.%${term}%,current_job_title.ilike.%${term}%`
       )
     }
     if (industries.length > 0) query = query.overlaps('fields_worked_in', industriesWithLegacyAliases(industries, legacyIndustryAliases))
@@ -286,25 +346,29 @@ export default function AdminDashboard() {
     if (interviewedFilter === 'yes') query = query.eq('interviewed', true)
     if (interviewedFilter === 'no') query = query.or('interviewed.is.null,interviewed.eq.false')
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    if (seq !== requestSeq.current) return
     const list = (data as Candidate[]) ?? []
     // Sort ignoring leading non-letter characters (e.g. "(evelyn ...)"),
     // so names in parentheses don't jump to the top of the list
     const sortKey = (name: string | null) => (name ?? '').replace(/^[^a-zA-Z֐-׿]+/, '').toLowerCase()
     list.sort((a, b) => sortKey(a.full_name).localeCompare(sortKey(b.full_name)))
-    setCandidates(list)
 
+    let asgn: { id: string; candidate_id: string; job_id: string; action: string | null }[] = []
     if (list.length > 0) {
-      const ids = list.map(c => c.id)
-      const { data: asgn } = await supabase
+      const { data: rows } = await supabase
         .from('candidate_job_assignments')
         .select('id, candidate_id, job_id, action')
-        .in('candidate_id', ids)
-
+        .in('candidate_id', list.map(c => c.id))
+      asgn = rows ?? []
+    }
+    if (seq !== requestSeq.current) return
+    {
       const map: Record<string, string[]> = {}
       const actMap: Record<string, Record<string, string | null>> = {}
       const idMap: Record<string, Record<string, string>> = {}
-      for (const row of asgn ?? []) {
+      for (const row of asgn) {
         if (!map[row.candidate_id]) map[row.candidate_id] = []
         map[row.candidate_id].push(row.job_id)
         if (!actMap[row.candidate_id]) actMap[row.candidate_id] = {}
@@ -312,6 +376,8 @@ export default function AdminDashboard() {
         if (!idMap[row.candidate_id]) idMap[row.candidate_id] = {}
         idMap[row.candidate_id][row.job_id] = row.id
       }
+      // Set together, so a row never shows another list's assignments.
+      setCandidates(list)
       setJobAssignments(map)
       setJobActions(actMap)
       setAssignmentIds(idMap)
@@ -319,14 +385,38 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Failed to load candidates:', err)
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
-  }, [search, industries, status, employment, interviewedFilter, legacyIndustryAliases])
+  }, [q, industries, status, employment, interviewedFilter, legacyIndustryAliases])
+
+  // On the next tick, so a burst of filter changes makes one request.
+  useEffect(() => {
+    const t = setTimeout(fetchCandidates, 0)
+    return () => clearTimeout(t)
+  }, [fetchCandidates])
+
+  // Typing goes into the address a moment after it stops.
+  useEffect(() => {
+    if (search === q) return
+    const t = setTimeout(() => setParams({ q: search.trim() ? search : null }), 300)
+    return () => clearTimeout(t)
+  }, [search, q, setParams])
+
+  // Whatever is on screen — including approvals and assignments made here —
+  // is what Back will show next time.
+  useEffect(() => {
+    if (loading) return
+    listCache.set(listKey, { candidates, jobAssignments, jobActions, assignmentIds })
+  }, [listKey, loading, candidates, jobAssignments, jobActions, assignmentIds])
 
   useEffect(() => {
-    const t = setTimeout(fetchCandidates, search ? 300 : 0)
+    if (!lastOpened) return
+    const t = setTimeout(() => setLastOpened(null), 2500)
     return () => clearTimeout(t)
-  }, [fetchCandidates, search])
+  }, [lastOpened])
 
   // Keep assignment actions in sync with DB changes made by employers
   useEffect(() => {
@@ -353,7 +443,7 @@ export default function AdminDashboard() {
   }, [])
 
   function toggleIndustry(val: string) {
-    setIndustries(prev => prev.includes(val) ? prev.filter(i => i !== val) : [...prev, val])
+    setParams({ industry: industries.includes(val) ? industries.filter(i => i !== val) : [...industries, val] })
   }
 
 
@@ -423,7 +513,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between">
           <h1 className="page-title">Candidates</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{candidates.length} total</span>
+            <span className="text-sm text-gray-400">{loading ? '' : `${candidates.length} total`}</span>
             <AddCandidatesPanel onAdded={fetchCandidates} />
           </div>
         </div>
@@ -445,7 +535,7 @@ export default function AdminDashboard() {
           <IndustryFilter
             industries={industries}
             toggleIndustry={toggleIndustry}
-            clearIndustries={() => setIndustries([])}
+            clearIndustries={() => setParams({ industry: null })}
           />
 
           <div className="w-px h-4 bg-gray-200 hidden sm:block" />
@@ -453,7 +543,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-gray-400 mr-0.5">Status</span>
             {['', ...STATUS_OPTIONS].map(s => (
-              <button key={s} type="button" onClick={() => setStatus(s)}
+              <button key={s} type="button" onClick={() => setParams({ status: s })}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all capitalize ${
                   status === s
                     ? 'bg-indigo-600 text-white'
@@ -469,7 +559,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-gray-400 mr-0.5">Type</span>
             {['', ...EMPLOYMENT_OPTIONS].map(e => (
-              <button key={e} type="button" onClick={() => setEmployment(e)}
+              <button key={e} type="button" onClick={() => setParams({ type: e })}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   employment === e
                     ? 'bg-indigo-600 text-white'
@@ -485,7 +575,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-gray-400 mr-0.5">Interviewed</span>
             {(['all', 'yes', 'no'] as const).map(v => (
-              <button key={v} type="button" onClick={() => setInterviewedFilter(v)}
+              <button key={v} type="button" onClick={() => setParams({ interviewed: v === 'all' ? null : v })}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   interviewedFilter === v
                     ? 'bg-indigo-600 text-white'
@@ -501,20 +591,26 @@ export default function AdminDashboard() {
 
         {/* Results */}
         {loading ? (
-          <div className="text-sm text-gray-400 py-12 text-center">Loading...</div>
+          <CandidateRowsSkeleton />
         ) : candidates.length === 0 ? (
-          <div className="text-sm text-gray-400 py-12 text-center">No candidates found.</div>
+          <div className={`text-sm text-gray-400 py-12 text-center ${refreshing ? 'opacity-50' : ''}`}>No candidates found.</div>
         ) : (
-          <div className="space-y-3">
+          // Dimmed while the next set loads, so a click visibly did something
+          // without the list vanishing from under you.
+          <div className={`space-y-3 transition-opacity ${refreshing ? 'opacity-60' : ''}`}>
             {candidates.map(c => {
               const assignedJobIds = jobAssignments[c.id] ?? []
               const actions = jobActions[c.id] ?? {}
               const isExpanded = expandedAssign === c.id
 
               return (
-                <div key={c.id} className="w-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div key={c.id} className={`w-full bg-white rounded-xl border shadow-sm overflow-hidden transition-[box-shadow,border-color] duration-700 ${
+                  lastOpened === c.id ? 'border-indigo-300 ring-2 ring-indigo-200' : 'border-gray-100'
+                }`}>
                   {/* Candidate info — links to detail */}
-                  <Link href={`/dashboard/admin/candidates/${c.id}`} className="block px-5 py-4 group hover:bg-gray-50/60 transition-colors">
+                  <Link href={`/dashboard/admin/candidates/${c.id}`}
+                    onClick={() => { try { sessionStorage.setItem(LAST_OPENED_KEY, c.id) } catch {} }}
+                    className="block px-5 py-4 group hover:bg-gray-50/60 transition-colors">
                     <div className="flex items-center justify-between gap-4">
                       <div className="shrink-0 w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-sm select-none">
                         {c.full_name?.charAt(0)?.toUpperCase() ?? '?'}

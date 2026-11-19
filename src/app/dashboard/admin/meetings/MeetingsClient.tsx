@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import ErrorNote from '@/components/ErrorNote'
 import BookingToggle from './BookingToggle'
+import { replaceQuery } from '@/lib/useQueryParams'
 
 type PendingRequest = {
   assignmentId: string
@@ -43,11 +44,16 @@ type ScheduleForm = {
   notes: string
 }
 
-export default function MeetingsClient() {
+export default function MeetingsClient({ initialTab = 'screening' }: { initialTab?: 'screening' | 'employer' }) {
   const [pending, setPending] = useState<PendingRequest[]>([])
   const [scheduled, setScheduled] = useState<ScheduledMeeting[]>([])
   const [screenings, setScreenings] = useState<ScreeningCall[]>([])
-  const [tab, setTab] = useState<'screening' | 'employer'>('screening')
+  const [tab, setTabState] = useState<'screening' | 'employer'>(initialTab)
+  // Kept in the address so Back from a candidate returns to the same tab.
+  function setTab(next: 'screening' | 'employer') {
+    setTabState(next)
+    replaceQuery({ tab: next === 'employer' ? 'employer' : null })
+  }
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [form, setForm] = useState<ScheduleForm>({ scheduled_at: '', notes: '' })
