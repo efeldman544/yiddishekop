@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import VideoPlayer from '@/app/dashboard/employer/candidates/[id]/VideoPlayer'
-import BackButton from '@/components/BackButton'
+import CandidateTopBar from '../../candidates/[id]/CandidateTopBar'
 
 export default async function AdminVideoCandidatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -23,15 +23,18 @@ export default async function AdminVideoCandidatePage({ params }: { params: Prom
   }
 
   return (
-    <div className="px-8 py-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <BackButton fallback="/dashboard/admin/videos" label="Back to videos" />
-      </div>
+    // Same shape as a profile's page: the bar pinned at the top, with Previous
+    // / Next through the Candidates list it was opened from.
+    <main className="px-8 pb-8 space-y-6">
+      <CandidateTopBar
+        candidateId={c.id}
+        source="video"
+        name={c.name}
+        subtitle={[c.current_job_title, c.location].filter(Boolean).join(' · ')}
+      />
 
       <div>
-        <h2 className="page-title">{c.name}</h2>
-        <p className="text-sm text-gray-400 mt-0.5">{[c.current_job_title, c.location].filter(Boolean).join(' · ')}</p>
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="flex flex-wrap gap-1.5">
           {c.fields_worked_in?.map(f => (
             <span key={f} className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">{f}</span>
           ))}
@@ -69,6 +72,6 @@ export default async function AdminVideoCandidatePage({ params }: { params: Prom
           </CardContent>
         </Card>
       )}
-    </div>
+    </main>
   )
 }

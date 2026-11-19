@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import TranscriptsStatus from './TranscriptsStatus'
 import { useToast, useUndoableRemove } from '@/components/Toaster'
+import { useQueryParams } from '@/lib/useQueryParams'
+import { ListPageSkeleton } from '@/components/PageSkeleton'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -249,7 +251,23 @@ type NameSuggestion = { match: CandidateOption; confidence: 'high' | 'medium' | 
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function VideosPage() {
+// useSearchParams (for the tab) needs a Suspense boundary above it.
+export default function VideosPageWithTabs() {
+  return (
+    <Suspense fallback={<ListPageSkeleton />}>
+      <VideosPage />
+    </Suspense>
+  )
+}
+
+// One list at a time, instead of recordings, video candidates and the bulk
+// import stacked down one long page. The tab is in the address, so Back from a
+// video candidate returns to the same one.
+type VideosTab = 'unassigned' | 'candidates'
+
+function VideosPage() {
+  const [params, setParams] = useQueryParams()
+  const tab: VideosTab = params.get('tab') === 'candidates' ? 'candidates' : 'unassigned'
   const [unassigned, setUnassigned] = useState<UnassignedVideo[]>([])
   const [videoCandidates, setVideoCandidates] = useState<VideoCandidate[]>([])
   const toast = useToast()
@@ -776,11 +794,26 @@ export default function VideosPage() {
         </div>
       )}
 
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        {([
+          ['unassigned', 'Unassigned recordings', shownUnassigned.length],
+          ['candidates', 'Video-only candidates', shownVideoCandidates.length],
+        ] as const).map(([key, label, n]) => (
+          <button key={key} type="button" onClick={() => setParams({ tab: key === 'unassigned' ? null : key })}
+            aria-current={tab === key ? 'page' : undefined}
+            className={`-mb-px px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
+            }`}>
+            {label}
+            <span className={`ml-1.5 ${tab === key ? 'text-indigo-400' : 'text-gray-400'}`}>({n})</span>
+          </button>
+        ))}
+      </div>
+
       {/* Unassigned recordings */}
-      <section className="space-y-3">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-          Unassigned recordings ({shownUnassigned.length})
-        </h3>
+      <section className={tab === 'unassigned' ? 'space-y-3' : 'hidden'}>
+        {/* The tab names the list; this says what it is for. */}
+        <p className="text-sm text-gray-500">Recordings that aren’t attached to a candidate yet.</p>
         {shownUnassigned.length === 0 ? (
           <p className="text-sm text-gray-400">None.</p>
         ) : shownUnassigned.map(v => (
@@ -853,11 +886,9 @@ export default function VideosPage() {
       </section>
 
       {/* Video-only candidates */}
-      <section className="space-y-3">
+      <section className={tab === 'candidates' ? 'space-y-3' : 'hidden'}>
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-            Video-only candidates ({shownVideoCandidates.length})
-          </h3>
+          <p className="text-sm text-gray-500">People known only from a video interview. They’re also listed under Candidates.</p>
           {videoCandidates.length > 0 && (
             <div className="flex items-center gap-3">
               {rematchResult && <span className="text-xs text-emerald-600">{rematchResult}</span>}
