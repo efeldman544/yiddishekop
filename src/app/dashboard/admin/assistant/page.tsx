@@ -110,7 +110,12 @@ export default function AssistantPage() {
       }
       setError(`Stopped after ${MAX_ROUNDS} rounds of lookups. Ask it to continue, or narrow the question.`)
     } catch (e) {
-      setError(humanError(e, 'Couldn’t reach the assistant.'))
+      // This page is for the admin only, so the server's own sentence is shown
+      // as it is — it names what went wrong, where the general error tidier
+      // would hide it behind "something went wrong".
+      const raw = e instanceof Error ? e.message.trim() : ''
+      const friendly = humanError(e, '')
+      setError(friendly && friendly !== raw ? friendly : `Couldn’t get an answer${raw ? `: ${raw.slice(0, 400)}` : '.'}`)
     } finally {
       setActivity(null)
     }

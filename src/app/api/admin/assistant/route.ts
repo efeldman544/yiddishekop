@@ -96,8 +96,11 @@ async function think(messages: Anthropic.Beta.BetaMessageParam[]): Promise<Anthr
       fallbacks: 'default',
     } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming)
   } catch (err) {
-    // An account or SDK without fallbacks: ask again without them.
-    if (err instanceof Anthropic.BadRequestError && /fallback/i.test(err.message)) {
+    // Rejected outright: ask once more without the fallback option, in case
+    // that is what this account doesn't accept. Anything else in the request
+    // that's wrong fails the same way again and is reported.
+    if (err instanceof Anthropic.BadRequestError) {
+      console.error('assistant request rejected, retrying without fallbacks:', err.message)
       return getAnthropic().beta.messages.create(params)
     }
     throw err
