@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument } from 'pdf-lib'
 import { resumeFileName } from '@/lib/resumeUrl'
 import {
   contactRanges, emailRanges, findRedactionBoxes, knownRanges, nameMentioned, nameRanges,
@@ -407,6 +407,56 @@ async function hasPictures(
   }
 }
 
+/**
+ * The résumé exactly as it was uploaded, for an admin.
+ *
+ * Admins used to get everything but photos through the employer pipeline —
+ * converted, redacted, read with OCR — so any step that failed (an old .doc,
+ * a Word file that wouldn't convert, a PDF with broken fonts or a password,
+ * a slow scan) refused the admin as well. An admin can see the candidate's
+ * details anyway, so none of that is needed: they get the file. "As
+ * employers see it" (?as=employer) still shows the redacted copy.
+ */
+async function serveOriginal(db: SupabaseClient, resumeUrl: string, fullName: string | null): Promise<NextResponse> {
+  const fetched = await downloadResume(db, resumeUrl)
+  if (fetched instanceof NextResponse) {
+    // A résumé hosted elsewhere that blocked our server: send the admin's own
+    // browser to it instead, which the site usually lets through.
+    const storageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resumes/`
+    if (/^https?:\/\//i.test(resumeUrl) && !resumeUrl.startsWith(storageBase)) return NextResponse.redirect(resumeUrl)
+    return fetched
+  }
+  const buffer = fetched
+  const head = buffer.subarray(0, 1024).toString('latin1')
+  const first = resumeFileName(fullName).replace(' (redacted).pdf', '')
+  const send = (body: Buffer, type: string, disposition: 'inline' | 'attachment', ext: string) =>
+    new NextResponse(new Uint8Array(body), {
+      headers: {
+        'Content-Type': type,
+        'Content-Disposition': `${disposition}; filename="${first}.${ext}"`,
+        // Never cached anywhere shared: this is the unredacted original.
+        'Cache-Control': 'private, no-store',
+      },
+    })
+
+  if (head.includes('%PDF')) return send(buffer, 'application/pdf', 'inline', 'pdf')
+  const imageType = sniffImage(buffer) ?? (/^[\s\S]{4}ftyp(heic|heix|mif1|hevc)/.test(head) ? 'image/heic' : null)
+  if (imageType) return send(buffer, imageType, 'inline', imageType.split('/')[1])
+  if (head.startsWith('PK')) {
+    // Shown as a PDF when it converts, so it opens in the browser; otherwise
+    // the Word file itself, to open in Word.
+    try {
+      return send(await docxToPdf(buffer), 'application/pdf', 'inline', 'pdf')
+    } catch (e) {
+      console.error('docx conversion failed, sending the original:', e)
+      return send(buffer, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'attachment', 'docx')
+    }
+  }
+  if (head.startsWith('\xD0\xCF\x11\xE0')) return send(buffer, 'application/msword', 'attachment', 'doc')
+  if (/<!doctype html|<html/i.test(head) && /^https?:\/\//i.test(resumeUrl)) return NextResponse.redirect(resumeUrl)
+  return send(buffer, 'application/octet-stream', 'attachment', 'bin')
+}
+
 function pdfResponse(bytes: Uint8Array, fullName: string | null): NextResponse {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
@@ -442,6 +492,7 @@ export async function serveResume(db: SupabaseClient, candidateId: string, viewe
     .eq('id', candidateId)
     .maybeSingle<{ resume_url: string | null; full_name: string | null; email: string | null; phone: string | null; whatsapp: string | null }>()
   if (!cp?.resume_url) return new NextResponse('No resume found', { status: 404 })
+  if (isAdmin) return serveOriginal(db, cp.resume_url, cp.full_name)
   const known = knownFromProfile(cp)
 
   const fetched = await downloadResume(db, cp.resume_url)
@@ -451,24 +502,6 @@ export async function serveResume(db: SupabaseClient, candidateId: string, viewe
   if (!buffer.subarray(0, 1024).toString('latin1').includes('%PDF')) {
     const head = buffer.subarray(0, 512).toString('latin1')
 
-    // An admin gets a photographed resume exactly as it was uploaded — they
-    // can see the candidate's details on the page they clicked from, and
-    // shouldn't be refused a resume for the sake of a redaction they don't
-    // need. Employers still go through all of it.
-    if (isAdmin) {
-      const imageType = sniffImage(buffer)
-        ?? (/^[\s\S]{4}ftyp(heic|heix|mif1|hevc)/.test(head) ? 'image/heic' : null)
-      if (imageType) {
-        return new NextResponse(new Uint8Array(buffer), {
-          headers: {
-            'Content-Type': imageType,
-            'Content-Disposition': 'inline',
-            // Never cached anywhere shared: this is the unredacted original.
-            'Cache-Control': 'private, no-store',
-          },
-        })
-      }
-    }
     if (head.startsWith('PK')) {
       // Word document — convert to PDF, then redact it like any other PDF
       try {
@@ -509,22 +542,8 @@ export async function serveResume(db: SupabaseClient, candidateId: string, viewe
     // nothing still reads as contact details.
     const scanned = textLength < 50 && ocrLength < MIN_OCR_TEXT
     const unverified = textLength >= 50 && !anchored
-    if ((scanned || leaked || unverified) && !isAdmin) return new NextResponse(REFUSED_MESSAGE, { status: 422 })
-
-    if (scanned || leaked || unverified) {
-      const firstPage = out.getPages()[0]
-      const { width, height } = firstPage.getSize()
-      const font = await out.embedFont(StandardFonts.Helvetica)
-      firstPage.drawRectangle({ x: 0, y: height - 28, width, height: 28, color: rgb(0.98, 0.93, 0.73) })
-      firstPage.drawText(
-        leaked
-          ? 'Contact details on this resume may not be fully redacted — please do not contact the candidate directly'
-          : scanned
-            ? 'Scanned document that could not be read — contact details were not checked'
-            : 'The text inside this PDF does not match what is printed — contact details could not be checked',
-        { x: 10, y: height - 18, size: 9, font, color: rgb(0.45, 0.35, 0.05) },
-      )
-    }
+    // Only employers get this far; anything that can't be vouched for is refused.
+    if (scanned || leaked || unverified) return new NextResponse(REFUSED_MESSAGE, { status: 422 })
     return pdfResponse(await out.save(), cp.full_name)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
