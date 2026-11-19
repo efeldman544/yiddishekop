@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import MeetingsClient from './MeetingsClient'
 
 // Meetings used to be a tab inside Matching, which only ever fitted half of
@@ -6,19 +7,16 @@ import MeetingsClient from './MeetingsClient'
 // screening calls are between us and a candidate, before any employer is
 // involved, and had nothing to do with matching at all. It is its own section
 // now, with the two kinds named separately on the page.
-export default async function AdminMeetingsPage({
-  searchParams,
-}: {
-  // ?tab=employer opens on employer interviews — for Back, and notifications.
-  searchParams: Promise<{ tab?: string }>
-}) {
-  const { tab } = await searchParams
+export default function AdminMeetingsPage() {
   return (
     <main className="px-8 py-6">
       {/* The tabs below name the two kinds, so repeating them here would be
           saying the same thing twice in a row. */}
       <h1 className="page-title mb-5">Meetings</h1>
-      <MeetingsClient initialTab={tab === 'employer' ? 'employer' : 'screening'} />
+      {/* Reads ?tab= itself; Suspense is what lets it do that on this page. */}
+      <Suspense fallback={null}>
+        <MeetingsClient />
+      </Suspense>
     </main>
   )
 }

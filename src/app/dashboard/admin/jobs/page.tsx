@@ -1,15 +1,11 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import JobsClient, { type Job } from './JobsClient'
 import { employerLabel, type EmployerOption } from './employerLabel'
 
-export default async function AdminJobsPage({
-  searchParams,
-}: {
-  // ?tab=employers&employer=<id>: which tab, and which employer's candidates
-  // are open — so Back, and a notification, land on the right place.
-  searchParams: Promise<{ tab?: string; employer?: string }>
-}) {
-  const { tab, employer } = await searchParams
+// ?tab=employers&employer=<id> (which view, which employer is open) is read
+// by JobsClient itself, so the page follows the address as it changes.
+export default async function AdminJobsPage() {
   const supabase = await createClient()
 
   const [{ data: jobData }, { data: empData }, { data: profileData }] = await Promise.all([
@@ -29,11 +25,12 @@ export default async function AdminJobsPage({
   const initialJobs = (jobData as Job[]) ?? []
 
   return (
+    // JobsClient reads ?tab= and ?employer= itself, which needs a Suspense boundary.
+    <Suspense fallback={null}>
     <JobsClient
       initialJobs={initialJobs}
       initialEmployers={initialEmployers}
-      initialTab={tab === 'employers' || employer ? 'employers' : 'jobs'}
-      initialEmployerId={employer ?? null}
     />
+    </Suspense>
   )
 }

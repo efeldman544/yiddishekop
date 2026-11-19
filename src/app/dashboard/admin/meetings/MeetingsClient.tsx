@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +46,7 @@ type ScheduleForm = {
   notes: string
 }
 
-export default function MeetingsClient({ initialTab = 'screening' }: { initialTab?: 'screening' | 'employer' }) {
+export default function MeetingsClient() {
   const [pending, setPending] = useState<PendingRequest[]>([])
   const [allScheduled, setScheduled] = useState<ScheduledMeeting[]>([])
   const [allScreenings, setScreenings] = useState<ScreeningCall[]>([])
@@ -53,10 +54,10 @@ export default function MeetingsClient({ initialTab = 'screening' }: { initialTa
   // Deleted ones stay off screen during their Undo window.
   const scheduled = allScheduled.filter(m => !hidden.has(m.id))
   const screenings = allScreenings.filter(s => !hidden.has(s.id))
-  const [tab, setTabState] = useState<'screening' | 'employer'>(initialTab)
-  // Kept in the address so Back from a candidate returns to the same tab.
+  // The tab is the address's ?tab=, read every render, so Back, a notification
+  // or a link always shows the tab the address names.
+  const tab: 'screening' | 'employer' = useSearchParams().get('tab') === 'employer' ? 'employer' : 'screening'
   function setTab(next: 'screening' | 'employer') {
-    setTabState(next)
     replaceQuery({ tab: next === 'employer' ? 'employer' : null })
   }
   const [loading, setLoading] = useState(true)
