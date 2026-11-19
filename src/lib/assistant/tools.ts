@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { IMAGE_MODEL, getAnthropic } from '@/lib/ai/models'
 import { loadResume } from '@/lib/resumeContent'
+import { resumesUrl, serviceClient, stagedPath } from '@/lib/assistant/storage'
 
 // SERVER ONLY.
 //
@@ -87,6 +88,19 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'read_attached_file',
+    description:
+      'The text of a file the admin attached in this chat — usually a résumé to add as a new candidate, or to put on an '
+      + 'existing candidate. The file id appears in the admin\'s message as "file_id: ...".',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['file_id'],
+      properties: { file_id: { type: 'string' } },
+    },
+  },
+  {
     name: 'list_jobs',
     description: 'Jobs on the job board, newest first, with their id, title, company and status.',
     strict: true,
@@ -135,6 +149,12 @@ export async function runTool(db: SupabaseClient, call: { id: string; name: stri
       case 'read_transcript': return ok(call.id, await readTranscript(db, String(input.id ?? ''), input.kind === 'video' ? 'video' : 'profile'))
       case 'list_jobs': return ok(call.id, await listJobs(db, str(input.status)))
       case 'get_job': return ok(call.id, await getJob(db, String(input.id ?? '')))
+      case 'read_attached_file': {
+        const path = stagedPath(input.file_id)
+        if (!path) return fail(call.id, 'That is not a file attached in this chat.')
+        // Attached files sit in a holding folder only the server role reads.
+        return ok(call.id, `Attached file:\n\n${await readResumeFile(serviceClient(), resumesUrl(path))}`)
+      }
       default: return fail(call.id, `There is no tool called ${call.name}.`)
     }
   } catch (e) {
@@ -306,8 +326,13 @@ async function readResume(db: SupabaseClient, id: string): Promise<string> {
   if (stored?.trim()) return `Résumé text:\n\n${cut(stored.trim())}`
 
   // Not read yet (no card built). Read it now.
+  return readResumeFile(db, resumeUrl)
+}
+
+/** The text of a résumé file: read directly, or transcribed when it's a photo or a scan. */
+async function readResumeFile(db: SupabaseClient, resumeUrl: string): Promise<string> {
   const resume = await loadResume(db, resumeUrl)
-  if (resume.kind === 'none') return 'This candidate has no résumé on file.'
+  if (resume.kind === 'none') return 'There is no file there.'
   if (resume.kind === 'unreadable') return `The résumé couldn't be read: ${resume.note}.`
   if (resume.kind === 'text') return `Résumé text:\n\n${cut(resume.text)}`
 
