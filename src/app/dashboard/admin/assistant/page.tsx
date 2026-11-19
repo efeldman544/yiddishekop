@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type Anthropic from '@anthropic-ai/sdk'
 import { ACTION_NAMES, describeCall } from '@/lib/assistant/labels'
@@ -9,14 +9,17 @@ import ErrorNote from '@/components/ErrorNote'
 import { notifyAssigned } from '@/lib/notifyAssigned'
 import { refreshCandidateCard } from '@/lib/refreshCard'
 import { useToast } from '@/components/Toaster'
+import { useQueryParams } from '@/lib/useQueryParams'
 
 // Ask questions about candidates, résumés, interviews and jobs, answered from
 // the records. The page runs the conversation: it asks the model, runs the
 // lookups the model asks for, and repeats until there is an answer — one
 // request per round, so no single request has to last long.
 //
-// The conversation is kept in this browser tab, so following a link to a
-// candidate and coming back keeps it.
+// Each chat is saved (supabase/assistant_chats.sql) as it goes and listed
+// under Recent chats; the open one is in the address (?chat=), and is also
+// kept in this tab so following a link to a candidate and coming back is
+// instant.
 //
 // When the model asks to change something, the loop stops and shows a card
 // for each change, worded by the server from the records. It carries on once
@@ -26,7 +29,11 @@ type Msg = Anthropic.Beta.BetaMessageParam
 type Block = Anthropic.Beta.BetaContentBlock
 type ToolUse = Anthropic.Beta.BetaToolUseBlock
 
-const STORE_KEY = 'admin-assistant:v1'
+const STORE_KEY = 'admin-assistant:v2'
+// A chat older than this gets a note that the records may have moved on.
+const STALE_MS = 24 * 3_600_000
+
+type ChatSummary = { id: string; title: string; cost_usd: number; updated_at: string }
 // Rounds of lookups for one question before stopping to ask the admin.
 const MAX_ROUNDS = 12
 
@@ -63,29 +70,66 @@ async function post<T>(body: object): Promise<T> {
   return res.json() as Promise<T>
 }
 
-function load(): { messages: Msg[]; cost: number } {
+/**
+ * A chat left waiting on a confirmation — the tab was closed, or it was saved
+ * mid-question — gets those changes recorded as not made, or it can't go on.
+ */
+function closeUnanswered(messages: Msg[]): Msg[] {
+  const last = messages[messages.length - 1]
+  const unanswered = last?.role === 'assistant' && Array.isArray(last.content)
+    ? (last.content as Block[]).filter((b): b is ToolUse => b.type === 'tool_use') : []
+  if (!unanswered.length) return messages
+  return [...messages, {
+    role: 'user',
+    content: unanswered.map(c => ({ type: 'tool_result' as const, tool_use_id: c.id, content: 'Not done: the chat was closed before this was confirmed.' })),
+  }]
+}
+
+function load(): { chatId: string | null; messages: Msg[]; cost: number } {
   try {
     const raw = sessionStorage.getItem(STORE_KEY)
     if (raw) {
-      const saved = JSON.parse(raw) as { messages: Msg[]; cost: number }
-      // Left waiting on a confirmation when the page was closed: those changes
-      // weren't made, and the conversation can't continue until they're answered.
-      const last = saved.messages[saved.messages.length - 1]
-      const unanswered = last?.role === 'assistant' && Array.isArray(last.content)
-        ? (last.content as Block[]).filter((b): b is ToolUse => b.type === 'tool_use') : []
-      if (unanswered.length) {
-        saved.messages = [...saved.messages, {
-          role: 'user',
-          content: unanswered.map(c => ({ type: 'tool_result' as const, tool_use_id: c.id, content: 'Not done: the page was closed before this was confirmed.' })),
-        }]
-      }
-      return saved
+      const saved = JSON.parse(raw) as { chatId: string | null; messages: Msg[]; cost: number }
+      return { ...saved, messages: closeUnanswered(saved.messages) }
     }
   } catch {}
-  return { messages: [], cost: 0 }
+  return { chatId: null, messages: [], cost: 0 }
 }
 
-export default function AssistantPage() {
+/** What the chat is called in the list: its first question. */
+function chatTitle(messages: Msg[]): string {
+  const first = messages.find(m => m.role === 'user' && typeof m.content === 'string')
+  const text = typeof first?.content === 'string' ? first.content.split('\n\n')[0] : ''
+  return text.trim().slice(0, 120) || 'Untitled chat'
+}
+
+function when(iso: string): string {
+  const d = new Date(iso)
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+async function chatsApi<T>(method: 'GET' | 'POST' | 'DELETE', query = '', body?: object): Promise<{ status: number; data: T | null; text: string }> {
+  const res = await fetch(`/api/admin/assistant/chats${query}`, {
+    method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  })
+  const text = await res.text().catch(() => '')
+  let data: T | null = null
+  try { data = JSON.parse(text) as T } catch {}
+  return { status: res.status, data, text }
+}
+
+// useSearchParams (for ?chat=) needs a Suspense boundary above it.
+export default function AssistantPageWithChats() {
+  return (
+    <Suspense fallback={null}>
+      <AssistantPage />
+    </Suspense>
+  )
+}
+
+function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [cost, setCost] = useState(0)
   const [input, setInput] = useState('')
@@ -100,20 +144,103 @@ export default function AssistantPage() {
   const toast = useToast()
   const busy = activity !== null || pending !== null || uploading
 
-  // Restored after the first paint (sessionStorage doesn't exist on the server).
+  // Saved chats. `historyReady` is false until the SQL has been run.
+  const [params, setParams] = useQueryParams()
+  const chatParam = params.get('chat')
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [chats, setChats] = useState<ChatSummary[] | null>(null)
+  const [historyReady, setHistoryReady] = useState<boolean | null>(null)
+  const [keepDays, setKeepDays] = useState(60)
+  /** When the open chat was last used, if that was long enough ago to warn about. */
+  const [openedAt, setOpenedAt] = useState<string | null>(null)
+  const [saveNote, setSaveNote] = useState<string | null>(null)
+  const [hiddenChats, setHiddenChats] = useState<ReadonlySet<string>>(new Set())
+  // What was last saved (or loaded), so opening a chat doesn't save it again —
+  // that would move it to the top, reset its date and restart its 60 days.
+  const savedSnapshot = useRef<string | null>(null)
+  const snapshot = (m: Msg[], c: number) => JSON.stringify([m, c])
+
+  async function refreshList() {
+    const r = await chatsApi<{ ready: boolean; chats?: ChatSummary[]; keepDays?: number }>('GET')
+    if (r.status === 409) { setHistoryReady(false); return }
+    if (r.data?.chats) { setChats(r.data.chats); setHistoryReady(true); if (r.data.keepDays) setKeepDays(r.data.keepDays) }
+  }
+
+  async function openChat(id: string) {
+    if (activity !== null || uploading) return
+    const r = await chatsApi<{ chat?: ChatSummary & { messages: Msg[] } }>('GET', `?id=${encodeURIComponent(id)}`)
+    if (!r.data?.chat) { setError(r.status === 404 ? 'That chat no longer exists.' : 'Couldn’t open that chat.'); setParams({ chat: null }); return }
+    const loaded = closeUnanswered(r.data.chat.messages)
+    const loadedCost = Number(r.data.chat.cost_usd) || 0
+    savedSnapshot.current = snapshot(r.data.chat.messages, loadedCost)
+    setMessages(loaded)
+    setCost(loadedCost)
+    setChatId(id)
+    // An old chat gets a note that the records may have moved on since.
+    const updated = r.data.chat.updated_at
+    setOpenedAt(Date.now() - new Date(updated).getTime() > STALE_MS ? updated : null)
+    setPending(null); setError(null); setAttachments([])
+    setParams({ chat: id })
+  }
+
+  // Restored after the first paint (sessionStorage doesn't exist on the server):
+  // the chat named in the address if there is one, else whatever this tab had.
   useEffect(() => {
     const t = setTimeout(() => {
       const saved = load()
-      setMessages(saved.messages)
-      setCost(saved.cost)
-      setRestored(true)
+      if (chatParam && chatParam !== saved.chatId) {
+        openChat(chatParam).finally(() => setRestored(true))
+      } else {
+        savedSnapshot.current = snapshot(saved.messages, saved.cost)
+        setMessages(saved.messages)
+        setCost(saved.cost)
+        setChatId(saved.chatId)
+        if (saved.chatId && !chatParam) setParams({ chat: saved.chatId })
+        setRestored(true)
+      }
+      refreshList()
     }, 0)
     return () => clearTimeout(t)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!restored) return
-    try { sessionStorage.setItem(STORE_KEY, JSON.stringify({ messages, cost })) } catch {}
-  }, [messages, cost, restored])
+    try { sessionStorage.setItem(STORE_KEY, JSON.stringify({ chatId, messages, cost })) } catch {}
+  }, [chatId, messages, cost, restored])
+
+  // Saved a moment after each change, so a chat is never more than a round behind.
+  useEffect(() => {
+    if (!restored || !chatId || messages.length === 0 || historyReady === false) return
+    const current = snapshot(messages, cost)
+    if (current === savedSnapshot.current) return
+    const t = setTimeout(async () => {
+      const title = chatTitle(messages)
+      const r = await chatsApi('POST', '', { id: chatId, title, messages, cost_usd: cost })
+      if (r.status === 409) { setHistoryReady(false); return }
+      if (r.status === 413) { setSaveNote('This chat is too long to save any more. Start a new one to keep saving.'); return }
+      if (r.status >= 400) { setSaveNote('Couldn’t save this chat just now; it will try again with the next message.'); return }
+      savedSnapshot.current = current
+      setSaveNote(null)
+      setHistoryReady(true)
+      const now = new Date().toISOString()
+      setChats(prev => [{ id: chatId, title, cost_usd: cost, updated_at: now }, ...(prev ?? []).filter(c => c.id !== chatId)])
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [messages, cost, chatId, restored, historyReady])
+
+  function deleteChat(id: string) {
+    setHiddenChats(prev => new Set(prev).add(id))
+    if (id === chatId) newChat()
+    toast.undoable({
+      message: 'Chat deleted',
+      failure: 'Couldn’t delete that chat, so it has been put back.',
+      commit: async () => {
+        const r = await chatsApi('DELETE', `?id=${encodeURIComponent(id)}`)
+        if (r.status >= 400) throw new Error(r.text)
+        setChats(prev => (prev ?? []).filter(c => c.id !== id))
+      },
+      restore: () => setHiddenChats(prev => { const next = new Set(prev); next.delete(id); return next }),
+    })
+  }
   useEffect(() => { bottom.current?.scrollIntoView({ block: 'end' }) }, [messages, activity, pending])
 
   /** Keep going until the model answers, it has looked things up MAX_ROUNDS times, or something fails. */
@@ -222,6 +349,13 @@ export default function AssistantPage() {
     ].join('\n\n')
     setInput('')
     setAttachments([])
+    // A new chat gets its id with its first question, and is saved from then on.
+    if (!chatId) {
+      const id = crypto.randomUUID()
+      setChatId(id)
+      setOpenedAt(null)
+      setParams({ chat: id })
+    }
     const next: Msg[] = [...messages, { role: 'user', content: question }]
     setMessages(next)
     run(next)
@@ -230,14 +364,53 @@ export default function AssistantPage() {
   function newChat() {
     if (activity !== null || uploading) return
     setMessages([]); setCost(0); setError(null); setPending(null); setAttachments([])
+    setChatId(null); setOpenedAt(null); setSaveNote(null)
+    setParams({ chat: null })
   }
 
   // A failed round leaves the conversation waiting on the model; Retry asks again.
   const last = messages[messages.length - 1]
   const canRetry = !busy && !!error && last?.role === 'user'
 
+  const shownChats = (chats ?? []).filter(c => !hiddenChats.has(c.id))
+  // Set only when an old chat is opened (see openChat).
+  const stale = !!openedAt
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex">
+      {/* Recent chats */}
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-gray-100 bg-gray-50/50">
+        <div className="px-4 pt-8 pb-3">
+          <button type="button" onClick={newChat} disabled={activity !== null || uploading}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            + New chat
+          </button>
+        </div>
+        <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Recent chats</p>
+        <div className="flex-1 overflow-y-auto px-2 pb-4">
+          {historyReady === false ? (
+            <p className="px-2 text-xs leading-relaxed text-gray-500">
+              Chats aren’t saved yet. Run <code className="text-[11px]">supabase/assistant_chats.sql</code> in the Supabase SQL Editor once to keep them.
+            </p>
+          ) : chats === null ? (
+            <p className="px-2 text-xs text-gray-400">Loading…</p>
+          ) : shownChats.length === 0 ? (
+            <p className="px-2 text-xs text-gray-400">No saved chats yet.</p>
+          ) : shownChats.map(c => (
+            <div key={c.id} className={`group flex items-start gap-1 rounded-lg px-2 py-2 ${c.id === chatId ? 'bg-indigo-50' : 'hover:bg-white'}`}>
+              <button type="button" onClick={() => openChat(c.id)} disabled={activity !== null || uploading} className="min-w-0 flex-1 text-left">
+                <span className={`block truncate text-sm ${c.id === chatId ? 'font-medium text-indigo-800' : 'text-gray-700'}`}>{c.title || 'Untitled chat'}</span>
+                <span className="block text-[11px] text-gray-400">{when(c.updated_at)}</span>
+              </button>
+              <button type="button" onClick={() => deleteChat(c.id)} title="Delete chat" aria-label={`Delete ${c.title}`}
+                className="shrink-0 px-1 text-gray-300 opacity-0 hover:text-gray-600 group-hover:opacity-100">×</button>
+            </div>
+          ))}
+        </div>
+        {historyReady && <p className="px-4 pb-4 text-[11px] text-gray-400">Chats are deleted after {keepDays} days without use.</p>}
+      </aside>
+
+    <div className="flex-1 min-w-0 h-full flex flex-col">
       <div className="flex items-center justify-between px-8 pt-8 pb-4">
         <div>
           <h1 className="page-title">Assistant</h1>
@@ -245,7 +418,7 @@ export default function AssistantPage() {
         </div>
         {messages.length > 0 && (
           <button type="button" onClick={newChat} disabled={activity !== null || uploading}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            className="lg:hidden text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             New chat
           </button>
         )}
@@ -253,6 +426,11 @@ export default function AssistantPage() {
 
       <div className="flex-1 overflow-y-auto px-8">
         <div className="max-w-3xl space-y-5 pb-6">
+          {stale && messages.length > 0 && (
+            <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              This chat is from {new Date(openedAt!).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Records may have changed since — ask again for current details.
+            </p>
+          )}
           {restored && messages.length === 0 && (
             <div className="pt-6 space-y-3">
               <p className="text-sm text-gray-500">Try asking:</p>
@@ -369,8 +547,14 @@ export default function AssistantPage() {
             Ask
           </button>
         </div>
-        {cost > 0 && <p className="max-w-3xl mt-2 text-[11px] text-gray-400">This chat has cost about ${cost < 0.01 ? '0.01' : cost.toFixed(2)} in AI usage.</p>}
+        {(cost > 0 || saveNote) && (
+          <p className="max-w-3xl mt-2 text-[11px] text-gray-400">
+            {cost > 0 && `This chat has cost about $${cost < 0.01 ? '0.01' : cost.toFixed(2)} in AI usage.`}
+            {saveNote && <span className="ml-1 text-amber-700">{saveNote}</span>}
+          </p>
+        )}
       </form>
+    </div>
     </div>
   )
 }
